@@ -59,6 +59,7 @@ export function RegisterForm() {
         inputMode="email"
         autoComplete="email"
         autoCapitalize="none"
+        spellCheck={false}
         required
         maxLength={AUTH_LIMITS.EMAIL_MAX}
         defaultValue={state.values?.email}

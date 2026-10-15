@@ -20,6 +20,11 @@ const field = (form: FormData, key: string, max: number): string => {
 function messageFor(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 429) return 'Слишком много попыток. Подождите минуту и попробуйте снова.';
+    // Сообщения с подсказкой, что делать дальше.
+    if (error.status === 401) return 'Неверный email или пароль. Проверьте раскладку и Caps Lock.';
+    if (error.status === 409 && error.userMessage?.includes('уже зарегистрирован')) {
+      return 'Этот email уже зарегистрирован. Войдите в аккаунт или укажите другой email.';
+    }
     if (error.status && error.status < 500 && error.userMessage) return error.userMessage;
   }
   console.error('Auth action failed', error);

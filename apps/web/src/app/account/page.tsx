@@ -16,7 +16,9 @@ export default async function AccountPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 pt-10 sm:px-6 md:pt-14">
-      <h1 className="text-3xl font-semibold tracking-tight">Здравствуйте, {user.name}</h1>
+      <h1 className="break-words text-3xl font-semibold tracking-tight">
+        Здравствуйте, {user.name}
+      </h1>
       <p className="mt-2 text-ink-soft">Личный кабинет</p>
 
       <dl className="mt-8 grid gap-x-8 gap-y-5 rounded-2xl border border-line bg-surface p-6 sm:grid-cols-2">

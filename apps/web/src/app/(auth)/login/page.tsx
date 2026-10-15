@@ -12,9 +12,9 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { next } = await searchParams;
+  const [{ next }, user] = await Promise.all([searchParams, getCurrentUser()]);
   const target = safeRedirectPath(Array.isArray(next) ? next[0] : next);
-  if (await getCurrentUser()) redirect(target);
+  if (user) redirect(target);
 
   return (
     <>
