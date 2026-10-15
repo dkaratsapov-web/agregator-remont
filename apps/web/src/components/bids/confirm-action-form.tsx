@@ -1,0 +1,43 @@
+'use client';
+
+import { useActionState } from 'react';
+import { FormError } from '@/components/auth/form-error';
+
+interface State {
+  error?: string;
+}
+
+/** Действие с подтверждением: кнопка подтверждения спрятана за раскрытием. */
+export function ConfirmActionForm({
+  action,
+  summary,
+  explanation,
+  confirmLabel,
+  pendingLabel,
+}: {
+  action: (state: State, form: FormData) => Promise<State>;
+  summary: string;
+  explanation: string;
+  confirmLabel: string;
+  pendingLabel: string;
+}) {
+  const [state, formAction, pending] = useActionState<State, FormData>(action, {});
+  return (
+    <details className="group">
+      <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink hover:border-ink-soft/50 [&::-webkit-details-marker]:hidden">
+        {summary}
+      </summary>
+      <form action={formAction} className="mt-3 space-y-3">
+        <FormError message={state.error} />
+        <p className="text-sm leading-relaxed text-ink-soft">{explanation}</p>
+        <button
+          type="submit"
+          disabled={pending}
+          className="inline-flex min-h-11 items-center rounded-xl bg-accent px-5 font-semibold text-accent-ink transition-colors duration-150 hover:bg-accent-hover disabled:cursor-wait disabled:opacity-70"
+        >
+          {pending ? pendingLabel : confirmLabel}
+        </button>
+      </form>
+    </details>
+  );
+}

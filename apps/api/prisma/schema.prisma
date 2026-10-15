@@ -36,6 +36,20 @@ enum AuditAction {
   JOB_CREATED
   JOB_UPDATED
   JOB_CLOSED
+  JOB_STARTED
+  BID_CREATED
+  BID_WITHDRAWN
+  BID_ACCEPTED
+  BID_REJECTED
+  PROFILE_UPDATED
+}
+
+// Синхронизировано с BID_STATUSES в packages/shared/src/bids.ts.
+enum BidStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
 }
 
 // Синхронизировано с USER_ROLES в packages/shared/src/auth.ts.
@@ -60,6 +74,7 @@ model Job {
   ownerId     String?     @map("owner_id")
   /// Restrict: удаление пользователя не должно молча удалять или «осиротить» его заказы.
   owner       User?       @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  bids        Bid[]
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
 
@@ -82,6 +97,8 @@ model User {
   sessions     Session[]
   jobs         Job[]
   auditLogs    AuditLog[]
+  profile      ContractorProfile?
+  bids         Bid[]
 
   @@map("users")
 }
@@ -117,4 +134,39 @@ model AuditLog {
   @@index([entityType, entityId, createdAt])
   @@index([actorId, createdAt])
   @@map("audit_logs")
+}
+
+/// Профиль подрядчика (1:1 с пользователем роли CONTRACTOR).
+model ContractorProfile {
+  userId          String        @id @map("user_id")
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  about           String        @default("")
+  categories      JobCategory[]
+  cities          String[]
+  experienceYears Int?          @map("experience_years")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  @@map("contractor_profiles")
+}
+
+/// Отклик подрядчика на заказ. Один отклик подрядчика на заказ (уникальный индекс).
+model Bid {
+  id           String    @id @default(cuid())
+  jobId        String    @map("job_id")
+  job          Job       @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  contractorId String    @map("contractor_id")
+  contractor   User      @relation(fields: [contractorId], references: [id], onDelete: Restrict)
+  /// Целые рубли.
+  price        Int
+  durationDays Int?      @map("duration_days")
+  comment      String
+  status       BidStatus @default(PENDING)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@unique([jobId, contractorId])
+  @@index([contractorId, createdAt(sort: Desc)])
+  @@index([jobId, status])
+  @@map("bids")
 }

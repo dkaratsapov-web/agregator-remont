@@ -89,6 +89,7 @@ jobs:
           (cd apps/web && pnpm exec next start --port 3000 > ../../web.log 2>&1 &)
           pnpm smoke
           node scripts/jobs-integration.mjs
+          node scripts/bids-integration.mjs
           # Последним: в конце останавливает API, чтобы проверить выход при сбое API.
           API_PID=$(cat api.pid) node scripts/auth-integration.mjs
 
@@ -132,6 +133,7 @@ jobs:
         run: |
           node scripts/smoke.mjs
           node scripts/jobs-integration.mjs
+          node scripts/bids-integration.mjs
 
       - name: Image sizes
         if: always()

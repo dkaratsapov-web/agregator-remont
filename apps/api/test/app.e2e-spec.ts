@@ -26,6 +26,7 @@ describe('API (e2e)', () => {
   let app: NestExpressApplication;
 
   beforeAll(async () => {
+    await prisma.bid.deleteMany();
     await prisma.job.deleteMany();
     await prisma.job.createMany({ data: fixtures });
 
@@ -37,6 +38,7 @@ describe('API (e2e)', () => {
 
   afterAll(async () => {
     await app.close();
+    await prisma.bid.deleteMany();
     await prisma.job.deleteMany();
     await prisma.$disconnect();
   });

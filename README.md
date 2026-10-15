@@ -94,13 +94,15 @@ curl -s localhost:4000/v1/jobs/demo-job-01
 pnpm build && pnpm start   # в отдельном терминале
 pnpm smoke                 # HTTP-коды, рендер данных из API, 404, заголовки безопасности и CSP
 node scripts/jobs-integration.mjs   # заказы через формы web → API, права доступа, CSRF
+node scripts/bids-integration.mjs   # профиль, отклики, выбор исполнителя через формы
 node scripts/auth-integration.mjs   # вход/выход, CSRF, лимиты (нужны env как в CI, см. ci.yml)
 ```
 
 ## Аккаунты
 
 Web: `/register`, `/login`, `/account`; для заказчика `/account/jobs` (мои заказы),
-`/account/jobs/new`, `/account/jobs/:id` (правка и закрытие). Сессия хранится в HttpOnly-cookie, web передаёт её API как
+`/account/jobs/new`, `/account/jobs/:id` (правка, закрытие, отклики и выбор исполнителя); для
+подрядчика `/account/profile` и `/account/bids`, отклик — на странице заказа `/jobs/:id`. Сессия хранится в HttpOnly-cookie, web передаёт её API как
 `Authorization: Bearer`. Подробности и ограничения: [docs/SECURITY.md](docs/SECURITY.md), раздел 5.
 
 ## Безопасность (что сделано на этом этапе)

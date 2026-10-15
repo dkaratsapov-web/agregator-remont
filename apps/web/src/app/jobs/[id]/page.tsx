@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import { StatusBadge } from '@/components/status-badge';
-import { getJob, getMyJob } from '@/lib/api';
+import type { MyBidDto, UserDto } from '@agregator/shared';
+import { RespondPanel } from '@/components/bids/respond-panel';
+import { getJob, getMyJob, listMyBids } from '@/lib/api';
 import { getCurrentUser, getSessionToken } from '@/lib/session';
 import { formatBudget, formatDate } from '@/lib/format';
 import { jobsHref } from '@/lib/search-params';
@@ -22,21 +24,50 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   return { title: job.title, description: job.description.slice(0, 160) };
 }
 
-/** Свой ли это заказ: только для заказчика, через API кабинета (404 для чужого). */
-async function isOwnJob(id: string): Promise<boolean> {
-  const [user, token] = await Promise.all([getCurrentUser(), getSessionToken()]);
-  if (!user || !token || user.role !== 'CUSTOMER') return false;
-  try {
-    return (await getMyJob(token, id)) !== null;
-  } catch {
-    return false;
-  }
+interface Viewer {
+  user: UserDto | null;
+  /** Заказчик-владелец этого заказа (проверяется API кабинета: чужой заказ даёт 404). */
+  own: boolean;
+  /** Отклик подрядчика на этот заказ, если есть. */
+  myBid: MyBidDto | null;
 }
 
-export default async function JobPage({ params }: { params: Params }) {
-  const { id } = await params;
-  const [job, own] = await Promise.all([loadJob(id), isOwnJob(id)]);
+async function loadViewer(id: string): Promise<Viewer> {
+  const [user, token] = await Promise.all([getCurrentUser(), getSessionToken()]);
+  if (!user || !token) return { user: null, own: false, myBid: null };
+  try {
+    if (user.role === 'CUSTOMER') {
+      return { user, own: (await getMyJob(token, id)) !== null, myBid: null };
+    }
+    if (user.role === 'CONTRACTOR') {
+      const bids = await listMyBids(token, 1, { jobId: id, limit: 1 });
+      return { user, own: false, myBid: bids.items[0] ?? null };
+    }
+  } catch (error) {
+    console.error('Job page: failed to load viewer state', error);
+  }
+  return { user, own: false, myBid: null };
+}
+
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default async function JobPage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: SearchParams;
+}) {
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const [job, viewer] = await Promise.all([loadJob(id), loadViewer(id)]);
   if (!job) notFound();
+  const own = viewer.own;
+  const notice =
+    query.bid === 'sent'
+      ? 'Отклик отправлен заказчику.'
+      : query.withdrawn
+        ? 'Отклик отозван.'
+        : null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 pt-8 sm:px-6 md:pt-12">
@@ -105,17 +136,14 @@ export default async function JobPage({ params }: { params: Params }) {
               <dd className="mt-1 font-medium">{JOB_CATEGORY_LABELS[job.category]}</dd>
             </div>
           </dl>
-          <button
-            type="button"
-            disabled
-            aria-describedby="respond-hint"
-            className="mt-6 inline-flex min-h-12 w-full cursor-not-allowed items-center justify-center rounded-xl bg-muted-tint px-5 font-semibold text-ink-soft"
-          >
-            Откликнуться
-          </button>
-          <p id="respond-hint" className="mt-2 text-xs leading-relaxed text-ink-soft">
-            Отклики станут доступны после запуска регистрации подрядчиков.
-          </p>
+          {own ? null : (
+            <RespondPanel
+              job={job}
+              viewerRole={viewer.user?.role ?? null}
+              myBid={viewer.myBid}
+              notice={notice}
+            />
+          )}
         </aside>
       </div>
 

@@ -12,14 +12,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 
-const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
-/** trim + единый перевод строки: браузеры отправляют textarea с \r\n. */
-const trimText = ({ value }: { value: unknown }) =>
-  typeof value === 'string' ? value.replace(/\r\n?/g, '\n').trim() : value;
-/** Без управляющих и невидимых символов (bidi-override, нулевые байты, переводы строк). */
-const SINGLE_LINE = /^[^\p{C}]+$/u;
-/** Как SINGLE_LINE, но переводы строк и табы в описании разрешены. */
-const MULTI_LINE = /^(?:[^\p{C}]|[\n\r\t])+$/u;
+import { MULTI_LINE, SINGLE_LINE, trim, trimText } from '../../common/text';
 
 const budget = () => [
   ValidateIf((_: unknown, value: unknown) => value !== null),

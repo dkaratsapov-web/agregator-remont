@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { Job, Prisma } from '@prisma/client';
 import { diffFields, writeAudit } from '../audit/audit';
+import { BidsService } from '../bids/bids.service';
 import { ListJobsQuery } from '../jobs/dto/list-jobs.query';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateJobDto, UpdateJobDto } from './dto/job-input.dto';
@@ -33,7 +34,10 @@ const NOT_FOUND = 'Заказ не найден';
  */
 @Injectable()
 export class MyJobsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly bids: BidsService,
+  ) {}
 
   async list(ownerId: string, query: ListJobsQuery): Promise<Paginated<OwnJobDto>> {
     const where: Prisma.JobWhereInput = { ownerId };
@@ -140,6 +144,8 @@ export class MyJobsService {
       const current = await this.lockOwned(tx, ownerId, id);
       if (current.status === 'CLOSED') throw new ConflictException('Заказ уже закрыт');
       const closed = await tx.job.update({ where: { id }, data: { status: 'CLOSED' } });
+      // Ожидающие отклики закрытого заказа больше не могут быть выбраны.
+      await this.bids.rejectPending(tx, ownerId, id);
       await writeAudit(tx, {
         actorId: ownerId,
         action: 'JOB_CLOSED',
