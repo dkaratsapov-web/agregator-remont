@@ -73,3 +73,16 @@ jobs:
           pnpm --filter @agregator/api exec prisma migrate deploy
           pnpm --filter @agregator/api exec tsx prisma/seed.ts
           pnpm --filter @agregator/api exec tsx prisma/seed.ts
+
+      - name: Smoke test production build
+        env:
+          NODE_ENV: production
+          CORS_ORIGINS: https://remont.example
+        run: |
+          (cd apps/api && node dist/main.js > ../../api.log 2>&1 &)
+          (cd apps/web && pnpm exec next start --port 3000 > ../../web.log 2>&1 &)
+          pnpm smoke
+
+      - name: Server logs on failure
+        if: failure()
+        run: tail -n 100 api.log web.log || true

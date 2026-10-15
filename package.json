@@ -17,6 +17,7 @@
     "db:migrate": "pnpm --filter @agregator/api db:migrate",
     "db:deploy": "pnpm --filter @agregator/api db:deploy",
     "db:seed": "pnpm --filter @agregator/api db:seed",
+    "smoke": "node scripts/smoke.mjs",
     "start": "dotenv -e .env -- pnpm --parallel --filter @agregator/api --filter @agregator/web start"
   },
   "devDependencies": {

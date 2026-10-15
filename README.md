@@ -79,13 +79,23 @@ curl -s 'localhost:4000/v1/jobs?page=1&limit=2'
 curl -s localhost:4000/v1/jobs/demo-job-01
 ```
 
+## Smoke-тест production-сборки
+
+```bash
+pnpm build && pnpm start   # в отдельном терминале
+pnpm smoke                 # HTTP-коды, рендер данных из API, 404, заголовки безопасности и CSP
+```
+
 ## Безопасность (что сделано на этом этапе)
 
-- `helmet` (заголовки безопасности), CORS только для origin'ов из `CORS_ORIGINS`, `*` запрещён.
-- Rate limit 120 запросов/мин на IP (in-memory, рассчитан на один инстанс).
+Подробности, исключения по зависимостям и гейт для write-эндпоинтов: [docs/SECURITY.md](docs/SECURITY.md).
+Развёртывание, reverse proxy, `TRUST_PROXY`, healthchecks: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+- `helmet` (заголовки безопасности), CORS только для точных origin'ов из `CORS_ORIGINS` (`*` запрещён, в production только https).
+- Rate limit 120 запросов/мин на IP (in-memory, **только один инстанс**); `TRUST_PROXY` для работы за reverse proxy.
 - Ответ API формируется через явный whitelist полей (`toJobDto`).
 - Строгая валидация query (`whitelist` + `forbidNonWhitelisted`).
-- Web: `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, без `X-Powered-By`.
+- Web: `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, CSP в режиме Report-Only, без `X-Powered-By`.
 - Демо-сид отказывается работать при `NODE_ENV=production` без явного `ALLOW_DEMO_SEED=true`.
 - Секретов в репозитории нет; `.env` в `.gitignore`.
 

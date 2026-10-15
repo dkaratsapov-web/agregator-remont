@@ -1,8 +1,7 @@
-import { INestApplication } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import { JobCategory, JobStatus, PrismaClient } from '@prisma/client';
 import request from 'supertest';
-import type { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { setupApp } from '../src/setup-app';
 
@@ -24,15 +23,15 @@ const fixtures = Array.from({ length: 30 }, (_, i) => ({
 }));
 
 describe('API (e2e)', () => {
-  let app: INestApplication<App>;
+  let app: NestExpressApplication;
 
   beforeAll(async () => {
     await prisma.job.deleteMany();
     await prisma.job.createMany({ data: fixtures });
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = moduleRef.createNestApplication();
-    setupApp(app, ['http://localhost:3000']);
+    app = moduleRef.createNestApplication<NestExpressApplication>();
+    setupApp(app, { corsOrigins: ['http://localhost:3000'], trustProxy: false });
     await app.init();
   });
 
@@ -139,6 +138,12 @@ describe('API (e2e)', () => {
         expect(res.body).toMatchObject({ statusCode: 404, message: 'Заказ не найден' });
       },
     );
+  });
+
+  describe('trust proxy', () => {
+    it('ignores X-Forwarded-For by default so clients cannot spoof their IP', () => {
+      expect(app.getHttpAdapter().getInstance().get('trust proxy')).toBe(false);
+    });
   });
 
   describe('CORS', () => {
