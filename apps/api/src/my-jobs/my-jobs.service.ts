@@ -56,17 +56,20 @@ export class MyJobsService {
   async create(ownerId: string, dto: CreateJobDto): Promise<OwnJobDto> {
     assertBudgetRange(dto.budgetMin, dto.budgetMax);
 
-    const createdToday = await this.prisma.job.count({
-      where: { ownerId, createdAt: { gt: new Date(Date.now() - DAY_MS) } },
-    });
-    if (createdToday >= JOB_LIMITS.CREATED_PER_DAY) {
-      throw new HttpException(
-        `Можно создать не больше ${JOB_LIMITS.CREATED_PER_DAY} заказов за сутки`,
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
-    }
-
     const job = await this.prisma.$transaction(async (tx) => {
+      // Блокировка строки пользователя сериализует создание заказов одним пользователем:
+      // параллельные запросы считают квоту по очереди и не могут превысить её.
+      await tx.$queryRaw`SELECT id FROM users WHERE id = ${ownerId} FOR UPDATE`;
+      const createdToday = await tx.job.count({
+        where: { ownerId, createdAt: { gt: new Date(Date.now() - DAY_MS) } },
+      });
+      if (createdToday >= JOB_LIMITS.CREATED_PER_DAY) {
+        throw new HttpException(
+          `Можно создать не больше ${JOB_LIMITS.CREATED_PER_DAY} заказов за сутки`,
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
       // Явный список полей: владелец и статус задаются только сервером.
       const created = await tx.job.create({
         data: {
@@ -93,7 +96,7 @@ export class MyJobsService {
 
   async update(ownerId: string, id: string, dto: UpdateJobDto): Promise<OwnJobDto> {
     const job = await this.prisma.$transaction(async (tx) => {
-      const current = await this.findOwned(tx, ownerId, id);
+      const current = await this.lockOwned(tx, ownerId, id);
       if (current.status !== 'OPEN') {
         throw new ConflictException('Редактировать можно только открытый заказ');
       }
@@ -113,10 +116,9 @@ export class MyJobsService {
         dto.budgetMax !== undefined ? dto.budgetMax : current.budgetMax,
       );
 
-      // Условие по статусу в самом UPDATE защищает от гонки с параллельным закрытием.
-      const { count } = await tx.job.updateMany({ where: { id, ownerId, status: 'OPEN' }, data });
-      if (count === 0) throw new ConflictException('Редактировать можно только открытый заказ');
-      const updated = await tx.job.findUniqueOrThrow({ where: { id } });
+      // Строка заблокирована: между чтением `current` и записью её никто не изменит,
+      // поэтому «было» в журнале — это действительно предыдущее состояние.
+      const updated = await tx.job.update({ where: { id }, data });
 
       const changes = diffFields(current, updated, EDITABLE_FIELDS);
       if (Object.keys(changes).length > 0) {
@@ -135,13 +137,9 @@ export class MyJobsService {
 
   async close(ownerId: string, id: string): Promise<OwnJobDto> {
     const job = await this.prisma.$transaction(async (tx) => {
-      const current = await this.findOwned(tx, ownerId, id);
-      const { count } = await tx.job.updateMany({
-        where: { id, ownerId, status: { not: 'CLOSED' } },
-        data: { status: 'CLOSED' },
-      });
-      if (count === 0) throw new ConflictException('Заказ уже закрыт');
-      const closed = await tx.job.findUniqueOrThrow({ where: { id } });
+      const current = await this.lockOwned(tx, ownerId, id);
+      if (current.status === 'CLOSED') throw new ConflictException('Заказ уже закрыт');
+      const closed = await tx.job.update({ where: { id }, data: { status: 'CLOSED' } });
       await writeAudit(tx, {
         actorId: ownerId,
         action: 'JOB_CLOSED',
@@ -152,6 +150,18 @@ export class MyJobsService {
       return closed;
     });
     return toOwnJobDto(job);
+  }
+
+  /**
+   * Блокирует строку своего заказа (SELECT … FOR UPDATE) до конца транзакции и читает её
+   * актуальное состояние. Параллельные правка и закрытие одного заказа выполняются по очереди.
+   */
+  private async lockOwned(db: Prisma.TransactionClient, ownerId: string, id: string): Promise<Job> {
+    if (!JOB_ID_PATTERN.test(id)) throw new NotFoundException(NOT_FOUND);
+    const locked = await db.$queryRaw<{ id: string }[]>`
+      SELECT id FROM jobs WHERE id = ${id} AND owner_id = ${ownerId} FOR UPDATE`;
+    if (locked.length === 0) throw new NotFoundException(NOT_FOUND);
+    return this.findOwned(db, ownerId, id);
   }
 
   private async findOwned(db: Prisma.TransactionClient, ownerId: string, id: string): Promise<Job> {
