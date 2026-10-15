@@ -15,6 +15,15 @@
 Web получает данные только через настоящий API (серверные запросы из React Server Components),
 моков нет.
 
+## Посмотреть продукт одной командой (Docker)
+
+```bash
+cp deploy/.env.example deploy/.env   # задайте POSTGRES_PASSWORD
+docker compose -f deploy/docker-compose.yml up -d --build
+```
+
+Сайт: http://localhost:3000. Развёртывание на домене с HTTPS: [deploy/README.md](deploy/README.md).
+
 ## Требования
 
 - Node.js 22 (`.nvmrc`), pnpm 10 (`corepack enable`)

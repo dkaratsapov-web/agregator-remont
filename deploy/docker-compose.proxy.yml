@@ -1,0 +1,24 @@
+# Подключается поверх docker-compose.yml на сервере с доменом: Caddy с автоматическим HTTPS
+# и паролем на весь сайт для закрытого теста. Порты 80 и 443 должны быть открыты.
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Задайте DOMAIN в deploy/.env}
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER:?Задайте BASIC_AUTH_USER в deploy/.env}
+      BASIC_AUTH_HASH: ${BASIC_AUTH_HASH:?Задайте BASIC_AUTH_HASH в deploy/.env}
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      web: { condition: service_healthy }
+
+volumes:
+  caddy-data:
+  caddy-config:
