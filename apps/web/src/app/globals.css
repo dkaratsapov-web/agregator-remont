@@ -1,0 +1,101 @@
+@import 'tailwindcss';
+
+/*
+ * Токены: холодная серая шкала (slate) + один акцент (тёмный оранжевый «строительный»).
+ * Тёмная тема через prefers-color-scheme, все цвета только через переменные.
+ */
+:root {
+  --canvas: #f6f7f9;
+  --surface: #ffffff;
+  --surface-sunken: #eef0f3;
+  --ink: #0f172a;
+  --ink-soft: #475569;
+  --line: #dde1e7;
+  --accent: #c2410c;
+  --accent-hover: #9a3412;
+  --accent-ink: #ffffff;
+  --accent-tint: #fff1e8;
+  --ok: #15803d;
+  --ok-tint: #e9f7ee;
+  --muted-tint: #eef0f3;
+  --shadow-color: 215 25% 27%;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #0b1018;
+    --surface: #121925;
+    --surface-sunken: #0e141e;
+    --ink: #e6eaf0;
+    --ink-soft: #9aa6b8;
+    --line: #243042;
+    --accent: #f97316;
+    --accent-hover: #fb8a3c;
+    --accent-ink: #1a0d03;
+    --accent-tint: #2a1708;
+    --ok: #4ade80;
+    --ok-tint: #0f2418;
+    --muted-tint: #1a2332;
+    --shadow-color: 220 60% 2%;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-sunken: var(--surface-sunken);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-tint: var(--accent-tint);
+  --color-ok: var(--ok);
+  --color-ok-tint: var(--ok-tint);
+  --color-muted-tint: var(--muted-tint);
+  --font-sans: var(--font-onest), ui-sans-serif, system-ui, sans-serif;
+  --shadow-raised:
+    0 1px 2px hsl(var(--shadow-color) / 0.06), 0 4px 12px -2px hsl(var(--shadow-color) / 0.08);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: 5rem;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+a,
+button {
+  touch-action: manipulation;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
