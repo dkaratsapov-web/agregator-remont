@@ -45,14 +45,33 @@ export default async function AccountPage() {
         <p className="mt-2 max-w-prose text-ink-soft">
           {isContractor
             ? 'Отклики на заказы появятся в следующем обновлении. Пока можно изучить каталог.'
-            : 'Публикация заказов появится в следующем обновлении. Пока можно посмотреть, как выглядят заказы в каталоге.'}
+            : 'Публикуйте заказы и управляйте ими: редактируйте, пока заказ открыт, и закрывайте, когда исполнитель найден.'}
         </p>
-        <Link
-          href="/jobs"
-          className="mt-4 inline-flex min-h-11 items-center rounded-xl border border-line bg-surface px-5 font-medium hover:border-ink-soft/50"
-        >
-          Открыть каталог
-        </Link>
+        <div className="mt-4 flex flex-wrap gap-3">
+          {isContractor ? (
+            <Link
+              href="/jobs"
+              className="inline-flex min-h-11 items-center rounded-xl border border-line bg-surface px-5 font-medium hover:border-ink-soft/50"
+            >
+              Открыть каталог
+            </Link>
+          ) : (
+            <>
+              <Link
+                href="/account/jobs/new"
+                className="inline-flex min-h-11 items-center rounded-xl bg-accent px-5 font-semibold text-accent-ink transition-colors duration-150 hover:bg-accent-hover"
+              >
+                Новый заказ
+              </Link>
+              <Link
+                href="/account/jobs"
+                className="inline-flex min-h-11 items-center rounded-xl border border-line bg-surface px-5 font-medium hover:border-ink-soft/50"
+              >
+                Мои заказы
+              </Link>
+            </>
+          )}
+        </div>
       </section>
 
       <div className="mt-12 border-t border-line pt-6">

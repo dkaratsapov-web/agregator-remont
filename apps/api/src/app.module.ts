@@ -2,10 +2,16 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
-import { AUTH_THROTTLER, isAuthRateLimited } from './auth/rate-limit';
+import {
+  AUTH_THROTTLER,
+  isAuthRateLimited,
+  isWriteRateLimited,
+  WRITE_THROTTLER,
+} from './auth/rate-limit';
 import { loadRateLimits } from './config/env';
 import { HealthController } from './health/health.controller';
 import { JobsModule } from './jobs/jobs.module';
+import { MyJobsModule } from './my-jobs/my-jobs.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
@@ -23,12 +29,19 @@ import { PrismaModule } from './prisma/prisma.module';
             // Строгий лимит действует только на маршруты с @AuthRateLimited().
             skipIf: (context) => !isAuthRateLimited(context),
           },
+          {
+            name: WRITE_THROTTLER,
+            ttl: 60_000,
+            limit: limits.writePerMinute,
+            skipIf: (context) => !isWriteRateLimited(context),
+          },
         ];
       },
     }),
     PrismaModule,
     JobsModule,
     AuthModule,
+    MyJobsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

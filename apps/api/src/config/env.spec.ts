@@ -71,11 +71,14 @@ describe('loadEnv', () => {
 
 describe('loadRateLimits', () => {
   it('uses defaults and parses overrides', () => {
-    expect(loadRateLimits({})).toEqual({ perMinute: 120, authPerMinute: 10 });
-    expect(loadRateLimits({ RATE_LIMIT_PER_MIN: '300', AUTH_RATE_LIMIT_PER_MIN: '5' })).toEqual({
-      perMinute: 300,
-      authPerMinute: 5,
-    });
+    expect(loadRateLimits({})).toEqual({ perMinute: 120, authPerMinute: 10, writePerMinute: 30 });
+    expect(
+      loadRateLimits({
+        RATE_LIMIT_PER_MIN: '300',
+        AUTH_RATE_LIMIT_PER_MIN: '5',
+        WRITE_RATE_LIMIT_PER_MIN: '7',
+      }),
+    ).toEqual({ perMinute: 300, authPerMinute: 5, writePerMinute: 7 });
   });
 
   it.each(['0', '-1', '1.5', 'abc'])('rejects %s', (value) => {

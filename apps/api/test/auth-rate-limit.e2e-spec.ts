@@ -10,6 +10,8 @@ describe('Auth rate limit (e2e)', () => {
 
   beforeAll(async () => {
     process.env.AUTH_RATE_LIMIT_PER_MIN = '3';
+    await prisma.auditLog.deleteMany();
+    await prisma.job.deleteMany({ where: { ownerId: { not: null } } });
     await prisma.user.deleteMany();
     app = await createTestApp();
   });

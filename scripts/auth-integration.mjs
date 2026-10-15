@@ -35,13 +35,14 @@ async function actionForm(path, cookie) {
   );
 }
 
-async function submit(path, fields, { origin = WEB, forwardedFor, cookie } = {}) {
+async function submit(path, fields, { origin = WEB, forwardedFor, forwardedHost, cookie } = {}) {
   const body = new FormData();
   for (const [name, value] of await actionForm(path, cookie)) body.append(name, value);
   for (const [name, value] of Object.entries(fields)) body.append(name, value);
   const headers = {};
   if (origin) headers.Origin = origin;
   if (forwardedFor) headers['X-Forwarded-For'] = forwardedFor;
+  if (forwardedHost) headers['X-Forwarded-Host'] = forwardedHost;
   if (cookie) headers.Cookie = cookie;
   const res = await fetch(WEB + path, { method: 'POST', body, headers, redirect: 'manual' });
   const setCookie = res.headers.get('set-cookie') ?? '';
@@ -78,12 +79,13 @@ check(
   'session cookie is HttpOnly; SameSite=Lax',
   /HttpOnly/i.test(good.setCookie) && /SameSite=Lax/i.test(good.setCookie),
 );
-for (const [name, origin] of [
+for (const [name, origin, forwardedHost] of [
   ['foreign Origin', 'https://evil.example'],
+  ['foreign Origin + spoofed X-Forwarded-Host', 'https://evil.example', 'evil.example'],
   ['Origin: null', 'null'],
   ['missing Origin', null],
 ]) {
-  const res = await login({ origin, forwardedFor: '203.0.113.11' });
+  const res = await login({ origin, forwardedHost, forwardedFor: '203.0.113.11' });
   check(
     `${name} login is rejected without a session`,
     !sessionFrom(res.setCookie) && res.status !== 303,

@@ -21,6 +21,11 @@ export function formatBudget(min: number | null, max: number | null, currency: C
   return 'По договорённости';
 }
 
+/** «300 000» для полей ввода; разбор обратно — parseBudget (пробелы допускаются). */
+export function formatAmount(value: number): string {
+  return numberFormat.format(value);
+}
+
 export function formatDate(iso: string): string {
   return dateFormat.format(new Date(iso));
 }

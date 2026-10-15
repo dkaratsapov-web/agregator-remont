@@ -1,25 +1,16 @@
 'use server';
 
 import { AUTH_LIMITS, SELF_SERVICE_ROLES } from '@agregator/shared';
-import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { ApiError, loginUser, logoutSession, registerUser } from '@/lib/api';
 import { safeRedirectPath } from '@/lib/redirect';
-import { isSameOriginRequest } from '@/lib/same-origin';
+import { FOREIGN_ORIGIN, isTrustedOrigin } from '@/lib/action-guard';
 import { clearSessionCookie, getClientIp, getSessionToken, setSessionCookie } from '@/lib/session';
 
 export interface AuthFormState {
   error?: string;
   /** Введённые значения (кроме пароля), чтобы не очищать форму при ошибке. */
   values?: Record<string, string>;
-}
-
-const FOREIGN_ORIGIN = 'Запрос отклонён. Обновите страницу и попробуйте снова.';
-
-/** Server Actions — публичные эндпоинты: источник проверяется в каждом из них. */
-async function isTrustedOrigin(): Promise<boolean> {
-  const h = await headers();
-  return isSameOriginRequest((name) => h.get(name));
 }
 
 const field = (form: FormData, key: string, max: number): string => {

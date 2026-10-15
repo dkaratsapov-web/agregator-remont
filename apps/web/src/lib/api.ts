@@ -1,5 +1,13 @@
 import 'server-only';
-import type { AuthSessionDto, JobCategory, JobDto, Paginated, UserDto } from '@agregator/shared';
+import type {
+  AuthSessionDto,
+  JobCategory,
+  JobDto,
+  JobInput,
+  OwnJobDto,
+  Paginated,
+  UserDto,
+} from '@agregator/shared';
 
 export class ApiError extends Error {
   constructor(
@@ -14,7 +22,7 @@ export class ApiError extends Error {
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST';
+  method?: 'GET' | 'POST' | 'PATCH';
   body?: unknown;
   /** Токен сессии пользователя; передаётся API как Bearer. */
   token?: string;
@@ -142,4 +150,56 @@ export async function getMe(token: string): Promise<UserDto | null> {
   const res = await request('/v1/me', { token });
   if (res.status === 401) return null;
   return expectJson<UserDto>(res, 'GET /v1/me');
+}
+
+// --- Заказы текущего заказчика (авторизация и проверка владельца — на стороне API)
+
+export async function listMyJobs(
+  token: string,
+  page: number,
+  limit = 20,
+): Promise<Paginated<OwnJobDto>> {
+  const query = new URLSearchParams({ page: String(page), limit: String(limit) });
+  const res = await request(`/v1/me/jobs?${query.toString()}`, { token });
+  return expectJson<Paginated<OwnJobDto>>(res, 'GET /v1/me/jobs');
+}
+
+/** null, если заказа нет или он принадлежит другому пользователю (API отвечает 404). */
+export async function getMyJob(token: string, id: string): Promise<OwnJobDto | null> {
+  const res = await request(`/v1/me/jobs/${encodeURIComponent(id)}`, { token });
+  if (res.status === 404) return null;
+  return expectJson<OwnJobDto>(res, 'GET /v1/me/jobs/:id');
+}
+
+export async function createMyJob(
+  token: string,
+  input: JobInput,
+  clientIp?: string,
+): Promise<OwnJobDto> {
+  const res = await request('/v1/me/jobs', { method: 'POST', body: input, token, clientIp });
+  return expectJson<OwnJobDto>(res, 'POST /v1/me/jobs');
+}
+
+export async function updateMyJob(
+  token: string,
+  id: string,
+  input: Partial<JobInput>,
+  clientIp?: string,
+): Promise<OwnJobDto> {
+  const res = await request(`/v1/me/jobs/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: input,
+    token,
+    clientIp,
+  });
+  return expectJson<OwnJobDto>(res, 'PATCH /v1/me/jobs/:id');
+}
+
+export async function closeMyJob(token: string, id: string, clientIp?: string): Promise<OwnJobDto> {
+  const res = await request(`/v1/me/jobs/${encodeURIComponent(id)}/close`, {
+    method: 'POST',
+    token,
+    clientIp,
+  });
+  return expectJson<OwnJobDto>(res, 'POST /v1/me/jobs/:id/close');
 }

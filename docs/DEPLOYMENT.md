@@ -27,6 +27,8 @@
 | `RATE_LIMIT_PER_MIN` | api | по умолчанию `120` |
 | `AUTH_RATE_LIMIT_PER_MIN` | api | по умолчанию `10` (вход и регистрация) |
 | `API_URL` | web | внутренний адрес API, например `http://api:4000` |
+| `WEB_PUBLIC_ORIGIN` | web | **обязательна**: публичный адрес сайта, например `https://remont.example`; Server Actions принимаются только с этого `Origin` |
+| `WRITE_RATE_LIMIT_PER_MIN` | api | по умолчанию `30` (создание и правка заказов) |
 | `WEB_TRUST_PROXY_HOPS` | web | число reverse proxy перед web (обычно `1`); `0` = IP посетителя не передаётся в API |
 | `ALLOW_DEMO_SEED` | api | не задавать (демо-сид в production отключён) |
 
@@ -61,8 +63,10 @@
 
 ## Host, TLS и Server Actions
 
-Формы входа, регистрации и выхода — Server Actions. Next.js и наша проверка сравнивают `Origin`
-браузера с хостом запроса, поэтому proxy обязан передавать публичный хост:
+Формы (вход, регистрация, выход, заказы) — Server Actions. Наша проверка сравнивает `Origin`
+строго с `WEB_PUBLIC_ORIGIN` и не зависит от заголовков proxy. Проверка самого Next.js
+сравнивает `Origin` с хостом запроса, поэтому proxy всё равно обязан передавать публичный хост
+и **перезаписывать** присланный клиентом `X-Forwarded-Host`:
 
 - `Host` = публичное имя сайта **или** `X-Forwarded-Host` = публичное имя
   (nginx: `proxy_set_header Host $host;` либо `proxy_set_header X-Forwarded-Host $host;`).

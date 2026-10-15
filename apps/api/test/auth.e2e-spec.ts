@@ -24,11 +24,15 @@ describe('Auth (e2e)', () => {
 
   beforeAll(async () => {
     process.env.AUTH_RATE_LIMIT_PER_MIN = '1000';
+    await prisma.auditLog.deleteMany();
+    await prisma.job.deleteMany({ where: { ownerId: { not: null } } });
     await prisma.user.deleteMany();
     app = await createTestApp();
   });
 
   afterEach(async () => {
+    await prisma.auditLog.deleteMany();
+    await prisma.job.deleteMany({ where: { ownerId: { not: null } } });
     await prisma.user.deleteMany();
   });
 
