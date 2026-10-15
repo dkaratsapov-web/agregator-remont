@@ -90,3 +90,26 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     databaseUrl,
   };
 }
+
+export interface RateLimits {
+  /** Общий лимит запросов в минуту на IP. */
+  perMinute: number;
+  /** Лимит на вход и регистрацию в минуту на IP. */
+  authPerMinute: number;
+}
+
+function parseLimit(raw: string | undefined, name: string, fallback: number): number {
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1 || value > 100_000) {
+    throw new Error(`${name} must be an integer 1..100000, got "${raw}"`);
+  }
+  return value;
+}
+
+export function loadRateLimits(source: NodeJS.ProcessEnv = process.env): RateLimits {
+  return {
+    perMinute: parseLimit(source.RATE_LIMIT_PER_MIN, 'RATE_LIMIT_PER_MIN', 120),
+    authPerMinute: parseLimit(source.AUTH_RATE_LIMIT_PER_MIN, 'AUTH_RATE_LIMIT_PER_MIN', 10),
+  };
+}

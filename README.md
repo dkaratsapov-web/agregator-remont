@@ -86,6 +86,11 @@ pnpm build && pnpm start   # в отдельном терминале
 pnpm smoke                 # HTTP-коды, рендер данных из API, 404, заголовки безопасности и CSP
 ```
 
+## Аккаунты
+
+Web: `/register`, `/login`, `/account`. Сессия хранится в HttpOnly-cookie, web передаёт её API как
+`Authorization: Bearer`. Подробности и ограничения: [docs/SECURITY.md](docs/SECURITY.md), раздел 5.
+
 ## Безопасность (что сделано на этом этапе)
 
 Подробности, исключения по зависимостям и гейт для write-эндпоинтов: [docs/SECURITY.md](docs/SECURITY.md).

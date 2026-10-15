@@ -1,17 +1,34 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { AuthModule } from './auth/auth.module';
+import { AUTH_THROTTLER, isAuthRateLimited } from './auth/rate-limit';
+import { loadRateLimits } from './config/env';
 import { HealthController } from './health/health.controller';
 import { JobsModule } from './jobs/jobs.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
   imports: [
-    // Базовая защита от перебора: 120 запросов в минуту на IP.
     // Счётчики в памяти процесса: корректно только для одного инстанса API (docs/SECURITY.md).
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    ThrottlerModule.forRootAsync({
+      useFactory: () => {
+        const limits = loadRateLimits();
+        return [
+          { name: 'default', ttl: 60_000, limit: limits.perMinute },
+          {
+            name: AUTH_THROTTLER,
+            ttl: 60_000,
+            limit: limits.authPerMinute,
+            // Строгий лимит действует только на маршруты с @AuthRateLimited().
+            skipIf: (context) => !isAuthRateLimited(context),
+          },
+        ];
+      },
+    }),
     PrismaModule,
     JobsModule,
+    AuthModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

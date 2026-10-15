@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, getJob, getJobs } from './api';
+import { ApiError, getJob, getJobs, getMe, loginUser, logoutSession, registerUser } from './api';
 
 const fetchMock = vi.fn();
 
@@ -56,5 +56,46 @@ describe('getJob', () => {
     await expect(getJob('missing')).resolves.toBeNull();
     fetchMock.mockResolvedValueOnce(json(503, {}));
     await expect(getJob('x')).rejects.toMatchObject({ status: 503 });
+  });
+});
+
+describe('auth calls', () => {
+  const session = { user: { id: 'u1' }, token: 't', expiresAt: '2026-01-01T00:00:00.000Z' };
+
+  it('posts JSON and forwards the visitor IP', async () => {
+    fetchMock.mockResolvedValue(json(201, session));
+    await registerUser(
+      { email: 'a@b.ru', password: 'password123', name: 'Ив', role: 'CUSTOMER' },
+      '203.0.113.7',
+    );
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://api.test/v1/auth/register');
+    expect(init.method).toBe('POST');
+    expect(init.headers['Content-Type']).toBe('application/json');
+    expect(init.headers['X-Forwarded-For']).toBe('203.0.113.7');
+    expect(JSON.parse(init.body)).toMatchObject({ email: 'a@b.ru', role: 'CUSTOMER' });
+  });
+
+  it('exposes the API message for client errors', async () => {
+    fetchMock.mockResolvedValue(json(401, { message: 'Неверный email или пароль' }));
+    await expect(loginUser({ email: 'a@b.ru', password: 'x' })).rejects.toMatchObject({
+      status: 401,
+      userMessage: 'Неверный email или пароль',
+    });
+    fetchMock.mockResolvedValue(json(400, { message: ['Укажите корректный email'] }));
+    await expect(loginUser({ email: 'x', password: 'x' })).rejects.toMatchObject({
+      userMessage: 'Укажите корректный email',
+    });
+  });
+
+  it('sends the session as a Bearer token and maps 401 to null', async () => {
+    fetchMock.mockResolvedValueOnce(json(401, {}));
+    await expect(getMe('tok')).resolves.toBeNull();
+    expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer tok');
+  });
+
+  it('never throws on logout', async () => {
+    fetchMock.mockRejectedValue(new TypeError('fetch failed'));
+    await expect(logoutSession('tok')).resolves.toBeUndefined();
   });
 });
