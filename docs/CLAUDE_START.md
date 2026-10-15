@@ -1,41 +1,29 @@
-# Стартовое задание для Claude Code
+# Старт Claude Code: единственный разработчик
 
-Ты технический продюсер frontend/bootstrap в репозитории dkaratsapov-web/agregator-remont.
+Проект: https://github.com/dkaratsapov-web/agregator-remont
 
-Цель первого PR: работающий базовый Web/PWA (Next.js App Router + TypeScript + Tailwind) и monorepo-каркас, готовый к подключению NestJS API.
+## Роли
+- Claude Code: **весь код**, включая frontend, backend, БД, тесты, CI/CD, документацию, деплой.
+- ChatGPT: **независимый ревьюер**, архитектура и риски, без изменения кода.
+- Владелец: продуктовые решения, приёмка и разрешение объединять PR.
 
-## Ветка
-Начни с актуальной main, создай **свою** ветку `feat/claude-web-bootstrap`. НЕ вноси изменения в `feat/marketplace-foundation` (там работает ChatGPT). Перед началом ознакомься с docs/ROADMAP.md после его слияния в main либо запроси разрешение у пользователя взять файл из существующего PR #1.
+## Старт
+Изучи docs/ROADMAP.md и docs/PROJECT.md в ветке feat/marketplace-foundation, PR #1. Сначала пользователь должен объединить PR #1 с main либо ты создаёшь рабочую ветку от feat/marketplace-foundation. Не затрагивай main напрямую.
 
-## Создай
-- pnpm-workspace.yaml и корневой package.json (скрипты dev, lint, typecheck, test, build)
-- apps/web — Next.js + Tailwind + адаптивные компоненты
-- apps/web/app — главная, каталог заказов, детали заказа
-- packages/ui — при необходимости, не усложняй
-- apps/web/lib/api — типизированный клиент под GET /v1/jobs, GET /v1/jobs/:id
-- apps/web/lib/mocks — явно обозначенный дев-режим, без имитации реальных сделок
-- .env.example, .gitignore, docker-compose.yml (PostgreSQL), README.md с запуском
-- GitHub Actions с lint/typecheck/build; lockfile обязательно фиксировать
+## Первый PR — работающий MVP-фундамент
+1. pnpm monorepo, apps/web Next.js App Router + TS + Tailwind + PWA, apps/api NestJS, Prisma/PostgreSQL, docker-compose, .env.example, .gitignore.
+2. Русскоязычные адаптивные страницы: главная, каталог заказов, подробная карточка заказа.
+3. Модель Job (id, title, description, category, city, budgetMin, budgetMax, currency RUB, status, createdAt) и demo seed.
+4. GET /health -> {status:"ok"}; GET /v1/jobs?page=1&limit=12 -> {items, page, limit, total}; GET /v1/jobs/:id -> детальная карточка, корректный 404. Query validation и ограничение limit.
+5. Web получает данные через настоящий API. Dev mocks допустимы только явно помеченные и не в production.
+6. README с точными командами запуска, CI lint/typecheck/test/build, тесты health/jobs, работающая локальная сборка.
+7. Создай PR (не мержи), перечисли готовые функции и **фактически выполненные** проверки.
 
-## UX
-Русский интерфейс. Визуально качественный адаптивный продукт, не шаблонный дешёвый лендинг.
-Роли: заказчик и исполнитель. Категория только ремонт/строительство. Карточки с городом, бюджетом, категорией, заголовком, датой.
-В dev-моке не использовать реальные персональные данные.
+## Безопасность
+- Не внедрять настоящие деньги, escrow или псевдозащиту без отдельного этапа.
+- Не коммитить секреты и персональные данные.
+- Проверять права доступа для будущих write-endpoints на сервере.
+- Не утверждать о безопасности без подтверждения.
+- После каждого PR дождись замечаний ChatGPT и исправь Critical/High перед согласованием.
 
-## API contract (предварительный)
-GET /health -> {status:"ok"}
-GET /v1/jobs?page=1&limit=12 -> {items:JobSummary[],page:number,limit:number,total:number}
-GET /v1/jobs/:id -> JobDetail
-JobSummary: {id:string,title:string,category:string,city:string,budgetMin:number|null,budgetMax:number|null,currency:"RUB",createdAt:string}
-JobDetail расширяет JobSummary полями description:string, status:"OPEN"|"IN_PROGRESS"|"CLOSED".
-Пока никакой клиентской записи, оплаты или авторизации-заглушки, выдающей себя за защищённую.
-
-## Приёмка
-- pnpm install, pnpm --filter web lint, pnpm --filter web build должны проходить
-- В README точные команды запуска
-- Каталог и карточка работают с моками; API-клиент готов к реальной интеграции
-- Без изменения финансовой логики, без хранения секретов, без коммита .env
-- Создай PR в main и дай пользователю ссылку, не мержи сам
-
-## Обязательное правило параллельности
-Не редактируй apps/api или packages/contracts — их делает ChatGPT. Если нужны изменения контракта, зафиксируй предложение в PR и дождись согласования.
+**Начинай писать код, не трать следующий цикл на переписывание плана.**
