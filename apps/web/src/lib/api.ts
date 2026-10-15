@@ -118,12 +118,22 @@ export async function loginUser(
   return expectJson<AuthSessionDto>(res, 'POST /v1/auth/login');
 }
 
-/** Ошибки игнорируются: локальная cookie удаляется в любом случае. */
-export async function logoutSession(token: string): Promise<void> {
+/**
+ * revoked — API удалил сессию; invalid — сессия уже недействительна (401);
+ * failed — API недоступен или ответил ошибкой: сессия может быть жива, cookie удалять нельзя.
+ */
+export type LogoutResult = 'revoked' | 'invalid' | 'failed';
+
+export async function logoutSession(token: string): Promise<LogoutResult> {
   try {
-    await request('/v1/auth/logout', { method: 'POST', token });
-  } catch {
-    // API недоступен: сессия истечёт сама
+    const res = await request('/v1/auth/logout', { method: 'POST', token });
+    if (res.status === 204) return 'revoked';
+    if (res.status === 401) return 'invalid';
+    console.error(`Logout: API responded ${res.status}`);
+    return 'failed';
+  } catch (error) {
+    console.error('Logout: API request failed', error);
+    return 'failed';
   }
 }
 

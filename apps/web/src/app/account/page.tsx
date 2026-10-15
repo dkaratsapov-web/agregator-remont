@@ -2,7 +2,7 @@ import { USER_ROLE_LABELS } from '@agregator/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { logoutAction } from '@/app/(auth)/actions';
+import { LogoutForm } from '@/components/auth/logout-form';
 import { formatDate } from '@/lib/format';
 import { getCurrentUser } from '@/lib/session';
 
@@ -55,14 +55,9 @@ export default async function AccountPage() {
         </Link>
       </section>
 
-      <form action={logoutAction} className="mt-12 border-t border-line pt-6">
-        <button
-          type="submit"
-          className="inline-flex min-h-11 items-center rounded-xl px-4 font-medium text-ink-soft hover:bg-muted-tint hover:text-ink"
-        >
-          Выйти из аккаунта
-        </button>
-      </form>
+      <div className="mt-12 border-t border-line pt-6">
+        <LogoutForm />
+      </div>
     </div>
   );
 }

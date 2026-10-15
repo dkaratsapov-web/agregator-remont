@@ -25,10 +25,14 @@ export class AuthService {
       throw new ConflictException('Пароль не должен совпадать с email');
     }
     const passwordHash = await hashPassword(dto.password);
-    let user: User;
     try {
-      user = await this.prisma.user.create({
-        data: { email: dto.email, passwordHash, name: dto.name, role: dto.role },
+      // Пользователь и первая сессия создаются атомарно: при сбое записи сессии не остаётся
+      // «осиротевшего» аккаунта, на повторную регистрацию которого пришёл бы 409.
+      return await this.prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: { email: dto.email, passwordHash, name: dto.name, role: dto.role },
+        });
+        return this.createSession(tx, user);
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -36,7 +40,6 @@ export class AuthService {
       }
       throw error;
     }
-    return this.createSession(user);
   }
 
   async login(dto: LoginDto): Promise<AuthSessionDto> {
@@ -49,7 +52,7 @@ export class AuthService {
     await this.prisma.session.deleteMany({
       where: { userId: user.id, expiresAt: { lte: new Date() } },
     });
-    return this.createSession(user);
+    return this.createSession(this.prisma, user);
   }
 
   async logout(sessionId: string): Promise<void> {
@@ -67,10 +70,10 @@ export class AuthService {
     return { user: session.user, sessionId: session.id };
   }
 
-  private async createSession(user: User): Promise<AuthSessionDto> {
+  private async createSession(db: Prisma.TransactionClient, user: User): Promise<AuthSessionDto> {
     const token = generateSessionToken();
     const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
-    await this.prisma.session.create({
+    await db.session.create({
       data: { tokenHash: hashSessionToken(token), userId: user.id, expiresAt },
     });
     return { user: toUserDto(user), token, expiresAt: expiresAt.toISOString() };

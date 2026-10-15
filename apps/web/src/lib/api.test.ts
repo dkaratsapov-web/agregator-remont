@@ -94,8 +94,19 @@ describe('auth calls', () => {
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer tok');
   });
 
-  it('never throws on logout', async () => {
+  it.each([
+    [204, 'revoked'],
+    [401, 'invalid'],
+    [500, 'failed'],
+    [503, 'failed'],
+    [429, 'failed'],
+  ])('maps logout status %i to %s', async (status, expected) => {
+    fetchMock.mockResolvedValue(new Response(null, { status }));
+    await expect(logoutSession('tok')).resolves.toBe(expected);
+  });
+
+  it('reports logout as failed when the API is unreachable', async () => {
     fetchMock.mockRejectedValue(new TypeError('fetch failed'));
-    await expect(logoutSession('tok')).resolves.toBeUndefined();
+    await expect(logoutSession('tok')).resolves.toBe('failed');
   });
 });

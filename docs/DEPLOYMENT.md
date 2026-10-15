@@ -59,6 +59,21 @@
 Без proxy перед web оставьте `WEB_TRUST_PROXY_HOPS=0`: подмена невозможна, но лимит на вход
 станет общим для всех посетителей.
 
+## Host, TLS и Server Actions
+
+Формы входа, регистрации и выхода — Server Actions. Next.js и наша проверка сравнивают `Origin`
+браузера с хостом запроса, поэтому proxy обязан передавать публичный хост:
+
+- `Host` = публичное имя сайта **или** `X-Forwarded-Host` = публичное имя
+  (nginx: `proxy_set_header Host $host;` либо `proxy_set_header X-Forwarded-Host $host;`).
+- `X-Forwarded-Proto: https`; TLS терминируется на proxy, `http` → редирект на `https`.
+- `serverActions.allowedOrigins` не задавать: дополнительные origin'ы ослабляют защиту от CSRF.
+- Если сайт доступен по нескольким доменам, все, кроме основного, редиректить на основной:
+  иначе формы на дополнительном домене будут отклоняться как чужой origin.
+
+Симптом неверной настройки: формы отвечают «Запрос отклонён» или 500, в логе web —
+предупреждение Next.js о несовпадении `origin` и `x-forwarded-host`.
+
 ## Healthchecks
 
 - API: `GET /health` → `200 {"status":"ok"}` (liveness, без обращения к БД, не лимитируется).

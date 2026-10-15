@@ -1,15 +1,25 @@
 'use server';
 
 import { AUTH_LIMITS, SELF_SERVICE_ROLES } from '@agregator/shared';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { ApiError, loginUser, logoutSession, registerUser } from '@/lib/api';
 import { safeRedirectPath } from '@/lib/redirect';
+import { isSameOriginRequest } from '@/lib/same-origin';
 import { clearSessionCookie, getClientIp, getSessionToken, setSessionCookie } from '@/lib/session';
 
 export interface AuthFormState {
   error?: string;
   /** Введённые значения (кроме пароля), чтобы не очищать форму при ошибке. */
   values?: Record<string, string>;
+}
+
+const FOREIGN_ORIGIN = 'Запрос отклонён. Обновите страницу и попробуйте снова.';
+
+/** Server Actions — публичные эндпоинты: источник проверяется в каждом из них. */
+async function isTrustedOrigin(): Promise<boolean> {
+  const h = await headers();
+  return isSameOriginRequest((name) => h.get(name));
 }
 
 const field = (form: FormData, key: string, max: number): string => {
@@ -38,8 +48,9 @@ export async function registerAction(_prev: AuthFormState, form: FormData): Prom
     email: field(form, 'email', AUTH_LIMITS.EMAIL_MAX + 1),
     role: field(form, 'role', 20),
   };
-  const password = field(form, 'password', AUTH_LIMITS.PASSWORD_MAX + 1);
+  if (!(await isTrustedOrigin())) return { error: FOREIGN_ORIGIN, values };
 
+  const password = field(form, 'password', AUTH_LIMITS.PASSWORD_MAX + 1);
   if (!(SELF_SERVICE_ROLES as readonly string[]).includes(values.role)) {
     return { error: 'Выберите, кто вы: заказчик или подрядчик.', values };
   }
@@ -55,6 +66,8 @@ export async function registerAction(_prev: AuthFormState, form: FormData): Prom
 
 export async function loginAction(_prev: AuthFormState, form: FormData): Promise<AuthFormState> {
   const values = { email: field(form, 'email', AUTH_LIMITS.EMAIL_MAX + 1) };
+  if (!(await isTrustedOrigin())) return { error: FOREIGN_ORIGIN, values };
+
   const password = field(form, 'password', AUTH_LIMITS.PASSWORD_MAX + 1);
   const next = safeRedirectPath(form.get('next'));
 
@@ -67,9 +80,21 @@ export async function loginAction(_prev: AuthFormState, form: FormData): Promise
   redirect(next);
 }
 
-export async function logoutAction(): Promise<void> {
+/**
+ * Cookie удаляется только если API подтвердил отзыв сессии (или она уже недействительна).
+ * При сбое API пользователь остаётся в аккаунте и видит ошибку: иначе он считал бы, что вышел,
+ * а токен продолжал бы действовать до истечения срока.
+ */
+export async function logoutAction(_prev: AuthFormState, _form: FormData): Promise<AuthFormState> {
+  if (!(await isTrustedOrigin())) return { error: FOREIGN_ORIGIN };
+
   const token = await getSessionToken();
-  if (token) await logoutSession(token);
+  if (token) {
+    const result = await logoutSession(token);
+    if (result === 'failed') {
+      return { error: 'Не удалось выйти: сервис временно недоступен. Попробуйте ещё раз.' };
+    }
+  }
   await clearSessionCookie();
   redirect('/');
 }

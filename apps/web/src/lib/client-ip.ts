@@ -1,3 +1,5 @@
+import { isIP } from 'node:net';
+
 /**
  * IP посетителя для передачи в API (rate limit).
  *
@@ -16,11 +18,17 @@ export function clientIpFromForwardedFor(
     .map((entry) => entry.trim())
     .filter(Boolean);
   const candidate = entries[entries.length - hops];
-  return candidate && isIpAddress(candidate) ? candidate : undefined;
+  return candidate ? normalizeIp(candidate) : undefined;
 }
 
-function isIpAddress(value: string): boolean {
-  return /^(\d{1,3}\.){3}\d{1,3}$/.test(value) || /^[0-9a-f:.]{2,45}$/i.test(value);
+/** Валидный IPv4/IPv6 (node:net), IPv4-mapped IPv6 приводится к IPv4; иначе undefined. */
+export function normalizeIp(value: string): string | undefined {
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(value);
+  const ip = mapped ? mapped[1] : value;
+  const version = isIP(ip);
+  if (version === 4) return ip;
+  if (version === 6) return ip.toLowerCase();
+  return undefined;
 }
 
 export function parseTrustProxyHops(raw: string | undefined): number {
