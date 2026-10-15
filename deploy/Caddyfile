@@ -1,0 +1,19 @@
+# Caddy получает и продлевает сертификат Let's Encrypt для DOMAIN автоматически.
+# X-Forwarded-For от клиента не принимается (trusted_proxies не задан): Caddy записывает
+# в него реальный IP посетителя, web берёт его при WEB_TRUST_PROXY_HOPS=1.
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Закрытое тестирование: весь сайт за паролем, пока не выполнены условия публичного запуска
+	# (docs/SECURITY.md). Для открытия убрать этот блок.
+	basic_auth {
+		{$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	reverse_proxy web:3000
+}

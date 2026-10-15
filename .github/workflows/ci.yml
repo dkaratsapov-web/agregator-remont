@@ -89,9 +89,140 @@ jobs:
           (cd apps/web && pnpm exec next start --port 3000 > ../../web.log 2>&1 &)
           pnpm smoke
           node scripts/jobs-integration.mjs
+          node scripts/bids-integration.mjs
           # Последним: в конце останавливает API, чтобы проверить выход при сбое API.
           API_PID=$(cat api.pid) node scripts/auth-integration.mjs
 
       - name: Server logs on failure
         if: failure()
         run: tail -n 100 api.log web.log || true
+
+  docker:
+    name: Docker stack (compose)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      COMPOSE: docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.local.yml -f deploy/docker-compose.ci.yml
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Prepare deploy/.env
+        run: |
+          cp deploy/.env.example deploy/.env
+          sed -i "s/^POSTGRES_PASSWORD=$/POSTGRES_PASSWORD=$(openssl rand -hex 16)/" deploy/.env
+          echo "AUTH_RATE_LIMIT_PER_MIN=20" >> deploy/.env
+
+      - name: Build images and start the stack
+        run: $COMPOSE up -d --build
+
+      - name: Wait for web
+        run: |
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:3000/offline > /dev/null && exit 0
+            sleep 2
+          done
+          exit 1
+
+      - name: Smoke and integration tests against containers
+        env:
+          NODE_ENV: production
+          API_URL: http://localhost:4000
+          WEB_URL: http://localhost:3000
+        run: |
+          node scripts/smoke.mjs
+          node scripts/jobs-integration.mjs
+          node scripts/bids-integration.mjs
+
+      - name: Another container in the backend network cannot spoof the client IP
+        run: |
+          docker run --rm --network agregator_backend agregator-api:local node -e "
+            (async () => {
+              for (let i = 1; i <= 30; i++) {
+                const res = await fetch('http://api:4000/v1/auth/login', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '203.0.113.' + i },
+                  body: JSON.stringify({ email: 'victim@example.ru', password: 'guess-password-' + i }),
+                });
+                if (res.status === 429) { console.log('blocked after', i, 'attempts with rotating X-Forwarded-For'); return; }
+              }
+              console.error('X-Forwarded-For from a non-web container was trusted'); process.exit(1);
+            })();"
+
+      - name: Image sizes
+        if: always()
+        run: docker image ls 'agregator-*'
+
+      - name: Container logs on failure
+        if: failure()
+        run: $COMPOSE logs --tail 200
+
+      - name: Stop the stack
+        if: always()
+        run: $COMPOSE down -v
+
+  proxy:
+    name: Docker stack behind Caddy (proxy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      COMPOSE: docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Prepare deploy/.env for https://localhost (Caddy internal CA)
+        run: |
+          cp deploy/.env.example deploy/.env
+          HASH=$(docker run --rm caddy:2-alpine caddy hash-password --plaintext 'ci-password')
+          {
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
+            echo "DOMAIN=localhost"
+            echo "PUBLIC_ORIGIN=https://localhost"
+            echo "WEB_TRUST_PROXY_HOPS=1"
+            echo "BASIC_AUTH_USER=tester"
+            echo "BASIC_AUTH_HASH='$HASH'"
+          } >> deploy/.env
+
+      - name: Only Caddy publishes ports; backend network is internal
+        run: $COMPOSE config --format json | node scripts/check-deploy-ports.mjs
+
+      - name: Build images and start the stack
+        run: $COMPOSE up -d --build
+
+      - name: Wait for Caddy
+        run: |
+          for i in $(seq 1 60); do
+            code=$(curl -sk -o /dev/null -w '%{http_code}' https://localhost/) || true
+            [ "$code" = "401" ] && exit 0
+            sleep 2
+          done
+          exit 1
+
+      - name: Password, HTTPS and closed web port
+        run: |
+          set -e
+          test "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost/jobs)" = "401"
+          test "$(curl -sk -o /dev/null -w '%{http_code}' -u tester:wrong https://localhost/jobs)" = "401"
+          test "$(curl -sk -o /dev/null -w '%{http_code}' -u tester:ci-password https://localhost/jobs)" = "200"
+          curl -sk -D - -o /dev/null -u tester:ci-password https://localhost/jobs | grep -i '^strict-transport-security: max-age=31536000'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost/jobs)" = "308"
+          if curl -s -o /dev/null --max-time 5 http://127.0.0.1:3000/; then echo 'web port 3000 is reachable on the host'; exit 1; fi
+          if curl -s -o /dev/null --max-time 5 http://127.0.0.1:4000/health; then echo 'api port 4000 is reachable on the host'; exit 1; fi
+          echo 'Proxy checks passed'
+
+      - name: Container logs on failure
+        if: failure()
+        run: $COMPOSE logs --tail 200
+
+      - name: Stop the stack
+        if: always()
+        run: $COMPOSE down -v

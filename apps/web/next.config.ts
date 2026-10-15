@@ -1,3 +1,4 @@
+import path from 'node:path';
 import type { NextConfig } from 'next';
 import { buildCsp, CSP_HEADER } from './src/lib/csp';
 
@@ -10,6 +11,10 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Docker-образ собирается с NEXT_OUTPUT=standalone; dev и CI используют обычную сборку.
+  ...(process.env.NEXT_OUTPUT === 'standalone'
+    ? { output: 'standalone' as const, outputFileTracingRoot: path.join(__dirname, '../../') }
+    : {}),
   poweredByHeader: false,
   reactStrictMode: true,
   async headers() {

@@ -1,0 +1,109 @@
+# Полный стек: PostgreSQL, миграции (+ демо-данные), API и web. Наружу ничего не публикуется:
+#   локально:  docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.local.yml up -d --build
+#   на домене: docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml up -d --build
+#
+# Сети: `backend` — внутренняя (без выхода наружу), в ней база, миграции, API и web со статическим
+# адресом; API доверяет X-Forwarded-For только этому адресу. `edge` — сеть web и Caddy.
+# Подробности: deploy/README.md
+name: agregator
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-agregator}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Задайте POSTGRES_PASSWORD в deploy/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-agregator}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Одноразовый запуск: миграции и (по желанию) демо-заказы. API стартует только после успеха.
+  migrate:
+    build: { context: .., target: api }
+    image: agregator-api:local
+    restart: 'no'
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-agregator}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-agregator}?schema=public
+      SEED_DEMO: ${SEED_DEMO:-false}
+    command:
+      - sh
+      - -c
+      - ./node_modules/.bin/prisma migrate deploy && if [ "$$SEED_DEMO" = "true" ]; then ALLOW_DEMO_SEED=true ./node_modules/.bin/tsx prisma/seed.ts; fi
+    networks: [backend]
+    depends_on:
+      db: { condition: service_healthy }
+
+  api:
+    image: agregator-api:local
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-agregator}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-agregator}?schema=public
+      API_PORT: '4000'
+      # Браузеры к API напрямую не обращаются: web ходит к нему по внутренней сети.
+      CORS_ORIGINS: ''
+      # API доверяет X-Forwarded-For только от web (его статический адрес во внутренней сети).
+      TRUST_PROXY: ${WEB_BACKEND_IP:-172.31.250.10}
+      RATE_LIMIT_PER_MIN: ${RATE_LIMIT_PER_MIN:-120}
+      AUTH_RATE_LIMIT_PER_MIN: ${AUTH_RATE_LIMIT_PER_MIN:-10}
+      WRITE_RATE_LIMIT_PER_MIN: ${WRITE_RATE_LIMIT_PER_MIN:-30}
+    networks: [backend]
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:4000/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  web:
+    build: { context: .., target: web }
+    image: agregator-web:local
+    restart: unless-stopped
+    environment:
+      API_URL: http://api:4000
+      WEB_PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:3000}
+      # 1 за Caddy (docker-compose.proxy.yml), 0 при локальном запуске без proxy.
+      WEB_TRUST_PROXY_HOPS: ${WEB_TRUST_PROXY_HOPS:-0}
+    # Порт на хосте не публикуется: на сервере сайт доступен только через Caddy (с паролем),
+    # локально порт открывает docker-compose.local.yml.
+    networks:
+      backend:
+        ipv4_address: ${WEB_BACKEND_IP:-172.31.250.10}
+      edge: {}
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3000/offline').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      api: { condition: service_healthy }
+
+networks:
+  backend:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${BACKEND_SUBNET:-172.31.250.0/24}
+  edge: {}
+
+volumes:
+  db-data:

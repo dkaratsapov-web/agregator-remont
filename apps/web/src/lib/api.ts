@@ -1,6 +1,11 @@
 import 'server-only';
 import type {
   AuthSessionDto,
+  BidInput,
+  ContractorProfileDto,
+  ContractorProfileInput,
+  JobBidDto,
+  MyBidDto,
   JobCategory,
   JobDto,
   JobInput,
@@ -22,7 +27,7 @@ export class ApiError extends Error {
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH';
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT';
   body?: unknown;
   /** Токен сессии пользователя; передаётся API как Bearer. */
   token?: string;
@@ -202,4 +207,81 @@ export async function closeMyJob(token: string, id: string, clientIp?: string): 
     clientIp,
   });
   return expectJson<OwnJobDto>(res, 'POST /v1/me/jobs/:id/close');
+}
+
+// --- Подрядчик: профиль и отклики
+
+export async function getMyProfile(token: string): Promise<ContractorProfileDto> {
+  return expectJson<ContractorProfileDto>(
+    await request('/v1/me/profile', { token }),
+    'GET /v1/me/profile',
+  );
+}
+
+export async function saveMyProfile(
+  token: string,
+  input: ContractorProfileInput,
+  clientIp?: string,
+): Promise<ContractorProfileDto> {
+  const res = await request('/v1/me/profile', { method: 'PUT', body: input, token, clientIp });
+  return expectJson<ContractorProfileDto>(res, 'PUT /v1/me/profile');
+}
+
+export async function placeBid(
+  token: string,
+  jobId: string,
+  input: BidInput,
+  clientIp?: string,
+): Promise<MyBidDto> {
+  const res = await request(`/v1/jobs/${encodeURIComponent(jobId)}/bids`, {
+    method: 'POST',
+    body: input,
+    token,
+    clientIp,
+  });
+  return expectJson<MyBidDto>(res, 'POST /v1/jobs/:id/bids');
+}
+
+export async function listMyBids(
+  token: string,
+  page: number,
+  options: { jobId?: string; limit?: number } = {},
+): Promise<Paginated<MyBidDto>> {
+  const query = new URLSearchParams({ page: String(page), limit: String(options.limit ?? 20) });
+  if (options.jobId) query.set('jobId', options.jobId);
+  const res = await request(`/v1/me/bids?${query.toString()}`, { token });
+  return expectJson<Paginated<MyBidDto>>(res, 'GET /v1/me/bids');
+}
+
+export async function withdrawBid(
+  token: string,
+  bidId: string,
+  clientIp?: string,
+): Promise<MyBidDto> {
+  const res = await request(`/v1/me/bids/${encodeURIComponent(bidId)}/withdraw`, {
+    method: 'POST',
+    token,
+    clientIp,
+  });
+  return expectJson<MyBidDto>(res, 'POST /v1/me/bids/:id/withdraw');
+}
+
+// --- Заказчик: отклики на свой заказ
+
+export async function listJobBids(token: string, jobId: string): Promise<JobBidDto[]> {
+  const res = await request(`/v1/me/jobs/${encodeURIComponent(jobId)}/bids`, { token });
+  return expectJson<JobBidDto[]>(res, 'GET /v1/me/jobs/:id/bids');
+}
+
+export async function acceptBid(
+  token: string,
+  jobId: string,
+  bidId: string,
+  clientIp?: string,
+): Promise<JobBidDto> {
+  const res = await request(
+    `/v1/me/jobs/${encodeURIComponent(jobId)}/bids/${encodeURIComponent(bidId)}/accept`,
+    { method: 'POST', token, clientIp },
+  );
+  return expectJson<JobBidDto>(res, 'POST /v1/me/jobs/:id/bids/:bidId/accept');
 }

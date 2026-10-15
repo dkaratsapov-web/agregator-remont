@@ -11,6 +11,8 @@ import {
 import { loadRateLimits } from './config/env';
 import { HealthController } from './health/health.controller';
 import { JobsModule } from './jobs/jobs.module';
+import { BidsModule } from './bids/bids.module';
+import { ContractorsModule } from './contractors/contractors.module';
 import { MyJobsModule } from './my-jobs/my-jobs.module';
 import { PrismaModule } from './prisma/prisma.module';
 
@@ -42,6 +44,8 @@ import { PrismaModule } from './prisma/prisma.module';
     JobsModule,
     AuthModule,
     MyJobsModule,
+    BidsModule,
+    ContractorsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

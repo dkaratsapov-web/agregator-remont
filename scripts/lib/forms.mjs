@@ -26,7 +26,12 @@ const decode = (v) =>
 
 /** Скрытые поля Server Action формы на странице; `pick` выбирает форму по её HTML. */
 export async function actionForm(path, { cookie, pick = () => true } = {}) {
-  const res = await fetch(WEB + path, { headers: cookie ? { Cookie: cookie } : {} });
+  // Без перехода по редиректам: иначе при потерянной сессии скрипт взял бы форму входа.
+  const res = await fetch(WEB + path, {
+    headers: cookie ? { Cookie: cookie } : {},
+    redirect: 'manual',
+  });
+  if (res.status !== 200) throw new Error(`GET ${path} -> HTTP ${res.status} (expected 200)`);
   const html = await res.text();
   const form = [...html.matchAll(/<form[^>]*>([\s\S]*?)<\/form>/g)].find(
     (m) => m[1].includes('$ACTION') && pick(m[1]),
@@ -58,9 +63,8 @@ export async function submit(path, fields, opts = {}) {
 
 export const sessionFrom = (setCookie) => /(__Host-ar_session|ar_session)=([^;]*)/.exec(setCookie);
 
-/** Cookie сессии web для токена, выданного API. */
-export const sessionCookie = (token) =>
-  `${process.env.NODE_ENV === 'production' ? '__Host-ar_session' : 'ar_session'}=${token}`;
+/** Cookie сессии web для токена от API: под обоими именами (production и dev), web читает своё. */
+export const sessionCookie = (token) => `__Host-ar_session=${token}; ar_session=${token}`;
 
 let counter = 0;
 /** Регистрация через API; уникальный X-Forwarded-For, чтобы не упираться в лимит на вход. */

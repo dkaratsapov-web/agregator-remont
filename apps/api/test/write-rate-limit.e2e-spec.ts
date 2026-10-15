@@ -17,6 +17,7 @@ describe('Write rate limit (e2e)', () => {
 
   afterAll(async () => {
     await prisma.auditLog.deleteMany();
+    await prisma.bid.deleteMany();
     await prisma.job.deleteMany();
     await prisma.user.deleteMany();
     await app.close();

@@ -8,7 +8,8 @@ import { CustomersOnly } from '@/components/jobs/customers-only';
 import { JobForm } from '@/components/jobs/job-form';
 import { Notice } from '@/components/notice';
 import { StatusBadge } from '@/components/status-badge';
-import { getMyJob } from '@/lib/api';
+import { JobBidList } from '@/components/bids/job-bid-list';
+import { getMyJob, listJobBids } from '@/lib/api';
 import { requireCustomerPage } from '@/lib/customer';
 import { formatAmount, formatBudget, formatDate } from '@/lib/format';
 import { closeJobAction, updateJobAction } from '../actions';
@@ -30,8 +31,10 @@ export default async function MyJobPage({
   if (!token) return <CustomersOnly />;
 
   let job: Awaited<ReturnType<typeof getMyJob>>;
+  let bids: Awaited<ReturnType<typeof listJobBids>> = [];
   try {
     job = await getMyJob(token, id);
+    if (job) bids = await listJobBids(token, job.id);
   } catch (error) {
     console.error('My job: failed to load', error);
     return (
@@ -48,7 +51,9 @@ export default async function MyJobPage({
       ? 'Изменения сохранены.'
       : query.closed
         ? 'Заказ закрыт.'
-        : null;
+        : query.accepted
+          ? 'Исполнитель выбран, заказ в работе.'
+          : null;
 
   return (
     <div className="mx-auto max-w-2xl px-4 pt-10 sm:px-6 md:pt-14">
@@ -75,6 +80,23 @@ export default async function MyJobPage({
         </div>
       ) : null}
 
+      <section aria-labelledby="bids-title" className="mt-10">
+        <h2 id="bids-title" className="text-lg font-semibold">
+          Отклики <span className="tabular-nums text-ink-soft">{bids.length}</span>
+        </h2>
+        <div className="mt-4">
+          {bids.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-line bg-surface px-4 py-6 text-center text-sm text-ink-soft">
+              {job.status === 'OPEN'
+                ? 'Откликов пока нет. Подрядчики увидят заказ в каталоге.'
+                : 'Откликов нет.'}
+            </p>
+          ) : (
+            <JobBidList jobId={job.id} bids={bids} canAccept={job.status === 'OPEN'} />
+          )}
+        </div>
+      </section>
+
       {job.editable ? (
         <>
           <h2 className="mt-10 text-lg font-semibold">Редактирование</h2>
@@ -99,7 +121,7 @@ export default async function MyJobPage({
           <p className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink-soft">
             {job.status === 'CLOSED'
               ? 'Заказ закрыт, редактирование недоступно.'
-              : 'Заказ в работе, редактирование недоступно.'}
+              : 'Исполнитель выбран, заказ в работе. Редактирование недоступно.'}
           </p>
           <dl className="grid gap-4 rounded-2xl border border-line bg-surface p-6">
             <div>

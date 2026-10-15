@@ -29,3 +29,4 @@ pnpm-debug.log*
 api.log
 web.log
 api.pid
+deploy/.env
