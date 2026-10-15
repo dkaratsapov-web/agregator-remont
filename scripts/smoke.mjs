@@ -42,7 +42,32 @@ check('jobs seeded', list.total > 0, `total=${list.total}`);
 await expectStatus(`${API}/v1/jobs?limit=51`, 400);
 await expectStatus(`${API}/v1/jobs/does-not-exist`, 404);
 
+// Аккаунт: регистрация, профиль, выход; уникальный email на каждый прогон.
+const email = `smoke-${Date.now()}@example.ru`;
+const reg = await fetch(`${API}/v1/auth/register`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    email,
+    password: 'smoke-password-123',
+    name: 'Смоук Тест',
+    role: 'CUSTOMER',
+  }),
+});
+check('register -> 201', reg.status === 201, `got ${reg.status}`);
+const { token } = await reg.json();
+const auth = { Authorization: `Bearer ${token}` };
+const me = await fetch(`${API}/v1/me`, { headers: auth });
+check('me with session -> 200', me.status === 200, `got ${me.status}`);
+check('me hides password hash', !(await me.text()).includes('passwordHash'));
+await fetch(`${API}/v1/auth/logout`, { method: 'POST', headers: auth });
+const after = await fetch(`${API}/v1/me`, { headers: auth });
+check('me after logout -> 401', after.status === 401, `got ${after.status}`);
+
 await expectStatus(`${WEB}/`, 200);
+await expectStatus(`${WEB}/login`, 200);
+await expectStatus(`${WEB}/register`, 200);
+await expectStatus(`${WEB}/account`, 307);
 await expectStatus(`${WEB}/jobs`, 200);
 await expectStatus(`${WEB}/jobs?page=2`, 200);
 const detail = await expectStatus(`${WEB}/jobs/${list.items[0].id}`, 200);

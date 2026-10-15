@@ -1,4 +1,4 @@
-import { loadEnv } from './env';
+import { loadEnv, loadRateLimits } from './env';
 
 describe('loadEnv', () => {
   const base = { DATABASE_URL: 'postgresql://u:p@localhost:5432/db' };
@@ -66,5 +66,21 @@ describe('loadEnv', () => {
     ])('rejects %s', (value, message) => {
       expect(() => loadEnv({ ...base, TRUST_PROXY: value })).toThrow(message);
     });
+  });
+});
+
+describe('loadRateLimits', () => {
+  it('uses defaults and parses overrides', () => {
+    expect(loadRateLimits({})).toEqual({ perMinute: 120, authPerMinute: 10 });
+    expect(loadRateLimits({ RATE_LIMIT_PER_MIN: '300', AUTH_RATE_LIMIT_PER_MIN: '5' })).toEqual({
+      perMinute: 300,
+      authPerMinute: 5,
+    });
+  });
+
+  it.each(['0', '-1', '1.5', 'abc'])('rejects %s', (value) => {
+    expect(() => loadRateLimits({ AUTH_RATE_LIMIT_PER_MIN: value })).toThrow(
+      'AUTH_RATE_LIMIT_PER_MIN',
+    );
   });
 });

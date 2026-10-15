@@ -28,3 +28,4 @@ pnpm-debug.log*
 # логи smoke-теста в CI
 api.log
 web.log
+api.pid

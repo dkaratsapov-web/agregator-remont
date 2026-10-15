@@ -74,14 +74,20 @@ jobs:
           pnpm --filter @agregator/api exec tsx prisma/seed.ts
           pnpm --filter @agregator/api exec tsx prisma/seed.ts
 
-      - name: Smoke test production build
+      - name: Smoke and auth integration tests (production build)
         env:
           NODE_ENV: production
           CORS_ORIGINS: https://remont.example
+          # Имитация схемы proxy → web → API: web доверяет одному proxy, API доверяет web (loopback).
+          TRUST_PROXY: loopback
+          WEB_TRUST_PROXY_HOPS: '1'
+          AUTH_RATE_LIMIT_PER_MIN: '3'
         run: |
-          (cd apps/api && node dist/main.js > ../../api.log 2>&1 &)
+          node apps/api/dist/main.js > api.log 2>&1 &
+          echo $! > api.pid
           (cd apps/web && pnpm exec next start --port 3000 > ../../web.log 2>&1 &)
           pnpm smoke
+          API_PID=$(cat api.pid) node scripts/auth-integration.mjs
 
       - name: Server logs on failure
         if: failure()

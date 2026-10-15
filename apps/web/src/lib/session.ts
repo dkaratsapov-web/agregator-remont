@@ -1,0 +1,60 @@
+import 'server-only';
+import type { UserDto } from '@agregator/shared';
+import { cookies, headers } from 'next/headers';
+import { cache } from 'react';
+import { getMe } from './api';
+import { clientIpFromForwardedFor, parseTrustProxyHops } from './client-ip';
+
+/**
+ * В production cookie с префиксом __Host-: только HTTPS, только этот хост, путь /.
+ * Токен недоступен JavaScript (HttpOnly) и не уходит на сторонние сайты (SameSite=Lax).
+ */
+export function sessionCookieName(): string {
+  return process.env.NODE_ENV === 'production' ? '__Host-ar_session' : 'ar_session';
+}
+
+export async function getSessionToken(): Promise<string | undefined> {
+  return (await cookies()).get(sessionCookieName())?.value;
+}
+
+function cookieAttributes() {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    path: '/',
+  };
+}
+
+export async function setSessionCookie(token: string, expiresAt: string): Promise<void> {
+  (await cookies()).set(sessionCookieName(), token, {
+    ...cookieAttributes(),
+    expires: new Date(expiresAt),
+  });
+}
+
+/**
+ * Удаление теми же атрибутами, что и установка: браузер отвергает Set-Cookie для __Host-
+ * без Secure, и cookie.delete() без атрибутов оставил бы её в браузере.
+ */
+export async function clearSessionCookie(): Promise<void> {
+  (await cookies()).set(sessionCookieName(), '', { ...cookieAttributes(), maxAge: 0 });
+}
+
+/** Текущий пользователь (один запрос к API на рендер). null без сессии или при её истечении. */
+export const getCurrentUser = cache(async (): Promise<UserDto | null> => {
+  const token = await getSessionToken();
+  if (!token) return null;
+  try {
+    return await getMe(token);
+  } catch (error) {
+    console.error('Session: failed to load current user', error);
+    return null;
+  }
+});
+
+/** IP посетителя с учётом доверенных прокси перед web (WEB_TRUST_PROXY_HOPS, docs/DEPLOYMENT.md). */
+export async function getClientIp(): Promise<string | undefined> {
+  const hops = parseTrustProxyHops(process.env.WEB_TRUST_PROXY_HOPS);
+  return clientIpFromForwardedFor((await headers()).get('x-forwarded-for'), hops);
+}
