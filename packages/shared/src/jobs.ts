@@ -59,3 +59,34 @@ export interface JobDto {
 export function isJobCategory(value: unknown): value is JobCategory {
   return typeof value === 'string' && (JOB_CATEGORIES as readonly string[]).includes(value);
 }
+
+export const JOB_LIMITS = {
+  TITLE_MIN: 5,
+  TITLE_MAX: 160,
+  DESCRIPTION_MIN: 20,
+  DESCRIPTION_MAX: 5000,
+  CITY_MIN: 2,
+  CITY_MAX: 100,
+  /** Верхняя граница бюджета в рублях (защита от переполнения и опечаток). */
+  BUDGET_MAX: 1_000_000_000,
+  /** Сколько заказов один пользователь может создать за 24 часа. */
+  CREATED_PER_DAY: 20,
+} as const;
+
+/** Поля, которые заказчик задаёт сам. Владелец, статус и даты задаёт только сервер. */
+export interface JobInput {
+  title: string;
+  description: string;
+  category: JobCategory;
+  city: string;
+  budgetMin: number | null;
+  budgetMax: number | null;
+}
+
+/** Заказ в кабинете владельца. */
+export interface OwnJobDto extends JobDto {
+  /** ISO 8601 */
+  updatedAt: string;
+  /** Редактировать можно только открытый заказ. */
+  editable: boolean;
+}

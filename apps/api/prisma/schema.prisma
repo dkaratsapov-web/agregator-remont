@@ -32,6 +32,12 @@ enum Currency {
   RUB
 }
 
+enum AuditAction {
+  JOB_CREATED
+  JOB_UPDATED
+  JOB_CLOSED
+}
+
 // Синхронизировано с USER_ROLES в packages/shared/src/auth.ts.
 enum UserRole {
   CUSTOMER
@@ -50,11 +56,16 @@ model Job {
   budgetMax   Int?        @map("budget_max")
   currency    Currency    @default(RUB)
   status      JobStatus   @default(OPEN)
+  /// Заказчик-владелец. null у демонстрационных заказов из сида.
+  ownerId     String?     @map("owner_id")
+  /// Restrict: удаление пользователя не должно молча удалять или «осиротить» его заказы.
+  owner       User?       @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
 
   @@index([createdAt(sort: Desc), id(sort: Desc)])
   @@index([category, createdAt(sort: Desc)])
+  @@index([ownerId, createdAt(sort: Desc)])
   @@map("jobs")
 }
 
@@ -69,6 +80,8 @@ model User {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   sessions     Session[]
+  jobs         Job[]
+  auditLogs    AuditLog[]
 
   @@map("users")
 }
@@ -85,4 +98,23 @@ model Session {
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
+}
+
+/// Журнал изменений: кто, что и когда изменил. Пишется в той же транзакции, что и изменение.
+/// Не содержит секретов; персональные данные — только идентификатор автора.
+model AuditLog {
+  id         String      @id @default(cuid())
+  /// SetNull: запись журнала переживает удаление пользователя.
+  actorId    String?     @map("actor_id")
+  actor      User?       @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action     AuditAction
+  entityType String      @map("entity_type") @db.VarChar(40)
+  entityId   String      @map("entity_id")
+  /// { field: { from, to } } только для изменённых полей.
+  changes    Json
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
 }

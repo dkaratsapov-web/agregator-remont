@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isSameOriginRequest } from './same-origin';
+import { isSameOriginRequest, parsePublicOrigin } from './same-origin';
 
 const req = (headers: Record<string, string>) => (name: string) => headers[name] ?? null;
 
@@ -46,5 +46,40 @@ describe('isSameOriginRequest', () => {
     ['no Host', { origin: 'https://remont.example' }],
   ])('rejects %s', (_name, headers) => {
     expect(isSameOriginRequest(req(headers))).toBe(false);
+  });
+});
+
+describe('isSameOriginRequest with WEB_PUBLIC_ORIGIN', () => {
+  const PUBLIC = 'https://remont.example';
+
+  it('accepts only the configured public origin', () => {
+    expect(isSameOriginRequest(req({ origin: PUBLIC, host: 'web:3000' }), PUBLIC)).toBe(true);
+  });
+
+  it('ignores spoofed Host and X-Forwarded-Host that match a foreign Origin', () => {
+    expect(
+      isSameOriginRequest(
+        req({
+          origin: 'https://evil.example',
+          host: 'evil.example',
+          'x-forwarded-host': 'evil.example',
+        }),
+        PUBLIC,
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects http when the public origin is https', () => {
+    expect(isSameOriginRequest(req({ origin: 'http://remont.example' }), PUBLIC)).toBe(false);
+  });
+});
+
+describe('parsePublicOrigin', () => {
+  it('normalizes and validates', () => {
+    expect(parsePublicOrigin(undefined)).toBeUndefined();
+    expect(parsePublicOrigin('https://remont.example/')).toBe('https://remont.example');
+    expect(() => parsePublicOrigin('https://remont.example/app')).toThrow();
+    expect(() => parsePublicOrigin('ftp://remont.example')).toThrow();
+    expect(() => parsePublicOrigin('remont.example')).toThrow();
   });
 });

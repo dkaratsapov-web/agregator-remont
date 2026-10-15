@@ -96,6 +96,8 @@ export interface RateLimits {
   perMinute: number;
   /** Лимит на вход и регистрацию в минуту на IP. */
   authPerMinute: number;
+  /** Лимит на изменяющие запросы (создание/правка заказов) в минуту на IP. */
+  writePerMinute: number;
 }
 
 function parseLimit(raw: string | undefined, name: string, fallback: number): number {
@@ -111,5 +113,6 @@ export function loadRateLimits(source: NodeJS.ProcessEnv = process.env): RateLim
   return {
     perMinute: parseLimit(source.RATE_LIMIT_PER_MIN, 'RATE_LIMIT_PER_MIN', 120),
     authPerMinute: parseLimit(source.AUTH_RATE_LIMIT_PER_MIN, 'AUTH_RATE_LIMIT_PER_MIN', 10),
+    writePerMinute: parseLimit(source.WRITE_RATE_LIMIT_PER_MIN, 'WRITE_RATE_LIMIT_PER_MIN', 30),
   };
 }

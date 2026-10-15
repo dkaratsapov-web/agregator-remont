@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import { StatusBadge } from '@/components/status-badge';
-import { getJob } from '@/lib/api';
+import { getJob, getMyJob } from '@/lib/api';
+import { getCurrentUser, getSessionToken } from '@/lib/session';
 import { formatBudget, formatDate } from '@/lib/format';
 import { jobsHref } from '@/lib/search-params';
 
@@ -21,8 +22,20 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   return { title: job.title, description: job.description.slice(0, 160) };
 }
 
+/** Свой ли это заказ: только для заказчика, через API кабинета (404 для чужого). */
+async function isOwnJob(id: string): Promise<boolean> {
+  const [user, token] = await Promise.all([getCurrentUser(), getSessionToken()]);
+  if (!user || !token || user.role !== 'CUSTOMER') return false;
+  try {
+    return (await getMyJob(token, id)) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export default async function JobPage({ params }: { params: Params }) {
-  const job = await loadJob((await params).id);
+  const { id } = await params;
+  const [job, own] = await Promise.all([loadJob(id), isOwnJob(id)]);
   if (!job) notFound();
 
   return (
@@ -45,6 +58,18 @@ export default async function JobPage({ params }: { params: Params }) {
           </li>
         </ol>
       </nav>
+
+      {own ? (
+        <p className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-accent-tint px-4 py-3 text-sm">
+          <span className="font-medium">Это ваш заказ.</span>
+          <Link
+            href={`/account/jobs/${job.id}`}
+            className="font-semibold text-accent hover:underline"
+          >
+            Управлять заказом
+          </Link>
+        </p>
+      ) : null}
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_20rem] lg:gap-12">
         <article>
