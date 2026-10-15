@@ -15,13 +15,13 @@ git clone https://github.com/dkaratsapov-web/agregator-remont.git
 cd agregator-remont
 cp deploy/.env.example deploy/.env
 # откройте deploy/.env и задайте POSTGRES_PASSWORD (буквы и цифры), например: openssl rand -hex 24
-docker compose -f deploy/docker-compose.yml up -d --build
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.local.yml up -d --build
 ```
 
 Первая сборка занимает несколько минут. Затем откройте http://localhost:3000 в Chrome или Firefox.
 В каталоге будут демо-заказы; зарегистрируйтесь как заказчик, чтобы создать свой заказ.
 
-Остановить: `docker compose -f deploy/docker-compose.yml down` (данные сохранятся в томе `db-data`;
+Остановить: `docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.local.yml down` (данные сохранятся в томе `db-data`;
 `down -v` удалит и их).
 
 ## 2. На сервере с доменом (закрытый тест)
@@ -71,17 +71,46 @@ docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml l
 # резервная копия базы (храните копии вне сервера)
 docker compose -f deploy/docker-compose.yml exec -T db \
   sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom' > backup-$(date +%F).dump
+
+# проверка восстановления: копия разворачивается в отдельную временную базу
+docker compose -f deploy/docker-compose.yml exec -T db sh -c 'createdb -U "$POSTGRES_USER" restore_check'
+docker compose -f deploy/docker-compose.yml exec -T db \
+  sh -c 'pg_restore -U "$POSTGRES_USER" -d restore_check --no-owner' < backup-$(date +%F).dump
+docker compose -f deploy/docker-compose.yml exec -T db \
+  sh -c 'psql -U "$POSTGRES_USER" -d restore_check -c "select count(*) from jobs"'
+docker compose -f deploy/docker-compose.yml exec -T db sh -c 'dropdb -U "$POSTGRES_USER" restore_check'
 ```
+
+## Перед появлением реальных пользовательских данных
+
+Сейчас стенд для закрытого теста. До реальных пользователей обязательно:
+
+- резервное копирование по расписанию (cron) с копией **вне сервера** и регулярной проверкой
+  восстановления (команды выше);
+- мониторинг доступности и срока действия сертификата (Caddy продлевает его сам, но сбой
+  продления нужно увидеть заранее);
+- ограничение размера логов Docker (`/etc/docker/daemon.json`: `"log-opts": {"max-size": "10m", "max-file": "5"}`);
+- условия публичного запуска из [docs/SECURITY.md](../docs/SECURITY.md).
 
 ## Что внутри и почему так
 
-- API наружу не публикуется: web обращается к нему по внутренней сети Docker. CORS пуст.
+- На сервере наружу открыт только Caddy (80/443). Порт web на хосте не публикуется
+  (`docker-compose.local.yml` делает это только для локального запуска), поэтому пароль Caddy
+  нельзя обойти даже с самого сервера через `127.0.0.1`. CI проверяет это и конфигурацией
+  (`scripts/check-deploy-ports.mjs`), и на запущенном стеке.
+- База, миграции и API находятся во внутренней сети `backend` без выхода наружу. У web в ней
+  статический адрес (`WEB_BACKEND_IP`, по умолчанию `172.31.250.10`), и API доверяет
+  `X-Forwarded-For` только ему. CI проверяет: посторонний контейнер в этой сети с подменённым
+  заголовком упирается в лимит на вход. Если подсеть `172.31.250.0/24` занята на сервере,
+  задайте `BACKEND_SUBNET` и `WEB_BACKEND_IP` в `deploy/.env`.
 - Caddy записывает в `X-Forwarded-For` реальный IP посетителя (заголовок от клиента не принимается),
-  web берёт его при `WEB_TRUST_PROXY_HOPS=1`, API доверяет заголовку только из приватной сети
-  Docker (`TRUST_PROXY=uniquelocal`). Так работают лимиты на вход по IP посетителя.
+  web берёт его при `WEB_TRUST_PROXY_HOPS=1` и передаёт API. Так работают лимиты на вход по IP
+  посетителя.
 - `PUBLIC_ORIGIN` попадает в `WEB_PUBLIC_ORIGIN`: формы принимаются только с этого адреса.
 - Сайт закрыт паролем (basic auth), пока не выполнены условия публичного запуска из
   `docs/SECURITY.md`. Для открытия убрать блок `basic_auth` в `deploy/Caddyfile`.
-- Порт web `3000` привязан к `127.0.0.1` и снаружи недоступен.
-- Сборка и запуск этого стека проверяются в CI (job `Docker stack (compose)`): образы собираются,
-  стек поднимается, по нему проходят smoke и интеграционный тест заказов.
+- Стек проверяется в CI двумя job: `Docker stack (compose)` (сборка образов, smoke и
+  интеграционные тесты по контейнерам, попытка подмены IP из внутренней сети) и
+  `Docker stack behind Caddy (proxy)` (Caddy на `https://localhost` со своим сертификатом:
+  без пароля 401, с паролем 200, HSTS, редирект с http, порты 3000 и 4000 на хосте закрыты).
+  Получение настоящего сертификата Let's Encrypt проверяется только при запуске на домене.

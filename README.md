@@ -19,7 +19,7 @@ Web получает данные только через настоящий API
 
 ```bash
 cp deploy/.env.example deploy/.env   # задайте POSTGRES_PASSWORD
-docker compose -f deploy/docker-compose.yml up -d --build
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.local.yml up -d --build
 ```
 
 Сайт: http://localhost:3000. Развёртывание на домене с HTTPS: [deploy/README.md](deploy/README.md).
