@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Значения enum'ов синхронизированы с packages/shared/src/jobs.ts
+// (проверяется тестом src/jobs/contract.spec.ts).
+enum JobCategory {
+  REPAIR_TURNKEY
+  PLUMBING
+  ELECTRICAL
+  TILING
+  FINISHING
+  FLOORING
+  ROOFING
+  WINDOWS_DOORS
+  DESIGN
+  OTHER
+}
+
+enum JobStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+}
+
+enum Currency {
+  RUB
+}
+
+model Job {
+  id          String      @id @default(cuid())
+  title       String      @db.VarChar(160)
+  description String
+  category    JobCategory
+  city        String      @db.VarChar(100)
+  /// Целые рубли; null — «по договорённости». Ограничения проверяются CHECK в миграции.
+  budgetMin   Int?        @map("budget_min")
+  budgetMax   Int?        @map("budget_max")
+  currency    Currency    @default(RUB)
+  status      JobStatus   @default(OPEN)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  @@index([createdAt(sort: Desc), id(sort: Desc)])
+  @@index([category, createdAt(sort: Desc)])
+  @@map("jobs")
+}
