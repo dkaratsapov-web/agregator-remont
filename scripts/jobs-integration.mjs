@@ -10,6 +10,13 @@ const job = {
   budgetMin: '40 000',
   budgetMax: '60 000',
   description: 'Укладка плитки в ванной, около 20 м². Материалы заказчика.',
+  // Обязательные вопросы анкеты плитки (packages/shared/src/job-questions.ts).
+  details: JSON.stringify({
+    rooms: ['bathroom'],
+    surfaces: ['floor'],
+    floorArea: 6,
+    tileType: 'ceramic',
+  }),
 };
 
 const owner = await registerViaApi('CUSTOMER');

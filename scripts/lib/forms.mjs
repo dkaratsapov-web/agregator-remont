@@ -48,7 +48,8 @@ export async function submit(path, fields, opts = {}) {
   const { origin = WEB, forwardedFor, forwardedHost, cookie, pick } = opts;
   const body = new FormData();
   for (const [name, value] of await actionForm(path, { cookie, pick })) body.append(name, value);
-  for (const [name, value] of Object.entries(fields)) body.append(name, value);
+  // set, а не append: поле формы заменяет одноимённое скрытое (его пишут свои выпадающие списки).
+  for (const [name, value] of Object.entries(fields)) body.set(name, value);
   const headers = {};
   if (origin) headers.Origin = origin;
   if (forwardedFor) headers['X-Forwarded-For'] = forwardedFor;
