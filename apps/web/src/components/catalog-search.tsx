@@ -1,6 +1,7 @@
-import { JOB_LIMITS, JOB_SEARCH } from '@agregator/shared';
+import { JOB_LIMITS, JOB_SEARCH, SERVICE_AREA_ERROR } from '@agregator/shared';
 import Link from 'next/link';
-import { RU_CITIES } from '@/lib/cities';
+import { CityCombobox } from '@/components/ui/city-combobox';
+import { CITY_GROUPS, CITY_OPTIONS } from '@/lib/city-options';
 import { jobsHref, type JobsFilters } from '@/lib/search-params';
 
 /**
@@ -44,35 +45,22 @@ export function CatalogSearch({ filters }: { filters: JobsFilters }) {
             className="min-w-0 flex-1 bg-transparent text-base text-ink placeholder:text-ink-soft/70 focus:outline-none"
           />
         </label>
-        <label className="flex min-h-12 items-center gap-3 rounded-2xl bg-canvas px-4 ring-1 ring-transparent focus-within:ring-accent">
-          <svg
-            viewBox="0 0 20 20"
-            className="size-4 shrink-0 text-ink-soft"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            aria-hidden="true"
-          >
-            <path d="M10 18s6-5.2 6-10a6 6 0 1 0-12 0c0 4.8 6 10 6 10Z" strokeLinejoin="round" />
-            <circle cx="10" cy="8" r="2.2" />
-          </svg>
-          <span className="sr-only">Город</span>
-          <input
+        <div>
+          <label htmlFor="catalog-city" className="sr-only">
+            Город
+          </label>
+          <CityCombobox
+            id="catalog-city"
             name="city"
-            defaultValue={filters.city}
+            options={CITY_OPTIONS}
+            groups={CITY_GROUPS}
+            defaultValue={filters.city ?? ''}
             placeholder="Город"
-            list="catalog-cities"
-            minLength={JOB_LIMITS.CITY_MIN}
+            strict
+            emptyMessage={SERVICE_AREA_ERROR}
             maxLength={JOB_LIMITS.CITY_MAX}
-            autoComplete="off"
-            className="min-w-0 flex-1 bg-transparent text-base text-ink placeholder:text-ink-soft/70 focus:outline-none"
           />
-          <datalist id="catalog-cities">
-            {RU_CITIES.map((city) => (
-              <option key={city} value={city} />
-            ))}
-          </datalist>
-        </label>
+        </div>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2 px-1 pt-2">
         <label className="inline-flex min-h-10 cursor-pointer items-center gap-2.5 text-sm text-ink-soft">

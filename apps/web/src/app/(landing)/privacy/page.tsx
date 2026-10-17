@@ -50,7 +50,7 @@ export default function PrivacyPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">
           Редакция от {version}
         </p>
-        <h1 className="font-display mt-3 text-3xl font-semibold leading-[1.08] tracking-[-0.035em] sm:text-5xl">
+        <h1 className="font-display mt-3 text-[1.55rem] font-semibold leading-[1.1] tracking-[-0.035em] [overflow-wrap:anywhere] min-[400px]:text-3xl sm:text-5xl">
           Политика конфиденциальности
         </h1>
 

@@ -69,7 +69,7 @@ export default async function SettingsPage() {
       </p>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <nav aria-label="Разделы настроек" className="lg:sticky lg:top-24 lg:self-start">
+        <nav aria-label="Разделы настроек" className="min-w-0 lg:sticky lg:top-24 lg:self-start">
           <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] lg:mx-0 lg:flex-col lg:gap-1 lg:px-0">
             {SECTIONS.map((s) => (
               <li key={s.id}>

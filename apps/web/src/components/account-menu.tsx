@@ -167,10 +167,10 @@ export function AccountMenu({ user }: { user: MenuUser }) {
           aria-controls={panelId}
           aria-label={`Меню кабинета: ${user.name}`}
           onClick={() => setOpen((value) => !value)}
-          className="inline-flex min-h-11 max-w-[55vw] items-center gap-2.5 rounded-full border border-line bg-surface/80 py-1 pl-1 pr-3.5 text-sm font-semibold text-ink transition-[background-color,border-color] duration-200 hover:border-ink/25 hover:bg-surface aria-expanded:border-ink/25 aria-expanded:bg-surface sm:max-w-xs"
+          className="inline-flex min-h-11 max-w-[55vw] items-center gap-2 rounded-full border border-line bg-surface/80 py-1 pl-1 pr-2.5 sm:gap-2.5 sm:pr-3.5 text-sm font-semibold text-ink transition-[background-color,border-color] duration-200 hover:border-ink/25 hover:bg-surface aria-expanded:border-ink/25 aria-expanded:bg-surface sm:max-w-xs"
         >
           <UserAvatar name={user.name} avatarVersion={user.avatarVersion} />
-          <span className="min-w-0 truncate">{user.name}</span>
+          <span className="min-w-0 truncate max-sm:sr-only">{user.name}</span>
           <svg
             viewBox="0 0 16 16"
             aria-hidden="true"

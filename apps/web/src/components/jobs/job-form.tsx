@@ -6,9 +6,6 @@ import {
   JOB_CATEGORY_LABELS,
   JOB_LIMITS,
   SERVICE_AREA_ERROR,
-  SERVICE_CITIES,
-  SERVICE_REGION_LABELS,
-  SERVICE_REGIONS,
   validateJobDetails,
   type JobCategory,
   type JobDetails,
@@ -19,6 +16,7 @@ import { Field } from '@/components/auth/field';
 import { FormError } from '@/components/auth/form-error';
 import { SubmitButton } from '@/components/auth/submit-button';
 import { CityCombobox } from '@/components/ui/city-combobox';
+import { CITY_GROUPS, CITY_OPTIONS } from '@/lib/city-options';
 import { Select } from '@/components/ui/select';
 import {
   checkJobForm,
@@ -40,16 +38,6 @@ const CATEGORY_OPTIONS = JOB_CATEGORIES.map((category) => ({
   value: category,
   label: JOB_CATEGORY_LABELS[category],
 }));
-const CITY_OPTIONS = SERVICE_CITIES.map((city) => ({
-  value: city.name,
-  label: city.name,
-  group: city.region,
-}));
-const CITY_GROUPS = SERVICE_REGIONS.map((region) => ({
-  id: region,
-  label: SERVICE_REGION_LABELS[region],
-}));
-
 const FIELD_IDS: Record<JobFormIssue['field'], string> = {
   title: 'field-title',
   category: 'field-category',

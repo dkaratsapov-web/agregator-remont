@@ -23,7 +23,7 @@ function PasswordInput({
 }) {
   const [visible, setVisible] = useState(false);
   return (
-    <div>
+    <div className="min-w-0">
       <label htmlFor={id} className="block text-sm font-medium text-ink">
         {label}
       </label>
@@ -37,7 +37,7 @@ function PasswordInput({
           minLength={minLength}
           maxLength={AUTH_LIMITS.PASSWORD_MAX}
           aria-describedby={hint ? `${id}-hint` : undefined}
-          className="min-w-0 flex-1 bg-transparent px-4 py-3 text-base text-ink focus:outline-none"
+          className="w-0 min-w-0 flex-1 bg-transparent px-4 py-3 text-base text-ink focus:outline-none"
         />
         <button
           type="button"
