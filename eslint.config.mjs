@@ -13,6 +13,8 @@ export default tseslint.config(
       '**/.next/**',
       '**/coverage/**',
       '**/next-env.d.ts',
+      // Временные копии репозитория для параллельной работы агентов.
+      '.claude/**',
     ],
   },
   js.configs.recommended,

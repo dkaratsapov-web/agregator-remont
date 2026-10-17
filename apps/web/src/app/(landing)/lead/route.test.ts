@@ -91,6 +91,28 @@ describe('POST /lead', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('rejects an oversized chunked body without Content-Length', async () => {
+    state.headers.set('origin', 'http://localhost:3000');
+    state.headers.set('host', 'localhost:3000');
+    const big = new TextEncoder().encode(JSON.stringify({ ...valid, pad: 'x'.repeat(50_000) }));
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(big);
+        controller.close();
+      },
+    });
+    const res = await POST(
+      new Request('http://localhost:3000/lead', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+        duplex: 'half',
+      } as RequestInit),
+    );
+    expect(res.status).toBe(413);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('passes the API validation message through', async () => {
     fetchMock.mockResolvedValue(
       Response.json({ message: 'Укажите российский номер телефона' }, { status: 400 }),

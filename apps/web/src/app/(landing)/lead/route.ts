@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { FOREIGN_ORIGIN, isTrustedOrigin } from '@/lib/action-guard';
 import { apiErrorMessage } from '@/lib/action-helpers';
 import { submitLead } from '@/lib/api';
+import { readLimitedBody } from '@/lib/read-limited';
 import { getClientIp } from '@/lib/session';
 
 /**
@@ -23,16 +24,15 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!request.headers.get('content-type')?.startsWith('application/json')) {
     return fail(415, 'Неверный формат запроса.');
   }
-  if (Number(request.headers.get('content-length') ?? 0) > MAX_BODY) {
-    return fail(413, 'Слишком большой запрос.');
-  }
   if (!PRIVACY_OPERATOR) return fail(503, 'Приём заявок скоро откроется.');
+
+  // Потоком и с лимитом: Content-Length может не быть (chunked) или быть неверным.
+  const raw = await readLimitedBody(request, MAX_BODY);
+  if (!raw) return fail(413, 'Слишком большой запрос.');
 
   let body: Record<string, unknown>;
   try {
-    const raw = await request.text();
-    if (raw.length > MAX_BODY) return fail(413, 'Слишком большой запрос.');
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(new TextDecoder().decode(raw));
     if (typeof parsed !== 'object' || parsed === null) throw new Error('not an object');
     body = parsed as Record<string, unknown>;
   } catch {

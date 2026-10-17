@@ -280,6 +280,13 @@ jobs:
           done
           test "$(curl -sk -o /dev/null -w '%{http_code}' -X POST -H 'Next-Action: 0' https://localhost/)" = "401"
           test "$(curl -sk -o /dev/null -w '%{http_code}' -X POST -u tester:ci-password https://localhost/)" != "401"
+          # Большое тело без Content-Length (chunked) на открытый POST /lead: пока приём выключен,
+          # web отвечает 503, не читая тело (лимит чтения 2 КБ проверяет unit-тест route.test.ts).
+          head -c 9000000 /dev/zero > big.bin
+          code=$(curl -sk -o /dev/null -w '%{http_code}' -X POST -H 'Origin: https://localhost' \
+            -H 'Content-Type: application/json' -H 'Transfer-Encoding: chunked' \
+            --data-binary @big.bin https://localhost/lead)
+          [ "$code" = "503" ] || { echo "chunked 9 MB to /lead: expected 503, got $code"; exit 1; }
           # Политика открыта для чтения; единственный открытый POST — заявка (POST /lead). Пока
           # реквизиты оператора не заданы, приём выключен: 503 от web, а не 401 от Caddy.
           test "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost/privacy)" = "200"
