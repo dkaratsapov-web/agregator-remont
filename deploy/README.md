@@ -61,6 +61,26 @@ docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml u
 
 Миграции базы применяются автоматически контейнером `migrate` перед запуском API.
 
+### Если сборка зависает на `apt-get` (`deb.debian.org ... Connection timed out`)
+
+С некоторых российских VPS контейнеры сборки не достают `deb.debian.org`, хотя сам сервер его
+открывает. Укажите зеркало Debian в `deploy/.env` и повторите сборку:
+
+```bash
+echo 'DEBIAN_MIRROR=http://mirror.yandex.ru' >> deploy/.env
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml up -d --build
+```
+
+Если раньше на сервере вручную правили `Dockerfile`, перед `git pull` верните его:
+`git checkout Dockerfile`.
+
+### Если сертификат не выпускается (`NXDOMAIN` в логах Caddy)
+
+Домен ещё не виден в DNS (новый домен .рф публикуется до суток). Проверка:
+`dig +short A ваш-домен @8.8.8.8` — должен вернуться IP сервера. Для кириллического домена
+указывайте его в punycode (`xn--...`) и в `DOMAIN`, и в `PUBLIC_ORIGIN`. Когда IP появился,
+ускорьте повторную попытку: `docker compose ... restart caddy`.
+
 ### Полезные команды
 
 ```bash

@@ -2,8 +2,14 @@
 # Один Dockerfile на монорепозиторий, цели: `api` (API + миграции) и `web` (Next.js standalone).
 
 FROM node:22-slim AS base
+# Зеркало Debian для apt (например, http://mirror.yandex.ru), если deb.debian.org недоступен
+# с сервера сборки. Пусто — штатный deb.debian.org. Задаётся DEBIAN_MIRROR в deploy/.env.
+ARG DEBIAN_MIRROR=""
 # OpenSSL нужен движку Prisma.
-RUN apt-get update \
+RUN if [ -n "$DEBIAN_MIRROR" ]; then \
+    sed -i "s|http://deb.debian.org|${DEBIAN_MIRROR%/}|g" /etc/apt/sources.list.d/debian.sources; \
+  fi \
+  && apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 ENV NEXT_TELEMETRY_DISABLED=1
