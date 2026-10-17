@@ -6,40 +6,38 @@ import {
   useScroll,
   useSpring,
   useTransform,
+  type MotionStyle,
   type MotionValue,
 } from 'motion/react';
 import { useRef } from 'react';
 import { RoomScene } from './room-scene';
-import { StatusPill, type FeatureStatus } from './status-pill';
+import { StatusPill } from './status-pill';
 import { usePrefersReducedMotion } from './use-prefers-reduced-motion';
+import { useViewer } from './viewer';
 
 /**
  * Герой + «Как это работает»: блок закреплён на экране, пока идёт прокрутка трека, и комната
  * собирается по шагам. При reduced motion трек не закрепляется: собранная комната и список шагов.
  */
 
-type Step = { title: string; text: string; status: FeatureStatus };
+type Step = { title: string; text: string };
 
 const STEPS: Step[] = [
   {
     title: 'Опишите задачу',
     text: 'Что сделать, в каком городе и в какой бюджет. Заказ появится в каталоге, мастера увидят условия.',
-    status: 'live',
   },
   {
     title: 'Получите отклики',
     text: 'Мастера и бригады предлагают свою цену и срок. Все предложения собраны в одном списке.',
-    status: 'live',
   },
   {
     title: 'Выберите исполнителя',
     text: 'Сравните цены, сроки и профили: опыт, специализации, города работы.',
-    status: 'live',
   },
   {
     title: 'Платите по этапам',
     text: 'Демонтаж, черновые работы, чистовая отделка. Деньги будут ждать у платёжного провайдера, пока вы не примете этап.',
-    status: 'soon',
   },
 ];
 
@@ -60,7 +58,7 @@ const BIDS = [
 const STAGES = ['Демонтаж', 'Черновые работы', 'Чистовая отделка'];
 
 const HERO_POINTS = [
-  'Мы соединяем заказчиков с мастерами и бригадами',
+  'Соединяем заказчиков с мастерами и бригадами',
   'Выступаем гарантом качества выполнения вашего ремонта',
   'Включаемся в решение спорных ситуаций без потери ваших денег',
 ];
@@ -112,14 +110,18 @@ function HeroCopy() {
   );
 }
 
-/** Главная кнопка: ведёт в приложение (оно за паролем), обычной ссылкой без prefetch. */
+/**
+ * Главная кнопка: ведёт в приложение (оно за паролем), обычной ссылкой без prefetch.
+ * Вошедшему пользователю — сразу в кабинет.
+ */
 export function PrimaryCta({ label = 'Вход для тестировщиков' }: { label?: string }) {
+  const viewer = useViewer();
   return (
     <a
-      href="/login"
+      href={viewer ? '/account' : '/login'}
       className="group inline-flex min-h-12 items-center gap-3 rounded-full bg-ink py-1.5 pl-5 pr-1.5 text-sm font-semibold text-canvas transition-[background-color,transform] duration-200 hover:bg-[#1c2536] active:scale-[0.97]"
     >
-      {label}
+      {viewer ? 'Перейти в кабинет' : label}
       <span
         aria-hidden="true"
         className="grid size-9 place-items-center rounded-full bg-accent text-accent-ink transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
@@ -141,13 +143,9 @@ export function PrimaryCta({ label = 'Вход для тестировщиков
 function StepCopy({ step, index }: { step: Step; index: number }) {
   return (
     <div>
-      <div className="flex items-center gap-3">
-        <span className="font-display text-sm font-semibold tabular-nums text-accent">
-          {String(index + 1).padStart(2, '0')}
-        </span>
-        <span aria-hidden="true" className="h-px w-8 bg-line" />
-        <StatusPill status={step.status} />
-      </div>
+      <span className="font-display text-sm font-semibold tabular-nums text-accent">
+        {String(index + 1).padStart(2, '0')}
+      </span>
       <h3 className="font-display mt-4 text-[1.75rem] font-semibold leading-[1.08] tracking-[-0.03em] sm:text-4xl lg:text-[2.75rem]">
         {step.title}
       </h3>
@@ -314,6 +312,9 @@ function ScrollyStory() {
   const heroY = useTransform(progress, [0, 0.15], [0, -48]);
   const heroPointer = useTransform(heroOpacity, (v) => (v < 0.3 ? 'none' : 'auto'));
   const cueOpacity = useTransform(progress, [0, 0.05], [1, 0]);
+  // Телефон: после первого экрана комната опускается к тексту шага и чуть увеличивается,
+  // чтобы экран был заполнен равномерно (место под текст рассчитано на высокий первый экран).
+  const sceneShift = useTransform(progress, [0.08, 0.16], [0, 1]);
 
   // Наклон сцены за курсором, только для мыши/трекпада.
   const tiltXRaw = useMotionValue(0);
@@ -349,25 +350,26 @@ function ScrollyStory() {
               <HeroCopy />
             </motion.div>
             <h2 className="sr-only">Как это работает</h2>
-            <ol className="pointer-events-none grid [grid-area:1/1] lg:self-center">
+            <ol className="pointer-events-none grid self-end [grid-area:1/1] lg:self-center">
               {STEPS.map((step, i) => (
                 <AnimatedStep key={step.title} step={step} index={i} progress={progress} />
               ))}
             </ol>
           </div>
 
-          <div
-            className="relative order-1 min-h-0 lg:order-2 lg:col-span-6 lg:h-[min(640px,80svh)]"
+          <motion.div
+            className="relative order-1 min-h-0 max-lg:[transform:translateY(calc(var(--shift)*min(10rem,19svh)))_scale(calc(1+var(--shift)*0.05))] lg:order-2 lg:col-span-6 lg:h-[min(640px,80svh)]"
+            style={{ '--shift': sceneShift } as unknown as MotionStyle}
             onPointerMove={onPointerMove}
             onPointerLeave={onPointerLeave}
           >
-            <div className="absolute left-1/2 top-1/2 h-[460px] w-[520px] -translate-x-1/2 -translate-y-1/2 scale-[0.6] sm:scale-[0.8] lg:scale-105 xl:scale-110">
+            <div className="absolute left-1/2 top-1/2 h-[460px] w-[520px] -translate-x-1/2 -translate-y-1/2 scale-[0.66] min-[400px]:scale-[0.72] sm:scale-[0.8] lg:scale-105 xl:scale-110">
               <div className="size-full">
                 <RoomScene progress={progress} tiltX={tiltX} tiltY={tiltY} />
               </div>
             </div>
             <Overlays progress={progress} />
-          </div>
+          </motion.div>
         </div>
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0">

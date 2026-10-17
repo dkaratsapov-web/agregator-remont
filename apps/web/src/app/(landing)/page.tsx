@@ -1,17 +1,57 @@
-import { JOB_CATEGORY_LABELS } from '@agregator/shared';
 import { Features } from '@/components/landing/features';
 import { LandingHeader } from '@/components/landing/landing-header';
 import { Manifesto } from '@/components/landing/manifesto';
 import { Preloader } from '@/components/landing/preloader';
 import { Reveal } from '@/components/landing/reveal';
 import { PrimaryCta, Story } from '@/components/landing/story';
+import { ViewerProvider } from '@/components/landing/viewer';
 import { Wordmark } from '@/components/landing/wordmark';
+import { getCurrentUser } from '@/lib/session';
 
-const CATEGORIES = Object.values(JOB_CATEGORY_LABELS).filter((label) => label !== 'Другое');
+const SERVICE_ROWS = [
+  [
+    'Ремонт квартир под ключ',
+    'Косметический ремонт',
+    'Ремонт ванной',
+    'Ремонт кухни',
+    'Сантехника',
+    'Электромонтаж',
+    'Укладка плитки',
+    'Штукатурка стен',
+    'Шпаклёвка и покраска',
+    'Поклейка обоев',
+  ],
+  [
+    'Натяжные потолки',
+    'Потолки из гипсокартона',
+    'Стяжка пола',
+    'Укладка ламината',
+    'Паркетная доска',
+    'Наливные полы',
+    'Тёплый пол',
+    'Демонтаж',
+    'Перепланировка',
+    'Монтаж перегородок',
+  ],
+  [
+    'Установка дверей',
+    'Замена окон',
+    'Остекление балкона',
+    'Утепление балкона',
+    'Монтаж кондиционеров',
+    'Отопление и радиаторы',
+    'Вентиляция',
+    'Сборка кухни',
+    'Мастер на час',
+    'Уборка после ремонта',
+  ],
+];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  // Запрос к API только при cookie сессии: гость получает страницу без обращения к API.
+  const user = await getCurrentUser();
   return (
-    <>
+    <ViewerProvider viewer={user ? { name: user.name, role: user.role } : null}>
       <Preloader />
       <span id="top" aria-hidden="true" className="absolute top-0" />
       <LandingHeader />
@@ -20,37 +60,43 @@ export default function LandingPage() {
 
         <Features />
 
-        {/* Категории */}
-        <section
-          aria-labelledby="categories-title"
-          className="border-y border-line bg-surface py-14"
-        >
-          <h2 id="categories-title" className="sr-only">
-            Категории работ
+        {/* Виды работ: три бегущие строки в разные стороны, услуги не повторяются */}
+        <section aria-labelledby="services-title" className="border-y border-line bg-surface py-10">
+          <h2 id="services-title" className="sr-only">
+            Виды работ
           </h2>
-          <div className="marquee overflow-hidden">
-            <div className="marquee-track">
-              {[0, 1].map((copy) => (
-                <ul
-                  key={copy}
-                  aria-hidden={copy === 1 ? true : undefined}
-                  className="flex shrink-0 items-center"
+          <div className="flex flex-col gap-5 sm:gap-6">
+            {SERVICE_ROWS.map((row, r) => (
+              <div key={r} className="marquee overflow-hidden">
+                <div
+                  className={`marquee-track ${r === 1 ? 'marquee-track--reverse' : ''}`}
+                  style={{ '--marquee-duration': `${52 + r * 9}s` } as React.CSSProperties}
                 >
-                  {CATEGORIES.map((label) => (
-                    <li
-                      key={label}
-                      className="font-display flex items-center whitespace-nowrap text-2xl font-medium tracking-[-0.03em] text-ink sm:text-4xl"
+                  {[0, 1].map((copy) => (
+                    <ul
+                      key={copy}
+                      aria-hidden={copy === 1 ? true : undefined}
+                      className="flex shrink-0 items-center"
                     >
-                      <span className="px-6 sm:px-9">{label}</span>
-                      <span
-                        aria-hidden="true"
-                        className="size-2 rotate-45 rounded-[2px] bg-accent"
-                      />
-                    </li>
+                      {row.map((label) => (
+                        <li
+                          key={label}
+                          className={`font-display flex items-center whitespace-nowrap text-lg font-medium tracking-[-0.02em] sm:text-2xl ${
+                            r === 1 ? 'text-ink-soft' : 'text-ink'
+                          }`}
+                        >
+                          <span className="px-4 sm:px-6">{label}</span>
+                          <span
+                            aria-hidden="true"
+                            className={`size-1.5 rotate-45 rounded-[1px] ${r === 1 ? 'bg-ink-soft/50' : 'bg-accent'}`}
+                          />
+                        </li>
+                      ))}
+                    </ul>
                   ))}
-                </ul>
-              ))}
-            </div>
+                </div>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -93,6 +139,6 @@ export default function LandingPage() {
           <p>Площадка заказов на ремонт и строительство. Закрытое тестирование, 2026.</p>
         </div>
       </footer>
-    </>
+    </ViewerProvider>
   );
 }

@@ -211,7 +211,10 @@ html:has(.landing) {
 
 @media (prefers-reduced-motion: no-preference) {
   .marquee-track {
-    animation: marquee 48s linear infinite;
+    animation: marquee var(--marquee-duration, 48s) linear infinite;
+  }
+  .marquee-track--reverse {
+    animation-direction: reverse;
   }
   .marquee:hover .marquee-track {
     animation-play-state: paused;
@@ -365,8 +368,50 @@ html.is-ready .preloader {
   transform: scaleX(var(--fill));
 }
 
-.bid-fan {
-  transform: translateY(calc(-50% + (var(--i) - 1) * 62px)) scale(calc(0.94 + var(--i) * 0.03));
+/* Холст сцены 520×400 масштабируется под ширину панели (container query). */
+.scene-panel {
+  container: scene / inline-size;
+}
+
+.scene-canvas {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 520px;
+  height: 400px;
+  transform: translate(-50%, -50%) scale(0.62);
+}
+
+@container scene (min-width: 400px) {
+  .scene-canvas {
+    transform: translate(-50%, -50%) scale(0.76);
+  }
+}
+
+@container scene (min-width: 480px) {
+  .scene-canvas {
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+}
+
+@container scene (min-width: 580px) {
+  .scene-canvas {
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+}
+
+@container scene (min-width: 680px) {
+  .scene-canvas {
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+}
+
+.phone-back {
+  transform: rotate(-8deg);
+}
+
+.phone-float {
+  transform: rotate(4deg);
 }
 
 .deal-grid {
@@ -378,11 +423,6 @@ html.is-ready .preloader {
     auto,
     32px 32px,
     32px 32px;
-}
-
-.bid-fan:nth-child(1),
-.bid-fan:nth-child(2) {
-  opacity: 0.85;
 }
 
 .route-draw {
@@ -407,16 +447,12 @@ html.is-ready .preloader {
     transform: scaleX(var(--fill));
   }
 
-  .bid-fan {
-    transform: translateY(-50%) scale(0.96);
-    transition: transform 900ms var(--ease-out-strong) calc(250ms + var(--i) * 120ms);
+  .phone-back {
+    transition: transform 900ms var(--ease-out-strong) 200ms;
+    transform: rotate(0deg) translateX(40px);
   }
-  [data-on='true'] .bid-fan {
-    transform: translateY(calc(-50% + (var(--i) - 1) * 62px)) scale(calc(0.94 + var(--i) * 0.03));
-  }
-  .feature-card:hover .bid-fan {
-    transition-delay: 0ms;
-    transform: translateY(calc(-50% + (var(--i) - 1) * 68px)) scale(calc(0.94 + var(--i) * 0.03));
+  [data-on='true'] .phone-back {
+    transform: rotate(-8deg) translateX(0);
   }
 
   .route-draw {
@@ -438,7 +474,6 @@ html.is-ready .preloader {
   }
 
   .phone-float {
-    transform: rotateY(-18deg) rotateX(8deg);
     animation: phone-float 6s ease-in-out infinite;
   }
 
@@ -472,10 +507,10 @@ html.is-ready .preloader {
 @keyframes phone-float {
   0%,
   100% {
-    transform: rotateY(-18deg) rotateX(8deg) translateY(0);
+    transform: translateY(0) rotate(4deg);
   }
   50% {
-    transform: rotateY(-10deg) rotateX(4deg) translateY(-8px);
+    transform: translateY(-10px) rotate(3deg);
   }
 }
 
