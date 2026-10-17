@@ -613,6 +613,11 @@ export interface operations {
                 page?: number;
                 limit?: number;
                 category?: components["schemas"]["JobCategory"];
+                status?: components["schemas"]["JobStatus"];
+                /** @description Город, точное совпадение без учёта регистра */
+                city?: string;
+                /** @description Поиск подстроки в названии и описании без учёта регистра */
+                q?: string;
             };
             header?: never;
             path?: never;

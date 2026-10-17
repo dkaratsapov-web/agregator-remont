@@ -1,8 +1,10 @@
 import { JOB_CATEGORIES, JOB_CATEGORY_LABELS, type JobCategory } from '@agregator/shared';
 import Link from 'next/link';
-import { jobsHref } from '@/lib/search-params';
+import { jobsHref, type JobsFilters } from '@/lib/search-params';
 
-export function CategoryFilter({ active }: { active?: JobCategory }) {
+/** Категории; текст поиска, город и «только открытые» сохраняются при переключении. */
+export function CategoryFilter({ filters }: { filters: JobsFilters }) {
+  const active = filters.category;
   const items: { key: JobCategory | undefined; label: string }[] = [
     { key: undefined, label: 'Все категории' },
     ...JOB_CATEGORIES.map((key) => ({ key, label: JOB_CATEGORY_LABELS[key] })),
@@ -16,7 +18,7 @@ export function CategoryFilter({ active }: { active?: JobCategory }) {
           return (
             <li key={label} className="snap-start">
               <Link
-                href={jobsHref({ category: key })}
+                href={jobsHref({ ...filters, category: key })}
                 aria-current={current ? 'page' : undefined}
                 className={`inline-flex min-h-10 items-center whitespace-nowrap rounded-full border px-4 text-sm font-medium transition-colors duration-150 ${
                   current

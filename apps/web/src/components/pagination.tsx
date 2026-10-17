@@ -1,11 +1,10 @@
-import type { JobCategory } from '@agregator/shared';
 import Link from 'next/link';
-import { jobsHref } from '@/lib/search-params';
+import { jobsHref, type JobsFilters } from '@/lib/search-params';
 
 interface Props {
   page: number;
   totalPages: number;
-  category?: JobCategory;
+  filters: JobsFilters;
 }
 
 /** Номера страниц с многоточиями: 1 … 4 5 6 … 12. */
@@ -21,9 +20,9 @@ function pageWindow(page: number, totalPages: number): (number | 'gap')[] {
 }
 
 const base =
-  'inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 text-sm font-medium tabular-nums';
+  'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 text-sm font-medium tabular-nums';
 
-export function Pagination({ page, totalPages, category }: Props) {
+export function Pagination({ page, totalPages, filters }: Props) {
   if (totalPages <= 1) return null;
 
   return (
@@ -32,7 +31,7 @@ export function Pagination({ page, totalPages, category }: Props) {
         <li>
           {page > 1 ? (
             <Link
-              href={jobsHref({ page: page - 1, category })}
+              href={jobsHref({ ...filters, page: page - 1 })}
               className={`${base} text-ink hover:bg-muted-tint`}
               rel="prev"
             >
@@ -52,7 +51,7 @@ export function Pagination({ page, totalPages, category }: Props) {
           ) : (
             <li key={p}>
               <Link
-                href={jobsHref({ page: p, category })}
+                href={jobsHref({ ...filters, page: p })}
                 aria-current={p === page ? 'page' : undefined}
                 aria-label={`Страница ${p}`}
                 className={`${base} ${
@@ -67,7 +66,7 @@ export function Pagination({ page, totalPages, category }: Props) {
         <li>
           {page < totalPages ? (
             <Link
-              href={jobsHref({ page: page + 1, category })}
+              href={jobsHref({ ...filters, page: page + 1 })}
               className={`${base} text-ink hover:bg-muted-tint`}
               rel="next"
             >

@@ -9,7 +9,7 @@ const STYLES: Record<JobStatus, string> = {
 export function StatusBadge({ status }: { status: JobStatus }) {
   return (
     <span
-      className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ${STYLES[status]}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${STYLES[status]}`}
     >
       {JOB_STATUS_LABELS[status]}
     </span>

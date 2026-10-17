@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { jobsHref, parseCategory, parsePage } from './search-params';
+import {
+  jobsHref,
+  parseCategory,
+  parseCity,
+  parseOpenOnly,
+  parsePage,
+  parseQuery,
+} from './search-params';
 
 describe('parsePage', () => {
   it.each([
@@ -29,5 +36,41 @@ describe('jobsHref', () => {
     expect(jobsHref({})).toBe('/jobs');
     expect(jobsHref({ page: 1 })).toBe('/jobs');
     expect(jobsHref({ page: 2, category: 'TILING' })).toBe('/jobs?category=TILING&page=2');
+  });
+
+  it('keeps all filters', () => {
+    expect(
+      jobsHref({ q: 'плитка ванная', city: 'Тверь', category: 'TILING', openOnly: true, page: 3 }),
+    ).toBe(
+      '/jobs?q=%D0%BF%D0%BB%D0%B8%D1%82%D0%BA%D0%B0+%D0%B2%D0%B0%D0%BD%D0%BD%D0%B0%D1%8F&city=%D0%A2%D0%B2%D0%B5%D1%80%D1%8C&category=TILING&open=1&page=3',
+    );
+  });
+});
+
+describe('parseQuery and parseCity', () => {
+  it.each([
+    [undefined, undefined],
+    ['', undefined],
+    ['   ', undefined],
+    ['а', undefined],
+    ['  плитка ', 'плитка'],
+    [['ванна', 'кухня'], 'ванна'],
+    ['а'.repeat(101), undefined],
+  ])('query %j -> %j', (raw, expected) => {
+    expect(parseQuery(raw)).toBe(expected);
+  });
+
+  it('trims city and drops invalid lengths', () => {
+    expect(parseCity(' Тверь ')).toBe('Тверь');
+    expect(parseCity('Т')).toBeUndefined();
+    expect(parseCity('а'.repeat(101))).toBeUndefined();
+  });
+});
+
+describe('parseOpenOnly', () => {
+  it('is true only for 1', () => {
+    expect(parseOpenOnly('1')).toBe(true);
+    expect(parseOpenOnly('true')).toBe(false);
+    expect(parseOpenOnly(undefined)).toBe(false);
   });
 });
