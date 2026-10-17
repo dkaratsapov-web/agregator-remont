@@ -257,7 +257,7 @@ worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame
     Набор вариантов не доказывает стойкость ко всем возможным каноникализациям URL.
   - `Lint, typecheck, test, build`: браузерный тест `scripts/landing-e2e.mjs` за настоящим
     `deploy/Caddyfile`: главная не делает запросов в закрытую часть, прелоадер скрыт через
-    3,3 с, клавиатура вкладок, reduced motion; без пароля закрытая страница приходит как 401 из
+    3,3 с, reduced motion; без пароля закрытая страница приходит как 401 из
     сети (мимо SW, диалог пароля возможен), с паролем открывается; при остановленном Caddy и
     `navigator.onLine = true` показывается `/offline`. Тест проверен на двух неверных вариантах
     SW (обход SW по `navigator.onLine` и безусловный `respondWith(fetch)`): оба он ловит.

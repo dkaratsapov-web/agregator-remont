@@ -1,5 +1,4 @@
 import { JOB_CATEGORY_LABELS } from '@agregator/shared';
-import { AudienceSwitch } from '@/components/landing/audience-switch';
 import { LandingHeader } from '@/components/landing/landing-header';
 import { Manifesto } from '@/components/landing/manifesto';
 import { Preloader } from '@/components/landing/preloader';
@@ -136,24 +135,8 @@ export default function LandingPage() {
       <main id="main">
         <Story />
 
-        {/* Для кого */}
-        <section id="audience" className="mx-auto max-w-7xl px-4 py-28 sm:px-6 lg:px-8 lg:py-36">
-          <div className="grid gap-12 lg:grid-cols-12">
-            <div className="lg:col-span-4">
-              <SectionHead
-                eyebrow="Для кого"
-                title="Одна площадка для двух сторон ремонта"
-                text="Заказчик видит предложения, мастер видит заказы с реальным бюджетом."
-              />
-            </div>
-            <Reveal className="lg:col-span-8 lg:pt-2" delay={0.1}>
-              <AudienceSwitch />
-            </Reveal>
-          </div>
-        </section>
-
         {/* Возможности */}
-        <section id="features" className="mx-auto max-w-7xl px-4 pb-28 sm:px-6 lg:px-8 lg:pb-36">
+        <section id="features" className="mx-auto max-w-7xl px-4 py-28 sm:px-6 lg:px-8 lg:py-36">
           <SectionHead
             eyebrow="Возможности"
             title="Что уже работает и что на подходе"

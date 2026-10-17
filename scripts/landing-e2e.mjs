@@ -77,24 +77,6 @@ try {
     const hidden = await fresh.$eval('.preloader', (el) => getComputedStyle(el).visibility);
     check('preloader hidden within 3.3 s', hidden === 'hidden', `visibility ${hidden}`);
 
-    // 3. Вкладки «Для кого»: стрелки, Home, End.
-    const tabs = page.getByRole('tab');
-    await tabs.first().focus();
-    const selected = async () =>
-      page.$$eval('[role="tab"]', (els) =>
-        els.findIndex((el) => el.getAttribute('aria-selected') === 'true'),
-      );
-    await page.keyboard.press('End');
-    const afterEnd = await selected();
-    await page.keyboard.press('Home');
-    const afterHome = await selected();
-    await page.keyboard.press('ArrowRight');
-    const afterRight = await selected();
-    check(
-      'tabs: End/Home/ArrowRight',
-      afterEnd === 1 && afterHome === 0 && afterRight === 1,
-      `${afterEnd},${afterHome},${afterRight}`,
-    );
     await context.close();
   }
 
