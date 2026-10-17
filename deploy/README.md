@@ -171,4 +171,6 @@ docker compose -f deploy/docker-compose.yml exec -T db sh -c 'dropdb -U "$POSTGR
   `Docker stack behind Caddy (proxy)` (Caddy на `https://localhost` со своим сертификатом:
   приложение без пароля 401, с паролем 200, главная и её статика без пароля 200, попытки обхода
   через `..` не открывают приложение, HSTS, редирект с http, порты 3000 и 4000 на хосте закрыты).
+  Поведение главной в браузере (service worker, диалог пароля, офлайн-страница) проверяет
+  `scripts/landing-e2e.mjs` в job `Lint, typecheck, test, build` за этим же Caddyfile.
   Получение настоящего сертификата Let's Encrypt проверяется только при запуске на домене.

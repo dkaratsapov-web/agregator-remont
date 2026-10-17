@@ -82,6 +82,9 @@ jobs:
           pnpm --filter @agregator/api exec tsx prisma/seed.ts
           pnpm --filter @agregator/api exec tsx prisma/seed.ts
 
+      - name: Install Chromium for browser checks
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Smoke and integration tests (production build)
         env:
           NODE_ENV: production
@@ -98,6 +101,16 @@ jobs:
           pnpm smoke
           node scripts/jobs-integration.mjs
           node scripts/bids-integration.mjs
+          # Главная за настоящим deploy/Caddyfile (http://localhost:8080, подходит для service
+          # worker): публичность, отсутствие запросов в закрытую часть, клавиатура, reduced motion,
+          # диалог пароля мимо SW и офлайн-страница при остановленном Caddy (scripts/landing-e2e.mjs).
+          sed 's#reverse_proxy web:3000#reverse_proxy localhost:3000#' deploy/Caddyfile > "$RUNNER_TEMP/Caddyfile"
+          HASH=$(docker run --rm caddy:2-alpine caddy hash-password --plaintext 'ci-password')
+          docker run -d --name e2e-caddy --network host \
+            -e DOMAIN=http://localhost:8080 -e BASIC_AUTH_USER=tester -e BASIC_AUTH_HASH="$HASH" \
+            -v "$RUNNER_TEMP/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine
+          for i in $(seq 1 30); do curl -fs -o /dev/null http://localhost:8080/ && break; sleep 1; done
+          STOP_PROXY_CMD='docker stop e2e-caddy' node scripts/landing-e2e.mjs
           # Последним: в конце останавливает API, чтобы проверить выход при сбое API.
           API_PID=$(cat api.pid) node scripts/auth-integration.mjs
 
@@ -252,11 +265,27 @@ jobs:
             if [ "$path" = '/?x=1/../jobs' ]; then expected=200; else expected=401; fi
             [ "$code" = "$expected" ] || { echo "$path: expected $expected, got $code"; exit 1; }
           done
-          # Обход через «..», закодированные точки и двойной слеш: страница каталога не отдаётся.
-          for path in /icons/../jobs /_next/static/../../jobs /_next/static/%2e%2e/%2e%2e/jobs //jobs; do
-            code=$(curl -sk -o /dev/null -w '%{http_code}' --path-as-is "https://localhost$path")
+          # Обход: «..», закодированные точки и слеши, двойное кодирование, регистр, «;», «.».
+          # Ни один вариант не отдаёт страницу приложения (маркер — навигация шапки приложения).
+          for path in /icons/../jobs /_next/static/../../jobs /_next/static/%2e%2e/%2e%2e/jobs //jobs \
+            /%2fjobs '/_next/static%2f..%2f..%2fjobs' /_next/static/%2e%2e%2f%2e%2e%2fjobs /icons%2f..%2fjobs \
+            /_next/static/%252e%252e/%252e%252e/jobs /%252e%252e/jobs /Jobs /ACCOUNT /_NEXT/STATIC/../../jobs \
+            '/_next/static/..;/..;/jobs' /./jobs /jobs/ '/jobs?_rsc=1' /%6Aobs; do
+            code=$(curl -sk -o body.txt -w '%{http_code}' --path-as-is "https://localhost$path")
             case "$code" in 401|400|404) ;; *) echo "$path: got $code"; exit 1 ;; esac
+            if grep -q 'Основная навигация' body.txt; then echo "$path: app page leaked"; exit 1; fi
           done
+          # Тело ответа 401 пустое; HEAD и RSC-запросы к приложению тоже закрыты.
+          test "$(curl -sk -o body.txt -w '%{http_code}' https://localhost/jobs)" = "401" && test ! -s body.txt
+          test "$(curl -sk -I -o /dev/null -w '%{http_code}' https://localhost/jobs)" = "401"
+          test "$(curl -sk -I -o /dev/null -w '%{http_code}' https://localhost/)" = "200"
+          test "$(curl -sk -o /dev/null -w '%{http_code}' -H 'RSC: 1' https://localhost/jobs)" = "401"
+          test "$(curl -sk -o /dev/null -w '%{http_code}' -H 'RSC: 1' -H 'Next-Router-Prefetch: 1' https://localhost/account)" = "401"
+          # Главная не содержит данных приложения: ни заказов из демо-сида, ни шапки с сессией.
+          curl -sk https://localhost/ > body.txt
+          if grep -q -e 'Ремонт однокомнатной квартиры' -e 'Основная навигация' body.txt; then
+            echo 'landing contains app data'; exit 1
+          fi
           echo 'Proxy checks passed'
 
       - name: Container logs on failure

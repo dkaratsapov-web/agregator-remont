@@ -67,11 +67,21 @@ export function AudienceSwitch() {
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
   const id = useId();
 
+  /** Клавиатура вкладок по WAI-ARIA: стрелки по кругу, Home и End — первая и последняя. */
   function onKeyDown(event: React.KeyboardEvent) {
-    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
-    event.preventDefault();
+    const last = AUDIENCES.length - 1;
     const next =
-      (active + (event.key === 'ArrowRight' ? 1 : -1) + AUDIENCES.length) % AUDIENCES.length;
+      event.key === 'ArrowRight'
+        ? (active + 1) % AUDIENCES.length
+        : event.key === 'ArrowLeft'
+          ? (active - 1 + AUDIENCES.length) % AUDIENCES.length
+          : event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? last
+              : null;
+    if (next === null) return;
+    event.preventDefault();
     setActive(next);
     tabs.current[next]?.focus();
   }

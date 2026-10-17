@@ -296,8 +296,9 @@ html:has(.landing) {
 
 /* ---------- Прелоадер ----------
  * Контур комнаты прорисовывается линиями, затем экран растворяется. Скрывается, когда шрифты
- * готовы (класс is-ready на <html>), но не раньше ~0,7 с, чтобы не мигать. Без JS исчезает сам
- * через 1,6 с. При reduced motion не показывается.
+ * готовы (класс is-ready на <html>), но не раньше 0,45 с, чтобы не мигать. Жёсткий предел
+ * в CSS: через 0,9 с исчезает сам, даже если шрифты или JS ещё грузятся (затухание 0,25 с).
+ * При reduced motion не показывается.
  */
 
 .preloader {
@@ -310,11 +311,11 @@ html:has(.landing) {
   gap: 18px;
   background: var(--canvas);
   pointer-events: none;
-  animation: preloader-out 500ms ease 1.6s forwards;
+  animation: preloader-out 250ms ease 900ms forwards;
 }
 
 html.is-ready .preloader {
-  animation: preloader-out 500ms var(--ease-out-strong) forwards;
+  animation: preloader-out 250ms var(--ease-out-strong) forwards;
 }
 
 .preloader .draw {
@@ -325,8 +326,8 @@ html.is-ready .preloader {
   stroke-linejoin: round;
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: draw 700ms var(--ease-out-strong) forwards;
-  animation-delay: calc(var(--i, 0) * 90ms);
+  animation: draw 420ms var(--ease-out-strong) forwards;
+  animation-delay: calc(var(--i, 0) * 60ms);
 }
 
 .preloader .preloader-block {
@@ -335,7 +336,7 @@ html.is-ready .preloader {
   opacity: 0;
   transform-box: fill-box;
   transform-origin: 50% 100%;
-  animation: block-in 480ms var(--ease-out-strong) 420ms forwards;
+  animation: block-in 300ms var(--ease-out-strong) 260ms forwards;
 }
 
 .preloader-bar {
@@ -353,7 +354,7 @@ html.is-ready .preloader {
   background: var(--accent);
   transform-origin: left;
   transform: scaleX(0);
-  animation: bar 1100ms var(--ease-out-strong) forwards;
+  animation: bar 800ms var(--ease-out-strong) forwards;
 }
 
 @keyframes draw {
