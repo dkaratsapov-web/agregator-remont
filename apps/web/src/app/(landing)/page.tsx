@@ -5,13 +5,17 @@ import { Manifesto } from '@/components/landing/manifesto';
 import { Preloader } from '@/components/landing/preloader';
 import { Reveal } from '@/components/landing/reveal';
 import { PrimaryCta, Story } from '@/components/landing/story';
+import { ViewerProvider } from '@/components/landing/viewer';
 import { Wordmark } from '@/components/landing/wordmark';
+import { getCurrentUser } from '@/lib/session';
 
 const CATEGORIES = Object.values(JOB_CATEGORY_LABELS).filter((label) => label !== 'Другое');
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  // Запрос к API только при cookie сессии: гость получает страницу без обращения к API.
+  const user = await getCurrentUser();
   return (
-    <>
+    <ViewerProvider viewer={user ? { name: user.name } : null}>
       <Preloader />
       <span id="top" aria-hidden="true" className="absolute top-0" />
       <LandingHeader />
@@ -93,6 +97,6 @@ export default function LandingPage() {
           <p>Площадка заказов на ремонт и строительство. Закрытое тестирование, 2026.</p>
         </div>
       </footer>
-    </>
+    </ViewerProvider>
   );
 }

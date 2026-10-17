@@ -2,6 +2,7 @@
 
 import { motion, useMotionValueEvent, useScroll, useSpring } from 'motion/react';
 import { useState } from 'react';
+import { useViewer } from './viewer';
 import { Wordmark } from './wordmark';
 
 const LINKS = [
@@ -16,6 +17,7 @@ export function LandingHeader() {
   const [scrolled, setScrolled] = useState(false);
   useMotionValueEvent(scrollY, 'change', (y) => setScrolled(y > 24));
   const progress = useSpring(scrollYProgress, { stiffness: 200, damping: 40 });
+  const viewer = useViewer();
 
   return (
     <header
@@ -41,20 +43,39 @@ export function LandingHeader() {
             </a>
           ))}
         </nav>
-        <div className="flex items-center gap-2">
+        {viewer ? (
           <a
-            href="/register"
-            className="hidden min-h-11 items-center rounded-full border border-line bg-surface/70 px-5 text-sm font-semibold text-ink transition-[background-color,border-color,transform] duration-200 hover:border-ink/25 hover:bg-surface active:scale-[0.97] sm:inline-flex"
+            href="/account"
+            aria-label={`Личный кабинет: ${viewer.name}`}
+            className="inline-flex min-h-11 max-w-[60vw] items-center gap-2.5 rounded-full border border-line bg-surface/80 py-1 pl-1 pr-4 text-sm font-semibold text-ink transition-[background-color,border-color,transform] duration-200 hover:border-ink/25 hover:bg-surface active:scale-[0.97] sm:max-w-xs"
           >
-            Регистрация
+            <span
+              aria-hidden="true"
+              className="grid size-9 shrink-0 place-items-center rounded-full bg-ink text-sm font-semibold text-canvas"
+            >
+              {viewer.name.trim().charAt(0).toUpperCase()}
+            </span>
+            <span className="min-w-0 truncate">{viewer.name}</span>
+            <span aria-hidden="true" className="hidden text-ink-soft sm:inline">
+              · Кабинет
+            </span>
           </a>
-          <a
-            href="/login"
-            className="inline-flex min-h-11 items-center rounded-full bg-ink px-5 text-sm font-semibold text-canvas transition-[background-color,transform] duration-200 hover:bg-[#1c2536] active:scale-[0.97]"
-          >
-            Войти
-          </a>
-        </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <a
+              href="/register"
+              className="hidden min-h-11 items-center rounded-full border border-line bg-surface/70 px-5 text-sm font-semibold text-ink transition-[background-color,border-color,transform] duration-200 hover:border-ink/25 hover:bg-surface active:scale-[0.97] sm:inline-flex"
+            >
+              Регистрация
+            </a>
+            <a
+              href="/login"
+              className="inline-flex min-h-11 items-center rounded-full bg-ink px-5 text-sm font-semibold text-canvas transition-[background-color,transform] duration-200 hover:bg-[#1c2536] active:scale-[0.97]"
+            >
+              Войти
+            </a>
+          </div>
+        )}
       </div>
       <motion.div
         aria-hidden="true"

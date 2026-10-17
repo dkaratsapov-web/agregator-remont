@@ -10,36 +10,33 @@ import {
 } from 'motion/react';
 import { useRef } from 'react';
 import { RoomScene } from './room-scene';
-import { StatusPill, type FeatureStatus } from './status-pill';
+import { StatusPill } from './status-pill';
 import { usePrefersReducedMotion } from './use-prefers-reduced-motion';
+import { useViewer } from './viewer';
 
 /**
  * Герой + «Как это работает»: блок закреплён на экране, пока идёт прокрутка трека, и комната
  * собирается по шагам. При reduced motion трек не закрепляется: собранная комната и список шагов.
  */
 
-type Step = { title: string; text: string; status: FeatureStatus };
+type Step = { title: string; text: string };
 
 const STEPS: Step[] = [
   {
     title: 'Опишите задачу',
     text: 'Что сделать, в каком городе и в какой бюджет. Заказ появится в каталоге, мастера увидят условия.',
-    status: 'live',
   },
   {
     title: 'Получите отклики',
     text: 'Мастера и бригады предлагают свою цену и срок. Все предложения собраны в одном списке.',
-    status: 'live',
   },
   {
     title: 'Выберите исполнителя',
     text: 'Сравните цены, сроки и профили: опыт, специализации, города работы.',
-    status: 'live',
   },
   {
     title: 'Платите по этапам',
     text: 'Демонтаж, черновые работы, чистовая отделка. Деньги будут ждать у платёжного провайдера, пока вы не примете этап.',
-    status: 'soon',
   },
 ];
 
@@ -112,14 +109,18 @@ function HeroCopy() {
   );
 }
 
-/** Главная кнопка: ведёт в приложение (оно за паролем), обычной ссылкой без prefetch. */
+/**
+ * Главная кнопка: ведёт в приложение (оно за паролем), обычной ссылкой без prefetch.
+ * Вошедшему пользователю — сразу в кабинет.
+ */
 export function PrimaryCta({ label = 'Вход для тестировщиков' }: { label?: string }) {
+  const viewer = useViewer();
   return (
     <a
-      href="/login"
+      href={viewer ? '/account' : '/login'}
       className="group inline-flex min-h-12 items-center gap-3 rounded-full bg-ink py-1.5 pl-5 pr-1.5 text-sm font-semibold text-canvas transition-[background-color,transform] duration-200 hover:bg-[#1c2536] active:scale-[0.97]"
     >
-      {label}
+      {viewer ? 'Перейти в кабинет' : label}
       <span
         aria-hidden="true"
         className="grid size-9 place-items-center rounded-full bg-accent text-accent-ink transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
@@ -141,13 +142,9 @@ export function PrimaryCta({ label = 'Вход для тестировщиков
 function StepCopy({ step, index }: { step: Step; index: number }) {
   return (
     <div>
-      <div className="flex items-center gap-3">
-        <span className="font-display text-sm font-semibold tabular-nums text-accent">
-          {String(index + 1).padStart(2, '0')}
-        </span>
-        <span aria-hidden="true" className="h-px w-8 bg-line" />
-        <StatusPill status={step.status} />
-      </div>
+      <span className="font-display text-sm font-semibold tabular-nums text-accent">
+        {String(index + 1).padStart(2, '0')}
+      </span>
       <h3 className="font-display mt-4 text-[1.75rem] font-semibold leading-[1.08] tracking-[-0.03em] sm:text-4xl lg:text-[2.75rem]">
         {step.title}
       </h3>
