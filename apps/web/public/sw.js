@@ -21,8 +21,10 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Онлайн навигация идёт мимо SW: так браузер сам показывает запрос пароля basic auth для
+// закрытой части сайта (ответ 401 на fetch из SW диалог не вызывает). Офлайн — офлайн-страница.
 self.addEventListener('fetch', (event) => {
-  if (event.request.mode !== 'navigate') return;
+  if (event.request.mode !== 'navigate' || self.navigator.onLine) return;
   event.respondWith(
     fetch(event.request).catch(() =>
       caches.match(OFFLINE_URL).then((res) => res || Response.error()),

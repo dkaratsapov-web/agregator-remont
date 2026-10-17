@@ -1,6 +1,6 @@
 import { JOB_STATUS_LABELS, type MyBidDto } from '@agregator/shared';
 import Link from 'next/link';
-import { withdrawBidAction } from '@/app/account/bids/actions';
+import { withdrawBidAction } from '@/app/(site)/account/bids/actions';
 import { formatAmount, formatDate } from '@/lib/format';
 import { BidStatusBadge } from './bid-status-badge';
 import { ConfirmActionForm } from './confirm-action-form';

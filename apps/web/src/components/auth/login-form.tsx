@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import { loginAction, type AuthFormState } from '@/app/(auth)/actions';
+import { loginAction, type AuthFormState } from '@/app/(site)/(auth)/actions';
 import { Field } from './field';
 import { FormError } from './form-error';
 import { SubmitButton } from './submit-button';

@@ -1,17 +1,21 @@
 import Link from 'next/link';
 
+/** Неизвестный адрес: страница вне групп, поэтому без шапки приложения (она читает сессию). */
 export default function NotFound() {
   return (
-    <div className="mx-auto max-w-2xl px-4 py-20 text-center sm:px-6">
+    <main
+      id="main"
+      className="mx-auto grid min-h-dvh max-w-2xl place-content-center px-4 text-center"
+    >
       <p className="text-sm font-semibold tabular-nums text-accent">404</p>
       <h1 className="mt-3 text-3xl font-semibold tracking-tight">Страница не найдена</h1>
-      <p className="mt-3 text-ink-soft">Возможно, заказ снят с публикации или в адресе опечатка.</p>
+      <p className="mt-3 text-ink-soft">Проверьте адрес или вернитесь на главную.</p>
       <Link
-        href="/jobs"
-        className="mt-8 inline-flex min-h-12 items-center rounded-xl bg-accent px-6 font-semibold text-accent-ink hover:bg-accent-hover"
+        href="/"
+        className="mx-auto mt-8 inline-flex min-h-12 items-center rounded-xl bg-accent px-6 font-semibold text-accent-ink hover:bg-accent-hover"
       >
-        Открыть каталог
+        На главную
       </Link>
-    </div>
+    </main>
   );
 }

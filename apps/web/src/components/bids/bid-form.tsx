@@ -2,7 +2,7 @@
 
 import { BID_LIMITS } from '@agregator/shared';
 import { useActionState } from 'react';
-import type { BidFormState } from '@/app/account/bids/actions';
+import type { BidFormState } from '@/app/(site)/account/bids/actions';
 import { Field } from '@/components/auth/field';
 import { FormError } from '@/components/auth/form-error';
 import { SubmitButton } from '@/components/auth/submit-button';

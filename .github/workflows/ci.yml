@@ -223,7 +223,7 @@ jobs:
       - name: Wait for Caddy
         run: |
           for i in $(seq 1 60); do
-            code=$(curl -sk -o /dev/null -w '%{http_code}' https://localhost/) || true
+            code=$(curl -sk -o /dev/null -w '%{http_code}' https://localhost/jobs) || true
             [ "$code" = "401" ] && exit 0
             sleep 2
           done
@@ -239,6 +239,24 @@ jobs:
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost/jobs)" = "308"
           if curl -s -o /dev/null --max-time 5 http://127.0.0.1:3000/; then echo 'web port 3000 is reachable on the host'; exit 1; fi
           if curl -s -o /dev/null --max-time 5 http://127.0.0.1:4000/health; then echo 'api port 4000 is reachable on the host'; exit 1; fi
+          # Без пароля открыта только главная и её статика; приложение и /_next/image закрыты.
+          test "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost/)" = "200"
+          curl -sk https://localhost/ | grep -q 'Гарантыч'
+          test "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost/robots.txt)" = "200"
+          test "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost/offline)" = "200"
+          asset=$(curl -sk https://localhost/ | grep -o '/_next/static/[^"]*\.js' | head -n 1)
+          test -n "$asset"
+          test "$(curl -sk -o /dev/null -w '%{http_code}' "https://localhost$asset")" = "200"
+          for path in /login /register /account /account/jobs /jobs/x /_next/image /unknown '/?x=1/../jobs'; do
+            code=$(curl -sk -o /dev/null -w '%{http_code}' "https://localhost$path")
+            if [ "$path" = '/?x=1/../jobs' ]; then expected=200; else expected=401; fi
+            [ "$code" = "$expected" ] || { echo "$path: expected $expected, got $code"; exit 1; }
+          done
+          # Обход через «..», закодированные точки и двойной слеш: страница каталога не отдаётся.
+          for path in /icons/../jobs /_next/static/../../jobs /_next/static/%2e%2e/%2e%2e/jobs //jobs; do
+            code=$(curl -sk -o /dev/null -w '%{http_code}' --path-as-is "https://localhost$path")
+            case "$code" in 401|400|404) ;; *) echo "$path: got $code"; exit 1 ;; esac
+          done
           echo 'Proxy checks passed'
 
       - name: Container logs on failure

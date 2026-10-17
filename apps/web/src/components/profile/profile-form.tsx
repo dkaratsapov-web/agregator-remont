@@ -2,7 +2,7 @@
 
 import { JOB_CATEGORIES, JOB_CATEGORY_LABELS, PROFILE_LIMITS } from '@agregator/shared';
 import { useActionState } from 'react';
-import type { ProfileFormState } from '@/app/account/profile/actions';
+import type { ProfileFormState } from '@/app/(site)/account/profile/actions';
 import { Field } from '@/components/auth/field';
 import { FormError } from '@/components/auth/form-error';
 import { SubmitButton } from '@/components/auth/submit-button';

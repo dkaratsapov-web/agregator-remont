@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import { logoutAction, type AuthFormState } from '@/app/(auth)/actions';
+import { logoutAction, type AuthFormState } from '@/app/(site)/(auth)/actions';
 import { FormError } from './form-error';
 
 export function LogoutForm() {

@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from 'next';
 import { Onest } from 'next/font/google';
-import { SiteFooter } from '@/components/site-footer';
-import { SiteHeader } from '@/components/site-header';
 import { ServiceWorkerRegister } from '@/components/sw-register';
 import './globals.css';
 
@@ -43,11 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           Перейти к содержимому
         </a>
-        <SiteHeader />
-        <main id="main" className="pb-[env(safe-area-inset-bottom)]">
-          {children}
-        </main>
-        <SiteFooter />
+        {children}
         <ServiceWorkerRegister />
       </body>
     </html>

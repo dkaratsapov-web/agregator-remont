@@ -1,5 +1,5 @@
 import { JOB_CATEGORY_LABELS, type JobBidDto } from '@agregator/shared';
-import { acceptBidAction } from '@/app/account/jobs/actions';
+import { acceptBidAction } from '@/app/(site)/account/jobs/actions';
 import { formatAmount, formatDate } from '@/lib/format';
 import { BidStatusBadge } from './bid-status-badge';
 import { ConfirmActionForm } from './confirm-action-form';
