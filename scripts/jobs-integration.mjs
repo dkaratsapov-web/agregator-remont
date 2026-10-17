@@ -6,7 +6,7 @@ const { check, finish } = createChecker();
 const job = {
   title: 'Интеграционный заказ: укладка плитки',
   category: 'TILING',
-  city: 'Казань',
+  city: 'Санкт-Петербург',
   budgetMin: '40 000',
   budgetMax: '60 000',
   description: 'Укладка плитки в ванной, около 20 м². Материалы заказчика.',

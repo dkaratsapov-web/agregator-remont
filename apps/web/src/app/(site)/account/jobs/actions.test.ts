@@ -31,6 +31,7 @@ const job = {
   city: 'Москва',
   budgetMin: '40 000',
   budgetMax: '',
+  details: JSON.stringify({ rooms: ['bathroom'], surfaces: ['walls'], tileType: 'ceramic' }),
 };
 const form = (fields: Record<string, string>) => {
   const fd = new FormData();
@@ -74,8 +75,25 @@ describe('createJobAction', () => {
       city: 'Москва',
       budgetMin: 40000,
       budgetMax: null,
+      details: { rooms: ['bathroom'], surfaces: ['walls'], tileType: 'ceramic' },
     });
     expect(state.redirectedTo).toBe('/account/jobs/job1?created=1');
+  });
+
+  it('returns field issues and keeps answers when the questionnaire is incomplete', async () => {
+    const details = JSON.stringify({ rooms: ['bathroom'] });
+    const result = await createJobAction({}, form({ ...job, details }));
+    expect(result.error).toBe('Ответьте на вопрос «Поверхности»');
+    expect(result.issues?.map((issue) => issue.questionId)).toEqual(['surfaces', 'tileType']);
+    expect(result.values?.details).toBe(details);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses cities outside the service area before calling the API', async () => {
+    const result = await createJobAction({}, form({ ...job, city: 'Самара' }));
+    expect(result.error).toMatch(/Пока работаем только в Москве/);
+    expect(result.issues?.[0].field).toBe('city');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('redirects to login without a session and never calls the API', async () => {

@@ -17,7 +17,7 @@ const job = {
   title: 'Замена проводки в однокомнатной квартире',
   description: 'Нужно заменить проводку и щиток, квартира 35 м², стены бетон.',
   category: 'ELECTRICAL',
-  city: 'Самара',
+  city: 'Химки',
   budgetMin: 40_000,
   budgetMax: null,
 };
@@ -134,6 +134,24 @@ describe('API contract (e2e)', () => {
           201,
         );
         const jobId: string = created.body.id;
+        const detailed = await check(
+          'post',
+          MY_JOBS,
+          http()
+            .post(MY_JOBS)
+            .set(customer.auth)
+            .send({
+              ...job,
+              details: { task: 'full', area: 35, oldWiring: 'aluminum', smartHome: true },
+            }),
+          201,
+        );
+        expect(detailed.body.details).toEqual({
+          task: 'full',
+          area: 35,
+          oldWiring: 'aluminum',
+          smartHome: true,
+        });
         await check('post', MY_JOBS, http().post(MY_JOBS).set(customer.auth).send({}), 400);
         await check('post', MY_JOBS, http().post(MY_JOBS).send(job), 401);
         await check('post', MY_JOBS, http().post(MY_JOBS).set(contractor.auth).send(job), 403);
@@ -149,11 +167,11 @@ describe('API contract (e2e)', () => {
           const req = http().patch(`${MY_JOBS}/${id}`).send(body);
           return auth ? req.set(auth as Record<string, string>) : req;
         };
-        await check('patch', MY_JOB, patch(customer.auth, { city: 'Тольятти' }), 200);
+        await check('patch', MY_JOB, patch(customer.auth, { city: 'Мытищи' }), 200);
         await check('patch', MY_JOB, patch(customer.auth, {}), 400);
-        await check('patch', MY_JOB, patch(other.auth, { city: 'Тольятти' }), 404);
-        await check('patch', MY_JOB, patch(null, { city: 'Тольятти' }), 401);
-        await check('patch', MY_JOB, patch(contractor.auth, { city: 'Тольятти' }), 403);
+        await check('patch', MY_JOB, patch(other.auth, { city: 'Мытищи' }), 404);
+        await check('patch', MY_JOB, patch(null, { city: 'Мытищи' }), 401);
+        await check('patch', MY_JOB, patch(contractor.auth, { city: 'Мытищи' }), 403);
 
         // --- public catalog
         await check('get', '/v1/jobs', http().get('/v1/jobs'), 200);
@@ -241,12 +259,7 @@ describe('API contract (e2e)', () => {
         await check('post', CLOSE, http().post(closeUrl).set(contractor.auth), 403);
         await check('post', CLOSE, http().post(closeUrl).set(customer.auth), 200);
         await check('post', CLOSE, http().post(closeUrl).set(customer.auth), 409);
-        await check(
-          'patch',
-          MY_JOB,
-          patch(customer.auth, { city: 'Тольятти' }, second.body.id),
-          409,
-        );
+        await check('patch', MY_JOB, patch(customer.auth, { city: 'Мытищи' }, second.body.id), 409);
       },
     );
   });

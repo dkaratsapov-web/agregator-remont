@@ -1,6 +1,7 @@
 import { JOB_CATEGORY_LABELS, type JobDto } from '@agregator/shared';
 import Link from 'next/link';
 import { formatBudget, formatDate } from '@/lib/format';
+import { JobHighlights } from './jobs/job-details';
 import { StatusBadge } from './status-badge';
 
 export function JobCard({ job }: { job: JobDto }) {
@@ -21,6 +22,9 @@ export function JobCard({ job }: { job: JobDto }) {
         </Link>
       </h3>
       <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-ink-soft">{job.description}</p>
+      <div className="relative mt-4 empty:hidden">
+        <JobHighlights category={job.category} details={job.details} />
+      </div>
       <div className="mt-auto pt-5">
         <div className="h-px bg-line/80" />
         <dl className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1 pt-4">

@@ -17,7 +17,7 @@ const jobRes = await fetch(`${API}/v1/me/jobs`, {
     title: 'Интеграция: укладка ламината',
     description: 'Две комнаты, около 40 м², ламинат куплен заказчиком.',
     category: 'FLOORING',
-    city: 'Казань',
+    city: 'Гатчина',
     budgetMin: 30000,
     budgetMax: 45000,
   }),

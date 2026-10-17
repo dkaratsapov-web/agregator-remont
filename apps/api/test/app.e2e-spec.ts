@@ -82,6 +82,7 @@ describe('API (e2e)', () => {
         budgetMax: null,
         currency: 'RUB',
         status: 'CLOSED',
+        details: {},
         createdAt: new Date(BASE_TIME).toISOString(),
       });
     });

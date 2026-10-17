@@ -12,14 +12,16 @@ export default async function NewJobPage() {
   if (!token) return <CustomersOnly />;
 
   return (
-    <div className="mx-auto max-w-2xl px-4 pt-10 sm:px-6 md:pt-14">
+    <div className="mx-auto max-w-3xl px-4 pt-10 sm:px-6 md:pt-14">
       <p className="text-sm text-ink-soft">
         <Link href="/account/jobs" className="hover:text-ink hover:underline">
           Мои заказы
         </Link>
       </p>
       <h1 className="mt-1 text-3xl font-semibold tracking-tight">Новый заказ</h1>
-      <p className="mt-2 text-ink-soft">После публикации заказ сразу появится в каталоге.</p>
+      <p className="mt-2 text-ink-soft">
+        Три коротких шага. После публикации заказ сразу появится в каталоге.
+      </p>
       <div className="mt-8">
         <JobForm
           action={createJobAction}

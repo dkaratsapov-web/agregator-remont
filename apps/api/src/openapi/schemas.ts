@@ -10,6 +10,7 @@ import {
   type Currency,
   type JobBidDto,
   type JobCategory,
+  type JobDetails,
   type JobDto,
   type JobStatus,
   type MyBidDto,
@@ -19,6 +20,7 @@ import {
   type UserRole,
 } from '@agregator/shared';
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
+import { jobDetailsProperty } from './job-details';
 
 /**
  * Схемы ответов API для OpenAPI (ADR 0003). Каждый класс `implements` интерфейс из
@@ -45,6 +47,12 @@ export class JobSchema implements JobDto {
   budgetMax!: number | null;
   @ApiProperty({ enum: CURRENCIES, enumName: 'Currency' }) currency!: Currency;
   @ApiProperty({ enum: JOB_STATUSES, enumName: 'JobStatus' }) status!: JobStatus;
+  @ApiProperty(
+    jobDetailsProperty(
+      'Ответы анкеты категории { id вопроса: значение }; {} если анкета не заполнена',
+    ),
+  )
+  details!: JobDetails;
   @dateTime() createdAt!: string;
 }
 

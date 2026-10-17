@@ -10,7 +10,7 @@ const job = {
   title: 'Укладка ламината в квартире',
   description: 'Две комнаты, около 40 м², основание ровное, ламинат куплен.',
   category: 'FLOORING',
-  city: 'Казань',
+  city: 'Гатчина',
   budgetMin: 30_000,
   budgetMax: 45_000,
 };
