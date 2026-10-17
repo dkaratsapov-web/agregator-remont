@@ -19,6 +19,16 @@
 | Чем подтверждено | В CI с override выполняются: `prisma generate` (build, typecheck, test), `prisma migrate deploy` (глобальный setup тестов и отдельный шаг), сид дважды через `upsert` (ветки create и update), e2e-тесты `createMany`/`deleteMany`/`findMany`/`findUnique`/`count`/`$transaction`, smoke-тест запущенной сборки. |
 | Когда убрать | При переходе на Prisma 7 (она тянет `deepmerge-ts 8`): удалить `overrides` из `pnpm-workspace.yaml`. |
 
+### 1.1a `js-yaml`: override `^5.4.1` для `5.0.0–5.4.0` (было 5.3.0)
+
+| Поле | Значение |
+| --- | --- |
+| Advisory | [GHSA-r3ph-w7gj-g6xm](https://github.com/advisories/GHSA-r3ph-w7gj-g6xm), Moderate: `maxTotalMergeKeys` не ограничивает CPU при пустых источниках слияния. Уязвимы `>=5.0.0 <=5.4.0`. |
+| Цепочка | `@nestjs/swagger 11.4.7` (production-зависимость API с PR B) → `js-yaml 5.3.0` (зафиксирована точно) |
+| Фактическое использование | `@nestjs/swagger` вызывает `js-yaml` только для выдачи спецификации в YAML через `SwaggerModule.setup`, который в проекте не подключается; спецификация пишется в JSON. Override всё равно добавлен, чтобы `pnpm audit --prod` оставался чистым. |
+| Совместимость | Обновление в пределах 5.x (5.5.0), публичный API `dump`/`load` не менялся. Генерация `openapi.json` и все тесты проходят. |
+| Когда убрать | Когда `@nestjs/swagger` перейдёт на `js-yaml >=5.4.1`: удалить строку из `overrides` в `pnpm-workspace.yaml`. |
+
 ### 1.2 Известные уязвимости без исправления (только dev/CI-инструменты)
 
 | Пакет | Версия | Advisory | Путь | Оценка |

@@ -10,7 +10,7 @@ import {
 import { Job, Prisma } from '@prisma/client';
 import { diffFields, writeAudit } from '../audit/audit';
 import { BidsService } from '../bids/bids.service';
-import { ListJobsQuery } from '../jobs/dto/list-jobs.query';
+import { PaginationQuery } from '../jobs/dto/list-jobs.query';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateJobDto, UpdateJobDto } from './dto/job-input.dto';
 import { toOwnJobDto } from './own-job.mapper';
@@ -39,7 +39,7 @@ export class MyJobsService {
     private readonly bids: BidsService,
   ) {}
 
-  async list(ownerId: string, query: ListJobsQuery): Promise<Paginated<OwnJobDto>> {
+  async list(ownerId: string, query: PaginationQuery): Promise<Paginated<OwnJobDto>> {
     const where: Prisma.JobWhereInput = { ownerId };
     const [items, total] = await this.prisma.$transaction([
       this.prisma.job.findMany({
