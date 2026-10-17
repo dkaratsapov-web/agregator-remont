@@ -10,7 +10,7 @@ const validJob = {
   title: 'Замена проводки в квартире',
   description: 'Нужна полная замена проводки в двухкомнатной квартире, около 50 м².',
   category: 'ELECTRICAL',
-  city: 'Казань',
+  city: 'Санкт-Петербург',
   budgetMin: 80_000,
   budgetMax: 120_000,
 };

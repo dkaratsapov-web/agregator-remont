@@ -449,8 +449,13 @@ export interface components {
             /** @description Целые рубли; null или отсутствие — «по договорённости» */
             budgetMin?: number | null;
             category: components["schemas"]["JobCategory"];
+            /** @description Город или посёлок из списка SERVICE_CITIES (@agregator/shared): Москва и Московская область, Санкт-Петербург и Ленинградская область */
             city: string;
             description: string;
+            /** @description Ответы анкеты категории { id вопроса: значение }. Без поля: анкета не заполнена */
+            details?: {
+                [key: string]: string | number | boolean | string[];
+            };
             title: string;
         };
         CreateLeadDto: {
@@ -501,6 +506,10 @@ export interface components {
             createdAt: string;
             currency: components["schemas"]["Currency"];
             description: string;
+            /** @description Ответы анкеты категории { id вопроса: значение }; {} если анкета не заполнена */
+            details: {
+                [key: string]: string | number | boolean | string[];
+            };
             id: string;
             status: components["schemas"]["JobStatus"];
             title: string;
@@ -558,6 +567,10 @@ export interface components {
             createdAt: string;
             currency: components["schemas"]["Currency"];
             description: string;
+            /** @description Ответы анкеты категории { id вопроса: значение }; {} если анкета не заполнена */
+            details: {
+                [key: string]: string | number | boolean | string[];
+            };
             /** @description Редактировать можно только открытый заказ */
             editable: boolean;
             id: string;
@@ -631,8 +644,13 @@ export interface components {
             /** @description Целые рубли; null — «по договорённости»; отсутствие — не менять */
             budgetMin?: number | null;
             category?: components["schemas"]["JobCategory"];
+            /** @description Город или посёлок из списка SERVICE_CITIES (@agregator/shared): Москва и Московская область, Санкт-Петербург и Ленинградская область */
             city?: string;
             description?: string;
+            /** @description Ответы анкеты целиком (заменяют прежние); без поля: не менять. При смене категории без этого поля остаются только ответы, подходящие новой анкете */
+            details?: {
+                [key: string]: string | number | boolean | string[];
+            };
             title?: string;
         };
         UpdateLeadDto: {

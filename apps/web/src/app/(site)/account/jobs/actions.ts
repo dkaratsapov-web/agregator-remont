@@ -9,11 +9,14 @@ import {
   requireSessionToken,
 } from '@/lib/action-helpers';
 import { acceptBid, closeMyJob, createMyJob, updateMyJob } from '@/lib/api';
-import { parseJobForm, type JobFormValues } from '@/lib/job-form';
+import { parseJobForm, type JobFormIssue, type JobFormValues } from '@/lib/job-form';
 import { getClientIp } from '@/lib/session';
 
 export interface JobFormState {
   error?: string;
+  /** Ошибки по полям формы и вопросам анкеты (подсвечиваются у полей). */
+  issues?: JobFormIssue[];
+  /** Введённые значения, включая ответы анкеты (JSON), чтобы не потерять их при ошибке. */
   values?: Partial<JobFormValues>;
 }
 
@@ -26,7 +29,7 @@ export async function createJobAction(_prev: JobFormState, form: FormData): Prom
   const parsed = parseJobForm(form);
   if (!(await isTrustedOrigin())) return { error: FOREIGN_ORIGIN, values: parsed.values };
   const token = await requireSessionToken('/account/jobs/new');
-  if (!parsed.ok) return { error: parsed.error, values: parsed.values };
+  if (!parsed.ok) return { error: parsed.error, issues: parsed.issues, values: parsed.values };
 
   let id: string;
   try {
@@ -48,7 +51,7 @@ export async function updateJobAction(
   if (!isEntityId(id)) return { error: 'Заказ не найден.' };
   const path = `/account/jobs/${id}`;
   const token = await requireSessionToken(path);
-  if (!parsed.ok) return { error: parsed.error, values: parsed.values };
+  if (!parsed.ok) return { error: parsed.error, issues: parsed.issues, values: parsed.values };
 
   try {
     await updateMyJob(token, id, parsed.input, await getClientIp());

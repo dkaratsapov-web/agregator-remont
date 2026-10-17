@@ -164,6 +164,7 @@
             ]
           },
           "city": {
+            "description": "Город или посёлок из списка SERVICE_CITIES (@agregator/shared): Москва и Московская область, Санкт-Петербург и Ленинградская область",
             "maxLength": 100,
             "minLength": 2,
             "type": "string"
@@ -172,6 +173,29 @@
             "maxLength": 5000,
             "minLength": 20,
             "type": "string"
+          },
+          "details": {
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
+            "description": "Ответы анкеты категории { id вопроса: значение }. Без поля: анкета не заполнена",
+            "type": "object"
           },
           "title": {
             "maxLength": 160,
@@ -368,6 +392,29 @@
           "description": {
             "type": "string"
           },
+          "details": {
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
+            "description": "Ответы анкеты категории { id вопроса: значение }; {} если анкета не заполнена",
+            "type": "object"
+          },
           "id": {
             "type": "string"
           },
@@ -392,6 +439,7 @@
           "budgetMax",
           "currency",
           "status",
+          "details",
           "createdAt"
         ],
         "type": "object"
@@ -585,6 +633,29 @@
           "description": {
             "type": "string"
           },
+          "details": {
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
+            "description": "Ответы анкеты категории { id вопроса: значение }; {} если анкета не заполнена",
+            "type": "object"
+          },
           "editable": {
             "description": "Редактировать можно только открытый заказ",
             "type": "boolean"
@@ -617,6 +688,7 @@
           "budgetMax",
           "currency",
           "status",
+          "details",
           "createdAt",
           "updatedAt",
           "editable"
@@ -899,6 +971,7 @@
             ]
           },
           "city": {
+            "description": "Город или посёлок из списка SERVICE_CITIES (@agregator/shared): Москва и Московская область, Санкт-Петербург и Ленинградская область",
             "maxLength": 100,
             "minLength": 2,
             "type": "string"
@@ -907,6 +980,29 @@
             "maxLength": 5000,
             "minLength": 20,
             "type": "string"
+          },
+          "details": {
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
+            "description": "Ответы анкеты целиком (заменяют прежние); без поля: не менять. При смене категории без этого поля остаются только ответы, подходящие новой анкете",
+            "type": "object"
           },
           "title": {
             "maxLength": 160,

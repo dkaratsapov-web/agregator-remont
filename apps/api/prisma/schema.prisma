@@ -75,6 +75,9 @@ model Job {
   budgetMax   Int?        @map("budget_max")
   currency    Currency    @default(RUB)
   status      JobStatus   @default(OPEN)
+  /// Ответы анкеты категории ({ id вопроса: значение }); проверяются validateJobDetails из
+  /// @agregator/shared. Объект и размер ограничены CHECK в миграции.
+  details     Json        @default("{}")
   /// Заказчик-владелец. null у демонстрационных заказов из сида.
   ownerId     String?     @map("owner_id")
   /// Restrict: удаление пользователя не должно молча удалять или «осиротить» его заказы.

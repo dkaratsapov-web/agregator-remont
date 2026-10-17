@@ -32,7 +32,7 @@ describe('Write rate limit (e2e)', () => {
       title: 'Покраска стен',
       description: 'Покраска стен в двух комнатах, около 60 м².',
       category: 'FINISHING',
-      city: 'Пермь',
+      city: 'Подольск',
     };
     const post = () =>
       request(app.getHttpServer()).post('/v1/me/jobs').set(customer.auth).send(job);
