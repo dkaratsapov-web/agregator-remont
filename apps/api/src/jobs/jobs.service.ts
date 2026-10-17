@@ -5,6 +5,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ListJobsQuery } from './dto/list-jobs.query';
 import { toJobDto } from './job.mapper';
 
+/**
+ * Prisma строит `contains`/`equals` с mode: 'insensitive' через ILIKE и не экранирует его
+ * спецсимволы: без этого «%» или «_» в запросе совпадали бы со всеми заказами.
+ */
+export function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&');
+}
+
 /** cuid и id демо-данных; всё остальное заведомо не существует. */
 const JOB_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -13,8 +21,22 @@ export class JobsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async list(query: ListJobsQuery): Promise<Paginated<JobDto>> {
-    const { page, limit, category } = query;
-    const where: Prisma.JobWhereInput = category ? { category } : {};
+    const { page, limit, category, status } = query;
+    const city = query.city ? escapeLike(query.city) : undefined;
+    const q = query.q ? escapeLike(query.q) : undefined;
+    const where: Prisma.JobWhereInput = {
+      ...(category ? { category } : {}),
+      ...(status ? { status } : {}),
+      ...(city ? { city: { equals: city, mode: 'insensitive' } } : {}),
+      ...(q
+        ? {
+            OR: [
+              { title: { contains: q, mode: 'insensitive' } },
+              { description: { contains: q, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.job.findMany({

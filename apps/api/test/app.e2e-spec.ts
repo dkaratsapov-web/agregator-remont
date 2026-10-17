@@ -9,13 +9,17 @@ const prisma = new PrismaClient();
 const BASE_TIME = new Date('2026-01-15T12:00:00.000Z').getTime();
 const categories: JobCategory[] = ['PLUMBING', 'ELECTRICAL', 'TILING'];
 
-// 30 заказов: createdAt убывает с ростом индекса, категории чередуются.
+// 30 заказов: createdAt убывает с ростом индекса, категории чередуются. Заказы 3, 13, 23 в
+// Санкт-Петербурге; в описании заказа 4 есть «%» и «_» (проверка экранирования поиска).
 const fixtures = Array.from({ length: 30 }, (_, i) => ({
   id: `test-job-${String(i).padStart(2, '0')}`,
   title: `Тестовый заказ ${i}`,
-  description: `Описание тестового заказа ${i}`,
+  description:
+    i === 4
+      ? 'Описание тестового заказа 4: Плитка, скидка 50% на шов_2мм'
+      : `Описание тестового заказа ${i}`,
   category: categories[i % categories.length],
-  city: 'Москва',
+  city: i % 10 === 3 ? 'Санкт-Петербург' : 'Москва',
   budgetMin: i % 5 === 0 ? null : 1000 * i,
   budgetMax: i % 5 === 0 ? null : 2000 * i,
   status: (i % 7 === 0 ? 'CLOSED' : 'OPEN') as JobStatus,
@@ -106,6 +110,64 @@ describe('API (e2e)', () => {
       );
     });
 
+    it('filters by status', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/v1/jobs?status=OPEN&limit=50')
+        .expect(200);
+      expect(res.body.total).toBe(25);
+      expect(res.body.items.every((j: { status: string }) => j.status === 'OPEN')).toBe(true);
+    });
+
+    it('filters by city case-insensitively', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/v1/jobs?city=${encodeURIComponent('  санкт-петербург ')}&limit=50`)
+        .expect(200);
+      expect(res.body.items.map((j: { id: string }) => j.id)).toEqual([
+        'test-job-03',
+        'test-job-13',
+        'test-job-23',
+      ]);
+    });
+
+    it('searches title and description case-insensitively', async () => {
+      const server = app.getHttpServer();
+      const byDescription = await request(server)
+        .get(`/v1/jobs?q=${encodeURIComponent('  ПЛИТКА ')}`)
+        .expect(200);
+      expect(byDescription.body.items.map((j: { id: string }) => j.id)).toEqual(['test-job-04']);
+      const byTitle = await request(server)
+        .get(`/v1/jobs?q=${encodeURIComponent('заказ 2')}&limit=50`)
+        .expect(200);
+      expect(byTitle.body.total).toBe(11); // 2, 20-29
+    });
+
+    // Без экранирования «0%» и «_2» совпали бы со многими заказами (любая «0» / символ перед «2»).
+    it.each([
+      ['q', '0%'],
+      ['q', '_2'],
+      ['city', '%%'],
+      ['city', 'М_сква'],
+    ])('treats LIKE wildcards in %s=%s literally', async (name, value) => {
+      const res = await request(app.getHttpServer())
+        .get(`/v1/jobs?${name}=${encodeURIComponent(value)}&limit=50`)
+        .expect(200);
+      const expected = name === 'q' ? ['test-job-04'] : [];
+      expect(res.body.items.map((j: { id: string }) => j.id)).toEqual(expected);
+    });
+
+    it('combines filters', async () => {
+      const res = await request(app.getHttpServer())
+        .get(
+          `/v1/jobs?category=TILING&status=OPEN&city=${encodeURIComponent('Москва')}&q=${encodeURIComponent('заказ')}&limit=50`,
+        )
+        .expect(200);
+      const ids = fixtures
+        .map((f, i) => ({ f, i }))
+        .filter(({ f, i }) => f.category === 'TILING' && i % 7 !== 0 && i % 10 !== 3)
+        .map(({ f }) => f.id);
+      expect(res.body.items.map((j: { id: string }) => j.id)).toEqual(ids);
+    });
+
     it.each([
       ['limit=51', 'limit above maximum'],
       ['limit=0', 'zero limit'],
@@ -117,6 +179,14 @@ describe('API (e2e)', () => {
       ['page=1&page=2', 'repeated page'],
       ['page=10001', 'page above maximum'],
       ['category=UNKNOWN', 'unknown category'],
+      ['status=DRAFT', 'unknown status'],
+      ['q=', 'empty search'],
+      ['q=%20%20', 'blank search'],
+      ['q=a', 'search too short'],
+      [`q=${'а'.repeat(101)}`, 'search too long'],
+      ['q=ab&q=cd', 'repeated search'],
+      ['city=%20', 'blank city'],
+      [`city=${'а'.repeat(101)}`, 'city too long'],
       ['sort=title', 'unknown parameter'],
     ])('rejects %s (%s) with 400', async (qs) => {
       const res = await request(app.getHttpServer()).get(`/v1/jobs?${qs}`).expect(400);

@@ -73,6 +73,12 @@ export const JOB_LIMITS = {
   CREATED_PER_DAY: 20,
 } as const;
 
+/** Поиск в каталоге: длина строки запроса после обрезки пробелов. */
+export const JOB_SEARCH = {
+  QUERY_MIN: 2,
+  QUERY_MAX: 100,
+} as const;
+
 /** Поля, которые заказчик задаёт сам. Владелец, статус и даты задаёт только сервер. */
 export interface JobInput {
   title: string;

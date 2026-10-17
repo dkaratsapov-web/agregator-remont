@@ -9,6 +9,7 @@ import type {
   JobCategory,
   JobDto,
   JobInput,
+  JobStatus,
   OwnJobDto,
   Paginated,
   UserDto,
@@ -69,9 +70,15 @@ export async function getJobs(params: {
   page: number;
   limit: number;
   category?: JobCategory;
+  status?: JobStatus;
+  city?: string;
+  q?: string;
 }): Promise<Paginated<JobDto>> {
   const query = new URLSearchParams({ page: String(params.page), limit: String(params.limit) });
   if (params.category) query.set('category', params.category);
+  if (params.status) query.set('status', params.status);
+  if (params.city) query.set('city', params.city);
+  if (params.q) query.set('q', params.q);
 
   const res = await request(`/v1/jobs?${query.toString()}`);
   if (!res.ok) {
