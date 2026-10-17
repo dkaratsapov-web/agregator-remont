@@ -55,9 +55,39 @@ docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.local.yml u
 
 ### Обновление
 
+**Автоматически (рекомендуется).** Один раз на сервере:
+
+```bash
+cd /opt/agregator
+git pull
+sudo bash deploy/autodeploy/install.sh
+```
+
+Таймер systemd каждые 2 минуты запускает `deploy/autodeploy/deploy.sh`: если в `main` новый
+коммит и все проверки GitHub по нему зелёные, сервер переходит на него (только fast-forward),
+пересобирает стек, при изменении `deploy/Caddyfile` перезапускает Caddy и проверяет, что главная
+отвечает 200. Пока CI идёт, сервер ждёт; при красном CI или ошибке сборки коммит помечается и не
+повторяется (следующий коммит в `main` пробуется заново). Пока новые образы собираются, работают
+прежние контейнеры. Сценарии проверяет `scripts/autodeploy-test.sh` в CI.
+
+```bash
+journalctl -u agregator-deploy -n 50 --no-pager      # что делало автообновление
+sudo systemctl start agregator-deploy.service        # проверить main прямо сейчас
+sudo systemctl disable --now agregator-deploy.timer  # выключить
+cat /var/lib/agregator-deploy/deployed               # какой коммит развёрнут
+sudo rm /var/lib/agregator-deploy/failed             # повторить коммит, помеченный неудачным
+```
+
+Важно: всё, что попадает в `main`, автоматически выполняется на сервере (сборка образов от root).
+Поэтому в `main` — только через PR с зелёным CI; см. `docs/SECURITY.md`, раздел 9.
+
+**Вручную:**
+
 ```bash
 git pull
 docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml up -d --build
+# если менялся deploy/Caddyfile:
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml restart caddy
 ```
 
 Миграции базы применяются автоматически контейнером `migrate` перед запуском API.
