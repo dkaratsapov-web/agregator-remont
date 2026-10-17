@@ -50,7 +50,8 @@ docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.local.yml u
    ```bash
    docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml up -d --build
    ```
-   Caddy сам получит сертификат. Сайт: `https://ваш-домен` (браузер спросит логин и пароль).
+   Caddy сам получит сертификат. Сайт: `https://ваш-домен`. Главная открывается без пароля,
+   при входе в приложение браузер спросит логин и пароль.
 
 ### Обновление
 
@@ -161,10 +162,15 @@ docker compose -f deploy/docker-compose.yml exec -T db sh -c 'dropdb -U "$POSTGR
   web берёт его при `WEB_TRUST_PROXY_HOPS=1` и передаёт API. Так работают лимиты на вход по IP
   посетителя.
 - `PUBLIC_ORIGIN` попадает в `WEB_PUBLIC_ORIGIN`: формы принимаются только с этого адреса.
-- Сайт закрыт паролем (basic auth), пока не выполнены условия публичного запуска из
-  `docs/SECURITY.md`. Для открытия убрать блок `basic_auth` в `deploy/Caddyfile`.
+- Без пароля открыта только главная (статичный лендинг) и её статические файлы. Всё приложение
+  (каталог, вход, кабинет) закрыто паролем (basic auth), пока не выполнены условия публичного
+  запуска из `docs/SECURITY.md` (раздел 8: что именно открыто и почему). Для полного открытия
+  убрать matcher `@private` и блок `basic_auth` в `deploy/Caddyfile`.
 - Стек проверяется в CI двумя job: `Docker stack (compose)` (сборка образов, smoke и
   интеграционные тесты по контейнерам, попытка подмены IP из внутренней сети) и
   `Docker stack behind Caddy (proxy)` (Caddy на `https://localhost` со своим сертификатом:
-  без пароля 401, с паролем 200, HSTS, редирект с http, порты 3000 и 4000 на хосте закрыты).
+  приложение без пароля 401, с паролем 200, главная и её статика без пароля 200, попытки обхода
+  через `..` не открывают приложение, HSTS, редирект с http, порты 3000 и 4000 на хосте закрыты).
+  Поведение главной в браузере (service worker, диалог пароля, офлайн-страница) проверяет
+  `scripts/landing-e2e.mjs` в job `Lint, typecheck, test, build` за этим же Caddyfile.
   Получение настоящего сертификата Let's Encrypt проверяется только при запуске на домене.

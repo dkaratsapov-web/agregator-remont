@@ -1,6 +1,6 @@
 import type { JobDto, MyBidDto, UserRole } from '@agregator/shared';
 import Link from 'next/link';
-import { placeBidAction, withdrawBidAction } from '@/app/account/bids/actions';
+import { placeBidAction, withdrawBidAction } from '@/app/(site)/account/bids/actions';
 import { Notice } from '@/components/notice';
 import { formatAmount } from '@/lib/format';
 import { BidForm } from './bid-form';

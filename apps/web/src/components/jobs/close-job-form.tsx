@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import type { JobFormState } from '@/app/account/jobs/actions';
+import type { JobFormState } from '@/app/(site)/account/jobs/actions';
 import { FormError } from '@/components/auth/form-error';
 
 /** Закрытие необратимо, поэтому кнопка подтверждения спрятана за отдельным раскрытием. */

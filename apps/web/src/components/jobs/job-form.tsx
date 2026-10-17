@@ -2,7 +2,7 @@
 
 import { JOB_CATEGORIES, JOB_CATEGORY_LABELS, JOB_LIMITS } from '@agregator/shared';
 import { useActionState } from 'react';
-import type { JobFormState } from '@/app/account/jobs/actions';
+import type { JobFormState } from '@/app/(site)/account/jobs/actions';
 import { Field } from '@/components/auth/field';
 import { FormError } from '@/components/auth/form-error';
 import { SubmitButton } from '@/components/auth/submit-button';

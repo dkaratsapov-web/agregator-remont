@@ -2,7 +2,7 @@
 
 import { AUTH_LIMITS } from '@agregator/shared';
 import { useActionState } from 'react';
-import { registerAction, type AuthFormState } from '@/app/(auth)/actions';
+import { registerAction, type AuthFormState } from '@/app/(site)/(auth)/actions';
 import { Field } from './field';
 import { FormError } from './form-error';
 import { SubmitButton } from './submit-button';
