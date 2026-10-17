@@ -9,18 +9,6 @@ import { Wordmark } from '@/components/landing/wordmark';
 
 const CATEGORIES = Object.values(JOB_CATEGORY_LABELS).filter((label) => label !== 'Другое');
 
-const FACTS = [
-  { title: 'Серверы в России', text: 'Данные сервиса хранятся в российском дата-центре.' },
-  {
-    title: 'Доступ по приглашению',
-    text: 'Сейчас идёт закрытое тестирование с первыми пользователями.',
-  },
-  {
-    title: 'Работает с телефона',
-    text: 'Веб-версию можно установить на главный экран как приложение.',
-  },
-];
-
 export default function LandingPage() {
   return (
     <>
@@ -72,14 +60,6 @@ export default function LandingPage() {
           <div className="mt-6 max-w-5xl">
             <Manifesto text="Мы делаем Гарантыч, чтобы цена и срок ремонта были известны до начала работ, а деньги переходили мастеру только после того, как вы приняли этап." />
           </div>
-          <dl className="mt-20 grid gap-10 border-t border-line pt-10 sm:grid-cols-3">
-            {FACTS.map((fact, i) => (
-              <Reveal key={fact.title} delay={i * 0.08}>
-                <dt className="font-semibold">{fact.title}</dt>
-                <dd className="mt-2 leading-relaxed text-ink-soft">{fact.text}</dd>
-              </Reveal>
-            ))}
-          </dl>
         </section>
 
         {/* Призыв */}

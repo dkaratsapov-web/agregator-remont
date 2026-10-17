@@ -59,6 +59,12 @@ const BIDS = [
 
 const STAGES = ['Демонтаж', 'Черновые работы', 'Чистовая отделка'];
 
+const HERO_POINTS = [
+  'Мы соединяем заказчиков с мастерами и бригадами',
+  'Выступаем гарантом качества выполнения вашего ремонта',
+  'Включаемся в решение спорных ситуаций без потери ваших денег',
+];
+
 function HeroCopy() {
   // Неразрывный пробел перед тире: тире не уходит в начало строки.
   const words = ['Гарантыч\u00a0—', 'честный', 'ремонт', 'без', 'лишнего', 'риска!'];
@@ -76,13 +82,20 @@ function HeroCopy() {
           </span>
         ))}
       </h1>
-      <p
-        className="fade-up mt-5 max-w-[30rem] text-base leading-relaxed text-ink-soft sm:text-lg"
+      <ul
+        className="fade-up mt-6 max-w-[32rem] space-y-2.5 text-base leading-snug text-ink-soft sm:text-lg"
         style={{ '--d': '2650ms' } as React.CSSProperties}
       >
-        Мы соединяем заказчиков с мастерами и бригадами. Выступаем гарантом качества выполнения
-        вашего ремонта. Включаемся в решение спорных ситуаций без потери ваших денег!
-      </p>
+        {HERO_POINTS.map((point) => (
+          <li key={point} className="flex gap-3">
+            <span
+              aria-hidden="true"
+              className="mt-[0.55em] size-1.5 shrink-0 rounded-full bg-accent"
+            />
+            {point}
+          </li>
+        ))}
+      </ul>
       <div
         className="fade-up mt-7 flex flex-wrap items-center gap-3"
         style={{ '--d': '2800ms' } as React.CSSProperties}

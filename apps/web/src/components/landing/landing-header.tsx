@@ -41,12 +41,20 @@ export function LandingHeader() {
             </a>
           ))}
         </nav>
-        <a
-          href="/login"
-          className="inline-flex min-h-11 items-center rounded-full bg-ink px-5 text-sm font-semibold text-canvas transition-[background-color,transform] duration-200 hover:bg-[#1c2536] active:scale-[0.97]"
-        >
-          Войти
-        </a>
+        <div className="flex items-center gap-2">
+          <a
+            href="/register"
+            className="hidden min-h-11 items-center rounded-full border border-line bg-surface/70 px-5 text-sm font-semibold text-ink transition-[background-color,border-color,transform] duration-200 hover:border-ink/25 hover:bg-surface active:scale-[0.97] sm:inline-flex"
+          >
+            Регистрация
+          </a>
+          <a
+            href="/login"
+            className="inline-flex min-h-11 items-center rounded-full bg-ink px-5 text-sm font-semibold text-canvas transition-[background-color,transform] duration-200 hover:bg-[#1c2536] active:scale-[0.97]"
+          >
+            Войти
+          </a>
+        </div>
       </div>
       <motion.div
         aria-hidden="true"
