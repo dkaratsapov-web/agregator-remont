@@ -73,9 +73,9 @@ try {
     // 2. Прелоадер не держит экран дольше жёсткого предела.
     const fresh = await context.newPage();
     await fresh.goto(`${BASE}/`, { waitUntil: 'commit' });
-    await fresh.waitForTimeout(1300);
+    await fresh.waitForTimeout(3300);
     const hidden = await fresh.$eval('.preloader', (el) => getComputedStyle(el).visibility);
-    check('preloader hidden within 1.3 s', hidden === 'hidden', `visibility ${hidden}`);
+    check('preloader hidden within 3.3 s', hidden === 'hidden', `visibility ${hidden}`);
 
     // 3. Вкладки «Для кого»: стрелки, Home, End.
     const tabs = page.getByRole('tab');

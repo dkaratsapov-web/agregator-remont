@@ -2,12 +2,12 @@
 
 import { useEffect } from 'react';
 
-const MIN_VISIBLE_MS = 450;
+const MIN_VISIBLE_MS = 2200;
 
 /**
  * Прелоадер: контур комнаты прорисовывается и экран растворяется. Скрывается после
- * document.fonts.ready, но не раньше 0,45 с от начала загрузки, чтобы не мигать. Жёсткий предел
- * 0,9 с задан в CSS (работает и без JS), при reduced motion не показывается.
+ * document.fonts.ready, но не раньше 2,2 с от начала загрузки, чтобы анимация успела показаться.
+ * Жёсткий предел 2,8 с задан в CSS (работает и без JS), при reduced motion не показывается.
  */
 export function Preloader() {
   useEffect(() => {
@@ -25,7 +25,7 @@ export function Preloader() {
 
   return (
     <div className="preloader" aria-hidden="true">
-      <svg viewBox="0 0 120 110" width="92" height="84">
+      <svg viewBox="0 0 120 110" width="128" height="117">
         <path
           className="draw"
           pathLength={1}

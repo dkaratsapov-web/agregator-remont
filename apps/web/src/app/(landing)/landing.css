@@ -105,7 +105,7 @@ html:has(.landing) {
 @media (prefers-reduced-motion: no-preference) {
   .word-mask > span {
     animation: word-in 900ms var(--ease-out-strong) both;
-    animation-delay: calc(560ms + var(--i, 0) * 70ms);
+    animation-delay: calc(2350ms + var(--i, 0) * 70ms);
   }
 
   .fade-up {
@@ -296,8 +296,9 @@ html:has(.landing) {
 
 /* ---------- Прелоадер ----------
  * Контур комнаты прорисовывается линиями, затем экран растворяется. Скрывается, когда шрифты
- * готовы (класс is-ready на <html>), но не раньше 0,45 с, чтобы не мигать. Жёсткий предел
- * в CSS: через 0,9 с исчезает сам, даже если шрифты или JS ещё грузятся (затухание 0,25 с).
+ * готовы (класс is-ready на <html>), но не раньше 2,2 с: владелец просил, чтобы анимация успела
+ * показаться (2-3 с). Жёсткий предел в CSS: через 2,8 с исчезает сам, даже если шрифты или JS
+ * ещё грузятся (затухание 0,35 с). Анимация заголовка героя начинается после прелоадера.
  * При reduced motion не показывается.
  */
 
@@ -311,11 +312,11 @@ html:has(.landing) {
   gap: 18px;
   background: var(--canvas);
   pointer-events: none;
-  animation: preloader-out 250ms ease 900ms forwards;
+  animation: preloader-out 350ms ease 2800ms forwards;
 }
 
 html.is-ready .preloader {
-  animation: preloader-out 250ms var(--ease-out-strong) forwards;
+  animation: preloader-out 350ms var(--ease-out-strong) forwards;
 }
 
 .preloader .draw {
@@ -326,8 +327,8 @@ html.is-ready .preloader {
   stroke-linejoin: round;
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: draw 420ms var(--ease-out-strong) forwards;
-  animation-delay: calc(var(--i, 0) * 60ms);
+  animation: draw 900ms var(--ease-out-strong) forwards;
+  animation-delay: calc(150ms + var(--i, 0) * 260ms);
 }
 
 .preloader .preloader-block {
@@ -336,7 +337,7 @@ html.is-ready .preloader {
   opacity: 0;
   transform-box: fill-box;
   transform-origin: 50% 100%;
-  animation: block-in 300ms var(--ease-out-strong) 260ms forwards;
+  animation: block-in 500ms var(--ease-out-strong) 1150ms forwards;
 }
 
 .preloader-bar {
@@ -354,7 +355,7 @@ html.is-ready .preloader {
   background: var(--accent);
   transform-origin: left;
   transform: scaleX(0);
-  animation: bar 800ms var(--ease-out-strong) forwards;
+  animation: bar 2100ms var(--ease-out-strong) forwards;
 }
 
 @keyframes draw {
