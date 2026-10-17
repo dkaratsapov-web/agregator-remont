@@ -1,13 +1,6 @@
-import type { Metadata, Viewport } from 'next';
-import { Unbounded } from 'next/font/google';
+import type { Metadata } from 'next';
 import { MotionProvider } from '@/components/landing/motion-provider';
 import './landing.css';
-
-const unbounded = Unbounded({
-  subsets: ['latin', 'cyrillic'],
-  variable: '--font-unbounded',
-  display: 'swap',
-});
 
 export const metadata: Metadata = {
   title: { absolute: 'Гарантыч: честный ремонт без лишнего риска' },
@@ -21,18 +14,13 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport: Viewport = {
-  themeColor: '#f4f5f7',
-  colorScheme: 'light',
-};
-
 /**
  * Публичная главная. Здесь нет шапки приложения и запросов к API: страница открыта без пароля
  * (deploy/Caddyfile), а всё остальное приложение остаётся за ним.
  */
 export default function LandingLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`landing ${unbounded.variable}`}>
+    <div className="landing">
       <MotionProvider>{children}</MotionProvider>
     </div>
   );

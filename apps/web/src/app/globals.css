@@ -1,45 +1,25 @@
 @import 'tailwindcss';
 
 /*
- * Токены: холодная серая шкала (slate) + один акцент (тёмный оранжевый «строительный»).
- * Тёмная тема через prefers-color-scheme, все цвета только через переменные.
+ * Токены «Гарантыча»: фарфоровая холодная шкала + один акцент (терракота). Только светлая тема:
+ * так решил владелец для всего сайта, главная и приложение выглядят одинаково.
  */
 :root {
-  --canvas: #f6f7f9;
-  --surface: #ffffff;
-  --surface-sunken: #eef0f3;
-  --ink: #0f172a;
-  --ink-soft: #475569;
-  --line: #dde1e7;
+  --canvas: #f4f5f7;
+  --surface: #fbfbfc;
+  --surface-sunken: #eceef1;
+  --ink: #0d1320;
+  --ink-soft: #505a6b;
+  --line: #dfe2e7;
   --accent: #c2410c;
   --accent-hover: #9a3412;
   --accent-ink: #ffffff;
-  --accent-tint: #fff1e8;
+  --accent-tint: #fdeee5;
   --ok: #15803d;
-  --ok-tint: #e9f7ee;
-  --muted-tint: #eef0f3;
-  --shadow-color: 215 25% 27%;
+  --ok-tint: #e7f5ec;
+  --muted-tint: #eceef1;
+  --shadow-color: 218 30% 30%;
   color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --canvas: #0b1018;
-    --surface: #121925;
-    --surface-sunken: #0e141e;
-    --ink: #e6eaf0;
-    --ink-soft: #9aa6b8;
-    --line: #243042;
-    --accent: #f97316;
-    --accent-hover: #fb8a3c;
-    --accent-ink: #1a0d03;
-    --accent-tint: #2a1708;
-    --ok: #4ade80;
-    --ok-tint: #0f2418;
-    --muted-tint: #1a2332;
-    --shadow-color: 220 60% 2%;
-    color-scheme: dark;
-  }
 }
 
 @theme inline {
@@ -77,6 +57,16 @@ h1,
 h2,
 h3 {
   text-wrap: balance;
+}
+
+/* Фирменный широкий шрифт для крупных заголовков (Unbounded, подключён в корневом layout).
+ * В слое base, чтобы классы Tailwind (tracking-*, font-*) могли его переопределить. */
+@layer base {
+  .font-display,
+  h1 {
+    font-family: var(--font-unbounded), var(--font-onest), ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.03em;
+  }
 }
 
 p {

@@ -28,10 +28,6 @@ html:has(.landing) {
   --ease-out-strong: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.font-display {
-  font-family: var(--font-unbounded), var(--font-onest), ui-sans-serif, system-ui, sans-serif;
-}
-
 /* ---------- Поверхности ---------- */
 
 .landing-shadow {

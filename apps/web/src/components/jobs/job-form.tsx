@@ -6,6 +6,7 @@ import type { JobFormState } from '@/app/(site)/account/jobs/actions';
 import { Field } from '@/components/auth/field';
 import { FormError } from '@/components/auth/form-error';
 import { SubmitButton } from '@/components/auth/submit-button';
+import { RU_CITIES } from '@/lib/cities';
 import type { JobFormValues } from '@/lib/job-form';
 
 interface Props {
@@ -65,9 +66,16 @@ export function JobForm({ action, initial = {}, submitLabel, pendingLabel }: Pro
         required
         minLength={JOB_LIMITS.CITY_MIN}
         maxLength={JOB_LIMITS.CITY_MAX}
-        autoComplete="address-level2"
+        autoComplete="off"
+        list="ru-cities"
+        hint="Начните вводить и выберите из списка или впишите свой населённый пункт"
         defaultValue={values.city}
       />
+      <datalist id="ru-cities">
+        {RU_CITIES.map((city) => (
+          <option key={city} value={city} />
+        ))}
+      </datalist>
       <fieldset>
         <legend className="text-sm font-medium text-ink">Бюджет, ₽</legend>
         <div className="mt-1.5 grid gap-3 sm:grid-cols-2">
