@@ -207,6 +207,9 @@ html:has(.landing) {
 .marquee-track {
   display: flex;
   width: max-content;
+  /* Отдельный слой: лента едет на GPU и не дёргается при прокрутке страницы. */
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -215,9 +218,6 @@ html:has(.landing) {
   }
   .marquee-track--reverse {
     animation-direction: reverse;
-  }
-  .marquee:hover .marquee-track {
-    animation-play-state: paused;
   }
 }
 
@@ -240,8 +240,11 @@ html:has(.landing) {
 }
 
 @keyframes marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
   to {
-    transform: translateX(-50%);
+    transform: translate3d(-50%, 0, 0);
   }
 }
 

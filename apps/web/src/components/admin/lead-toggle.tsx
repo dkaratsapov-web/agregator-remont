@@ -24,7 +24,7 @@ export function LeadToggle({
         className={`inline-flex min-h-10 items-center rounded-xl px-4 text-sm font-semibold transition-colors duration-150 disabled:cursor-wait disabled:opacity-70 ${
           processed
             ? 'border border-line bg-surface text-ink hover:border-ink-soft/50'
-            : 'bg-ink text-canvas hover:bg-[#1c2536]'
+            : 'bg-ink text-canvas hover:bg-ink/85'
         }`}
       >
         {pending ? 'Сохраняем…' : processed ? 'Вернуть в новые' : 'Обработана'}

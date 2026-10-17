@@ -5,7 +5,13 @@ import { redirect } from 'next/navigation';
 import { ApiError, loginUser, logoutSession, registerUser } from '@/lib/api';
 import { safeRedirectPath } from '@/lib/redirect';
 import { FOREIGN_ORIGIN, isTrustedOrigin } from '@/lib/action-guard';
-import { clearSessionCookie, getClientIp, getSessionToken, setSessionCookie } from '@/lib/session';
+import {
+  clearSessionCookie,
+  getClientIp,
+  getSessionToken,
+  getUserAgent,
+  setSessionCookie,
+} from '@/lib/session';
 
 export interface AuthFormState {
   error?: string;
@@ -47,7 +53,11 @@ export async function registerAction(_prev: AuthFormState, form: FormData): Prom
   }
 
   try {
-    const session = await registerUser({ ...values, password }, await getClientIp());
+    const session = await registerUser(
+      { ...values, password },
+      await getClientIp(),
+      await getUserAgent(),
+    );
     await setSessionCookie(session.token, session.expiresAt);
   } catch (error) {
     return { error: messageFor(error), values };
@@ -63,7 +73,11 @@ export async function loginAction(_prev: AuthFormState, form: FormData): Promise
   const next = safeRedirectPath(form.get('next'));
 
   try {
-    const session = await loginUser({ email: values.email, password }, await getClientIp());
+    const session = await loginUser(
+      { email: values.email, password },
+      await getClientIp(),
+      await getUserAgent(),
+    );
     await setSessionCookie(session.token, session.expiresAt);
   } catch (error) {
     return { error: messageFor(error), values };

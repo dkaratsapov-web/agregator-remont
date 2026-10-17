@@ -54,6 +54,25 @@
         ],
         "type": "string"
       },
+      "ChangePasswordDto": {
+        "additionalProperties": false,
+        "properties": {
+          "currentPassword": {
+            "maxLength": 128,
+            "type": "string"
+          },
+          "newPassword": {
+            "maxLength": 128,
+            "minLength": 10,
+            "type": "string"
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "type": "object"
+      },
       "ContractorProfileDto": {
         "additionalProperties": false,
         "properties": {
@@ -753,6 +772,108 @@
         ],
         "type": "string"
       },
+      "SessionDto": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "current": {
+            "description": "Сессия, с которой сделан запрос",
+            "type": "boolean"
+          },
+          "device": {
+            "description": "Например «Chrome, Windows»",
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lastSeenAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "device",
+          "createdAt",
+          "lastSeenAt",
+          "current"
+        ],
+        "type": "object"
+      },
+      "SessionsRevoked": {
+        "additionalProperties": false,
+        "properties": {
+          "revoked": {
+            "description": "Сколько сессий завершено",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revoked"
+        ],
+        "type": "object"
+      },
+      "UiMotion": {
+        "enum": [
+          "system",
+          "reduced"
+        ],
+        "type": "string"
+      },
+      "UiPreferences": {
+        "additionalProperties": false,
+        "properties": {
+          "motion": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UiMotion"
+              }
+            ]
+          },
+          "scale": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UiScale"
+              }
+            ]
+          },
+          "theme": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UiTheme"
+              }
+            ]
+          }
+        },
+        "required": [
+          "theme",
+          "scale",
+          "motion"
+        ],
+        "type": "object"
+      },
+      "UiScale": {
+        "enum": [
+          "compact",
+          "normal",
+          "large"
+        ],
+        "type": "string"
+      },
+      "UiTheme": {
+        "enum": [
+          "light",
+          "dark",
+          "system"
+        ],
+        "type": "string"
+      },
       "UpdateJobDto": {
         "additionalProperties": false,
         "properties": {
@@ -808,6 +929,54 @@
         ],
         "type": "object"
       },
+      "UpdatePreferencesDto": {
+        "additionalProperties": false,
+        "properties": {
+          "motion": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UiMotion"
+              }
+            ]
+          },
+          "scale": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UiScale"
+              }
+            ]
+          },
+          "theme": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UiTheme"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "UpdateProfileDto": {
+        "additionalProperties": false,
+        "properties": {
+          "city": {
+            "maxLength": 80,
+            "nullable": true,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 2,
+            "type": "string"
+          },
+          "phone": {
+            "example": "+7 900 123-45-67",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "UpsertProfileDto": {
         "additionalProperties": false,
         "properties": {
@@ -847,6 +1016,16 @@
       "UserDto": {
         "additionalProperties": false,
         "properties": {
+          "avatarVersion": {
+            "description": "Версия фото для адреса картинки; null — фото нет",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "city": {
+            "nullable": true,
+            "type": "string"
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -859,6 +1038,14 @@
           },
           "name": {
             "type": "string"
+          },
+          "phone": {
+            "nullable": true,
+            "pattern": "^\\+7[3489][0-9]{9}$",
+            "type": "string"
+          },
+          "preferences": {
+            "$ref": "#/components/schemas/UiPreferences"
           },
           "role": {
             "allOf": [
@@ -873,6 +1060,10 @@
           "email",
           "name",
           "role",
+          "phone",
+          "city",
+          "avatarVersion",
+          "preferences",
           "createdAt"
         ],
         "type": "object"
@@ -1124,7 +1315,16 @@
     "/v1/auth/login": {
       "post": {
         "operationId": "Auth_login",
-        "parameters": [],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-client-user-agent",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1224,7 +1424,16 @@
     "/v1/auth/register": {
       "post": {
         "operationId": "Auth_register",
-        "parameters": [],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-client-user-agent",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1624,6 +1833,255 @@
               }
             },
             "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
+        ]
+      },
+      "patch": {
+        "operationId": "Me_updateProfile",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/avatar": {
+      "delete": {
+        "operationId": "Me_deleteAvatar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
+        ]
+      },
+      "get": {
+        "operationId": "Me_avatar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "image/webp": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Фото профиля (WebP 512×512)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
+        ]
+      },
+      "put": {
+        "operationId": "Me_setAvatar",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Файл слишком большой"
           },
           "429": {
             "content": {
@@ -2426,6 +2884,131 @@
         ]
       }
     },
+    "/v1/me/password": {
+      "post": {
+        "operationId": "Me_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Пароль изменён, остальные сеансы завершены"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/preferences": {
+      "patch": {
+        "operationId": "Me_updatePreferences",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePreferencesDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
+        ]
+      }
+    },
     "/v1/me/profile": {
       "get": {
         "operationId": "Profile_get",
@@ -2553,6 +3136,169 @@
         ],
         "tags": [
           "profile"
+        ]
+      }
+    },
+    "/v1/me/sessions": {
+      "get": {
+        "operationId": "Me_sessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SessionDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/sessions/revoke-others": {
+      "post": {
+        "operationId": "Me_revokeOthers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionsRevoked"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/sessions/{id}": {
+      "delete": {
+        "operationId": "Me_revokeSession",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Сеанс завершён"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
         ]
       }
     }

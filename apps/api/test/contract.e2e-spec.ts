@@ -1,6 +1,7 @@
 import { BID_LIMITS, JOB_LIMITS } from '@agregator/shared';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaClient } from '@prisma/client';
+import sharp from 'sharp';
 import request from 'supertest';
 import { expectContract, uncoveredResponses } from './contract';
 import { createTestApp } from './create-app';
@@ -251,6 +252,134 @@ describe('API contract (e2e)', () => {
         );
       },
     );
+  });
+
+  it('account endpoints match openapi.json', async () => {
+    const high = {
+      RATE_LIMIT_PER_MIN: '1000',
+      AUTH_RATE_LIMIT_PER_MIN: '1000',
+      WRITE_RATE_LIMIT_PER_MIN: '1000',
+    };
+    await withApp(high, async (app) => {
+      const http = () => request(app.getHttpServer());
+      const check = async (
+        method: 'get' | 'post' | 'put' | 'patch' | 'delete',
+        template: string,
+        req: request.Test,
+        status: number,
+      ) => {
+        const res = await req;
+        expect(res.status).toBe(status);
+        expectContract(res, method, template);
+        return res;
+      };
+      const email = `contract-acc-${Date.now()}@example.ru`;
+      const password = 'correct-horse-battery';
+      const reg = await http()
+        .post('/v1/auth/register')
+        .send({ email, password, name: 'Контракт', role: 'CUSTOMER' })
+        .expect(201);
+      const auth = { Authorization: `Bearer ${reg.body.token}` };
+      const other = await http().post('/v1/auth/login').send({ email, password }).expect(200);
+
+      await check('patch', '/v1/me', http().patch('/v1/me').set(auth).send({ city: 'Тверь' }), 200);
+      await check('patch', '/v1/me', http().patch('/v1/me').set(auth).send({ phone: '1' }), 400);
+      await check('patch', '/v1/me', http().patch('/v1/me').send({}), 401);
+
+      const PREF = '/v1/me/preferences';
+      await check('patch', PREF, http().patch(PREF).set(auth).send({ theme: 'dark' }), 200);
+      await check('patch', PREF, http().patch(PREF).set(auth).send({ theme: 'x' }), 400);
+      await check('patch', PREF, http().patch(PREF).send({}), 401);
+
+      const SESS = '/v1/me/sessions';
+      const list = await check('get', SESS, http().get(SESS).set(auth), 200);
+      await check('get', SESS, http().get(SESS), 401);
+      const ONE = '/v1/me/sessions/{id}';
+      const current = list.body.find((s: { current: boolean }) => s.current).id;
+      const otherId = list.body.find((s: { current: boolean }) => !s.current).id;
+      await check('delete', ONE, http().delete(`${SESS}/${current}`).set(auth), 400);
+      await check('delete', ONE, http().delete(`${SESS}/missing`).set(auth), 404);
+      await check('delete', ONE, http().delete(`${SESS}/${otherId}`), 401);
+      await check('delete', ONE, http().delete(`${SESS}/${otherId}`).set(auth), 204);
+      void other;
+      const REV = '/v1/me/sessions/revoke-others';
+      await check('post', REV, http().post(REV).set(auth), 200);
+      await check('post', REV, http().post(REV), 401);
+
+      const AV = '/v1/me/avatar';
+      await check('get', AV, http().get(AV).set(auth), 404);
+      await check('get', AV, http().get(AV), 401);
+      const png = await sharp({
+        create: { width: 64, height: 64, channels: 3, background: '#0d1320' },
+      })
+        .png()
+        .toBuffer();
+      await check(
+        'put',
+        AV,
+        http()
+          .put(AV)
+          .set(auth)
+          .attach('file', png, { filename: 'a.png', contentType: 'image/png' }),
+        200,
+      );
+      await check(
+        'put',
+        AV,
+        http()
+          .put(AV)
+          .set(auth)
+          .attach('file', Buffer.from('nope'), { filename: 'a.png', contentType: 'image/png' }),
+        400,
+      );
+      await check(
+        'put',
+        AV,
+        http()
+          .put(AV)
+          .set(auth)
+          .attach('file', Buffer.alloc(5 * 1024 * 1024 + 1, 1), {
+            filename: 'a.jpg',
+            contentType: 'image/jpeg',
+          }),
+        413,
+      );
+      await check('put', AV, http().put(AV), 401);
+      await check(
+        'get',
+        AV,
+        http()
+          .get(AV)
+          .set(auth)
+          .buffer(true)
+          .parse((r, cb) => {
+            const chunks: Buffer[] = [];
+            r.on('data', (c: Buffer) => chunks.push(c));
+            r.on('end', () => cb(null, Buffer.concat(chunks)));
+          }),
+        200,
+      );
+      await check('delete', AV, http().delete(AV).set(auth), 200);
+      await check('delete', AV, http().delete(AV), 401);
+
+      const PW = '/v1/me/password';
+      await check(
+        'post',
+        PW,
+        http().post(PW).set(auth).send({ currentPassword: 'x', newPassword: 'short' }),
+        400,
+      );
+      await check('post', PW, http().post(PW).send({}), 401);
+      await check(
+        'post',
+        PW,
+        http()
+          .post(PW)
+          .set(auth)
+          .send({ currentPassword: password, newPassword: 'new-password-2026' }),
+        204,
+      );
+    });
   });
 
   it('lead endpoints match openapi.json', async () => {

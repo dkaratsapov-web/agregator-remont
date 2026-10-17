@@ -12,7 +12,8 @@ export function CategoryFilter({ filters }: { filters: JobsFilters }) {
 
   return (
     <nav aria-label="Категории">
-      <ul className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
+      <p className="mb-2.5 hidden px-1 text-sm font-semibold text-ink lg:block">Категории</p>
+      <ul className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 lg:flex-col lg:gap-1 lg:overflow-visible lg:pb-0">
         {items.map(({ key, label }) => {
           const current = key === active;
           return (
@@ -20,10 +21,10 @@ export function CategoryFilter({ filters }: { filters: JobsFilters }) {
               <Link
                 href={jobsHref({ ...filters, category: key })}
                 aria-current={current ? 'page' : undefined}
-                className={`inline-flex min-h-10 items-center whitespace-nowrap rounded-full border px-4 text-sm font-medium transition-colors duration-150 ${
+                className={`inline-flex min-h-10 items-center whitespace-nowrap rounded-full border px-4 text-sm font-medium transition-colors duration-150 lg:flex lg:w-full lg:rounded-xl lg:border-transparent lg:px-3 ${
                   current
-                    ? 'border-ink bg-ink text-canvas'
-                    : 'border-line bg-surface text-ink-soft hover:border-ink-soft/50 hover:text-ink'
+                    ? 'border-ink bg-ink text-canvas lg:border-ink'
+                    : 'border-line bg-surface text-ink-soft hover:border-ink-soft/50 hover:text-ink lg:bg-transparent lg:hover:border-transparent lg:hover:bg-ink/5'
                 }`}
               >
                 {label}

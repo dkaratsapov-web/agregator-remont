@@ -4,7 +4,7 @@ import { RU_CITIES } from '@/lib/cities';
 import { jobsHref, type JobsFilters } from '@/lib/search-params';
 
 /**
- * Поиск по каталогу: обычная GET-форма, работает без JS. Категория сохраняется скрытым полем,
+ * Поиск по каталогу (левая колонка): обычная GET-форма, работает без JS. Категория сохраняется скрытым полем,
  * страница сбрасывается на первую.
  */
 export function CatalogSearch({ filters }: { filters: JobsFilters }) {
@@ -15,10 +15,11 @@ export function CatalogSearch({ filters }: { filters: JobsFilters }) {
       method="get"
       role="search"
       aria-label="Поиск заказов"
-      className="rounded-[24px] border border-line/80 bg-surface p-2 shadow-[0_1px_1px_hsl(var(--shadow-color)/0.05),0_12px_32px_-14px_hsl(var(--shadow-color)/0.2)]"
+      className="rounded-[24px] border border-line/80 bg-surface p-3 shadow-[0_1px_1px_hsl(var(--shadow-color)/0.05),0_12px_32px_-14px_hsl(var(--shadow-color)/0.2)]"
     >
+      <p className="px-1 pb-2.5 pt-1 text-sm font-semibold text-ink">Поиск и фильтры</p>
       {filters.category ? <input type="hidden" name="category" value={filters.category} /> : null}
-      <div className="grid gap-2 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_auto]">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
         <label className="flex min-h-12 items-center gap-3 rounded-2xl bg-canvas px-4 ring-1 ring-transparent focus-within:ring-accent">
           <svg
             viewBox="0 0 20 20"
@@ -72,14 +73,8 @@ export function CatalogSearch({ filters }: { filters: JobsFilters }) {
             ))}
           </datalist>
         </label>
-        <button
-          type="submit"
-          className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-ink px-6 text-sm font-semibold text-canvas transition-[background-color,transform] duration-200 hover:bg-[#1c2536] active:scale-[0.97]"
-        >
-          Найти
-        </button>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 px-2 pb-1 pt-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1 pt-2">
         <label className="inline-flex min-h-10 cursor-pointer items-center gap-2.5 text-sm text-ink-soft">
           <input
             type="checkbox"
@@ -95,10 +90,16 @@ export function CatalogSearch({ filters }: { filters: JobsFilters }) {
             href={jobsHref({ category: filters.category })}
             className="inline-flex min-h-10 items-center rounded-full px-3 text-sm font-medium text-ink-soft hover:bg-ink/5 hover:text-ink"
           >
-            Сбросить поиск
+            Сбросить
           </Link>
         ) : null}
       </div>
+      <button
+        type="submit"
+        className="mt-2 inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-ink px-6 text-sm font-semibold text-canvas transition-[background-color,transform] duration-200 hover:bg-ink/85 active:scale-[0.97]"
+      >
+        Найти
+      </button>
     </form>
   );
 }

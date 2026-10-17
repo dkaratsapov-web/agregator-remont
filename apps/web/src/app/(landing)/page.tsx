@@ -53,7 +53,9 @@ export default async function LandingPage() {
   // Запрос к API только при cookie сессии: гость получает страницу без обращения к API.
   const user = await getCurrentUser();
   return (
-    <ViewerProvider viewer={user ? { name: user.name, role: user.role } : null}>
+    <ViewerProvider
+      viewer={user ? { name: user.name, role: user.role, avatarVersion: user.avatarVersion } : null}
+    >
       <Preloader />
       <span id="top" aria-hidden="true" className="absolute top-0" />
       <LandingHeader />

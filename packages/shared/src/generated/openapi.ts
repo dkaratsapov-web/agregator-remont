@@ -177,6 +177,22 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
+        patch: operations["Me_updateProfile"];
+        trace?: never;
+    };
+    "/v1/me/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Me_avatar"];
+        put: operations["Me_setAvatar"];
+        post?: never;
+        delete: operations["Me_deleteAvatar"];
+        options?: never;
+        head?: never;
         patch?: never;
         trace?: never;
     };
@@ -292,6 +308,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Me_changePassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["Me_updatePreferences"];
+        trace?: never;
+    };
     "/v1/me/profile": {
         parameters: {
             query?: never;
@@ -303,6 +351,54 @@ export interface paths {
         put: operations["Profile_upsert"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Me_sessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/sessions/revoke-others": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Me_revokeOthers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["Me_revokeSession"];
         options?: never;
         head?: never;
         patch?: never;
@@ -325,6 +421,10 @@ export interface components {
         };
         /** @enum {string} */
         BidStatus: "PENDING" | "ACCEPTED" | "REJECTED" | "WITHDRAWN";
+        ChangePasswordDto: {
+            currentPassword: string;
+            newPassword: string;
+        };
         ContractorProfileDto: {
             about: string;
             categories: components["schemas"]["JobCategory"][];
@@ -499,6 +599,32 @@ export interface components {
         };
         /** @enum {string} */
         SelfServiceRole: "CUSTOMER" | "CONTRACTOR";
+        SessionDto: {
+            /** Format: date-time */
+            createdAt: string;
+            /** @description Сессия, с которой сделан запрос */
+            current: boolean;
+            /** @description Например «Chrome, Windows» */
+            device: string | null;
+            id: string;
+            /** Format: date-time */
+            lastSeenAt: string | null;
+        };
+        SessionsRevoked: {
+            /** @description Сколько сессий завершено */
+            revoked: number;
+        };
+        /** @enum {string} */
+        UiMotion: "system" | "reduced";
+        UiPreferences: {
+            motion: components["schemas"]["UiMotion"];
+            scale: components["schemas"]["UiScale"];
+            theme: components["schemas"]["UiTheme"];
+        };
+        /** @enum {string} */
+        UiScale: "compact" | "normal" | "large";
+        /** @enum {string} */
+        UiTheme: "light" | "dark" | "system";
         UpdateJobDto: {
             /** @description Целые рубли; null — «по договорённости»; отсутствие — не менять */
             budgetMax?: number | null;
@@ -513,6 +639,17 @@ export interface components {
             /** @description true — заявка обработана, false — вернуть в новые */
             processed: boolean;
         };
+        UpdatePreferencesDto: {
+            motion?: components["schemas"]["UiMotion"];
+            scale?: components["schemas"]["UiScale"];
+            theme?: components["schemas"]["UiTheme"];
+        };
+        UpdateProfileDto: {
+            city?: string | null;
+            name?: string;
+            /** @example +7 900 123-45-67 */
+            phone?: string | null;
+        };
         UpsertProfileDto: {
             about: string;
             categories: components["schemas"]["JobCategory"][];
@@ -521,11 +658,19 @@ export interface components {
             experienceYears?: number | null;
         };
         UserDto: {
+            /**
+             * Format: date-time
+             * @description Версия фото для адреса картинки; null — фото нет
+             */
+            avatarVersion: string | null;
+            city: string | null;
             /** Format: date-time */
             createdAt: string;
             email: string;
             id: string;
             name: string;
+            phone: string | null;
+            preferences: components["schemas"]["UiPreferences"];
             role: components["schemas"]["UserRole"];
         };
         /** @enum {string} */
@@ -691,7 +836,9 @@ export interface operations {
     Auth_login: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "x-client-user-agent": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -777,7 +924,9 @@ export interface operations {
     Auth_register: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "x-client-user-agent": string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1039,6 +1188,202 @@ export interface operations {
         };
     };
     Me_me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDto"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Me_updateProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProfileDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Me_avatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Фото профиля (WebP 512×512) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/webp": string;
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ресурса нет или он принадлежит другому пользователю */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Me_setAvatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Файл слишком большой */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Me_deleteAvatar: {
         parameters: {
             query?: never;
             header?: never;
@@ -1643,6 +1988,105 @@ export interface operations {
             };
         };
     };
+    Me_changePassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordDto"];
+            };
+        };
+        responses: {
+            /** @description Пароль изменён, остальные сеансы завершены */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Me_updatePreferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePreferencesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     Profile_get: {
         parameters: {
             query?: never;
@@ -1730,6 +2174,136 @@ export interface operations {
             };
             /** @description Роль не допускает операцию */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Me_sessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionDto"][];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Me_revokeOthers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionsRevoked"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Me_revokeSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Сеанс завершён */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ресурса нет или он принадлежит другому пользователю */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

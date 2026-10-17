@@ -26,13 +26,15 @@
     "class-validator": "^0.15.1",
     "helmet": "^8.1.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",
     "@nestjs/testing": "^11.1.0",
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
+    "@types/multer": "^2.3.0",
     "@types/node": "^22.0.0",
     "@types/supertest": "^6.0.0",
     "ajv": "^8.20.0",

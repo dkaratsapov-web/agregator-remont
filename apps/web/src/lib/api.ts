@@ -14,6 +14,10 @@ import type {
   LeadInput,
   OwnJobDto,
   Paginated,
+  PasswordChangeInput,
+  ProfileInput,
+  SessionDto,
+  UiPreferences,
   UserDto,
 } from '@agregator/shared';
 
@@ -30,15 +34,20 @@ export class ApiError extends Error {
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'PUT';
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
   /** Токен сессии пользователя; передаётся API как Bearer. */
   token?: string;
   /** IP посетителя для rate limit в API (API доверяет ему только при настроенном TRUST_PROXY). */
   clientIp?: string;
+  /** User-Agent браузера: API подписывает им устройство в списке входов. */
+  userAgent?: string;
+  /** Готовое тело (multipart с фото); Content-Type выставит fetch. */
+  formData?: FormData;
 }
 
 const REQUEST_TIMEOUT_MS = 5000;
+const UPLOAD_TIMEOUT_MS = 20000;
 
 function apiBaseUrl(): string {
   const url = process.env.API_URL;
@@ -53,14 +62,16 @@ async function request(path: string, options: RequestOptions = {}): Promise<Resp
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
   if (options.clientIp) headers['X-Forwarded-For'] = options.clientIp;
+  if (options.userAgent) headers['X-Client-User-Agent'] = options.userAgent.slice(0, 512);
 
   try {
     return await fetch(`${apiBaseUrl()}${path}`, {
       method: options.method ?? 'GET',
       cache: 'no-store',
       headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      body:
+        options.formData ?? (options.body === undefined ? undefined : JSON.stringify(options.body)),
+      signal: AbortSignal.timeout(options.formData ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS),
     });
   } catch (error) {
     if (error instanceof ApiError) throw error;
@@ -127,16 +138,23 @@ export interface RegisterInput {
 export async function registerUser(
   input: RegisterInput,
   clientIp?: string,
+  userAgent?: string,
 ): Promise<AuthSessionDto> {
-  const res = await request('/v1/auth/register', { method: 'POST', body: input, clientIp });
+  const res = await request('/v1/auth/register', {
+    method: 'POST',
+    body: input,
+    clientIp,
+    userAgent,
+  });
   return expectJson<AuthSessionDto>(res, 'POST /v1/auth/register');
 }
 
 export async function loginUser(
   input: { email: string; password: string },
   clientIp?: string,
+  userAgent?: string,
 ): Promise<AuthSessionDto> {
-  const res = await request('/v1/auth/login', { method: 'POST', body: input, clientIp });
+  const res = await request('/v1/auth/login', { method: 'POST', body: input, clientIp, userAgent });
   return expectJson<AuthSessionDto>(res, 'POST /v1/auth/login');
 }
 
@@ -330,4 +348,89 @@ export async function setLeadProcessed(
     clientIp,
   });
   return expectJson<LeadDto>(res, 'PATCH /v1/admin/leads/:id');
+}
+
+// --- Личный кабинет: профиль, оформление, пароль, устройства, фото
+
+export async function updateProfile(
+  token: string,
+  input: ProfileInput,
+  clientIp?: string,
+): Promise<UserDto> {
+  const res = await request('/v1/me', { method: 'PATCH', body: input, token, clientIp });
+  return expectJson<UserDto>(res, 'PATCH /v1/me');
+}
+
+export async function updatePreferences(
+  token: string,
+  input: Partial<UiPreferences>,
+  clientIp?: string,
+): Promise<UserDto> {
+  const res = await request('/v1/me/preferences', {
+    method: 'PATCH',
+    body: input,
+    token,
+    clientIp,
+  });
+  return expectJson<UserDto>(res, 'PATCH /v1/me/preferences');
+}
+
+export async function changePassword(
+  token: string,
+  input: PasswordChangeInput,
+  clientIp?: string,
+): Promise<void> {
+  const res = await request('/v1/me/password', { method: 'POST', body: input, token, clientIp });
+  if (res.status !== 204) {
+    throw new ApiError(
+      `POST /v1/me/password responded ${res.status}`,
+      res.status,
+      await userMessageOf(res),
+    );
+  }
+}
+
+export async function listSessions(token: string): Promise<SessionDto[]> {
+  const res = await request('/v1/me/sessions', { token });
+  return expectJson<SessionDto[]>(res, 'GET /v1/me/sessions');
+}
+
+export async function revokeSession(token: string, id: string, clientIp?: string): Promise<void> {
+  const res = await request(`/v1/me/sessions/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    token,
+    clientIp,
+  });
+  if (res.status !== 204) {
+    throw new ApiError(
+      `DELETE /v1/me/sessions/:id responded ${res.status}`,
+      res.status,
+      await userMessageOf(res),
+    );
+  }
+}
+
+export async function revokeOtherSessions(token: string, clientIp?: string): Promise<number> {
+  const res = await request('/v1/me/sessions/revoke-others', { method: 'POST', token, clientIp });
+  return (await expectJson<{ revoked: number }>(res, 'POST /v1/me/sessions/revoke-others')).revoked;
+}
+
+export async function uploadAvatar(token: string, file: Blob, clientIp?: string): Promise<UserDto> {
+  const formData = new FormData();
+  formData.append('file', file, 'avatar');
+  const res = await request('/v1/me/avatar', { method: 'PUT', formData, token, clientIp });
+  return expectJson<UserDto>(res, 'PUT /v1/me/avatar');
+}
+
+export async function deleteAvatar(token: string, clientIp?: string): Promise<UserDto> {
+  const res = await request('/v1/me/avatar', { method: 'DELETE', token, clientIp });
+  return expectJson<UserDto>(res, 'DELETE /v1/me/avatar');
+}
+
+/** Фото как есть (WebP); null, если фото нет. */
+export async function fetchAvatar(token: string): Promise<ArrayBuffer | null> {
+  const res = await request('/v1/me/avatar', { token });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new ApiError(`GET /v1/me/avatar responded ${res.status}`, res.status);
+  return res.arrayBuffer();
 }

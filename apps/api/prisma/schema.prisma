@@ -45,6 +45,8 @@ enum AuditAction {
   LEAD_PROCESSED
   LEAD_REOPENED
   USER_ROLE_CHANGED
+  PASSWORD_CHANGED
+  SESSIONS_REVOKED
 }
 
 // Синхронизировано с BID_STATUSES в packages/shared/src/bids.ts.
@@ -88,32 +90,46 @@ model Job {
 }
 
 model User {
-  id           String    @id @default(cuid())
+  id              String             @id @default(cuid())
   /// Хранится в нижнем регистре после trim; уникальность обеспечивает индекс.
-  email        String    @unique @db.VarChar(254)
+  email           String             @unique @db.VarChar(254)
   /// argon2id в PHC-формате. Никогда не попадает в ответы API.
-  passwordHash String    @map("password_hash")
-  name         String    @db.VarChar(80)
-  role         UserRole
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-  sessions     Session[]
-  jobs         Job[]
-  auditLogs    AuditLog[]
-  profile      ContractorProfile?
-  bids         Bid[]
+  passwordHash    String             @map("password_hash")
+  name            String             @db.VarChar(80)
+  role            UserRole
+  /// +7XXXXXXXXXX (CHECK в базе), необязательный.
+  phone           String?            @db.VarChar(12)
+  city            String?            @db.VarChar(80)
+  /// Время последней загрузки фото; null — фото нет. Само фото в user_avatars.
+  avatarUpdatedAt DateTime?          @map("avatar_updated_at")
+  /// Оформление кабинета (значения проверяет CHECK в базе и DTO).
+  uiTheme         String             @default("light") @map("ui_theme") @db.VarChar(10)
+  uiScale         String             @default("normal") @map("ui_scale") @db.VarChar(10)
+  uiMotion        String             @default("system") @map("ui_motion") @db.VarChar(10)
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  avatar          UserAvatar?
+  sessions        Session[]
+  jobs            Job[]
+  auditLogs       AuditLog[]
+  profile         ContractorProfile?
+  bids            Bid[]
 
   @@map("users")
 }
 
 model Session {
-  id        String   @id @default(cuid())
+  id         String    @id @default(cuid())
   /// SHA-256 (hex) от токена; сам токен в БД не хранится.
-  tokenHash String   @unique @map("token_hash") @db.Char(64)
-  userId    String   @map("user_id")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime @map("expires_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  tokenHash  String    @unique @map("token_hash") @db.Char(64)
+  userId     String    @map("user_id")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime  @map("expires_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  /// Браузер и система, например «Chrome, Windows» (из User-Agent при входе).
+  device     String?   @db.VarChar(80)
+  /// Последняя активность, обновляется не чаще раза в час.
+  lastSeenAt DateTime? @map("last_seen_at")
 
   @@index([userId])
   @@index([expiresAt])
@@ -188,4 +204,15 @@ model Lead {
   @@index([createdAt(sort: Desc)])
   @@index([phone, createdAt])
   @@map("leads")
+}
+
+/// Фото профиля: перекодировано в WebP 512×512 без метаданных. Отдельная таблица, чтобы байты
+/// не читались вместе с пользователем при каждой проверке сессии.
+model UserAvatar {
+  userId    String   @id @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data      Bytes
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("user_avatars")
 }

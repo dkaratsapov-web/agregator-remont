@@ -4,6 +4,7 @@ import { Prisma, User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { toUserDto } from '../users/user.mapper';
 import type { AuthContext } from './auth.types';
+import { deviceLabel } from './device';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { getDummyHash, hashPassword, verifyPassword } from './password';
@@ -15,12 +16,14 @@ import {
 } from './session-token';
 
 const INVALID_CREDENTIALS = 'Неверный email или пароль';
+/** Время активности сеанса обновляется не чаще раза в час, а не на каждый запрос. */
+const LAST_SEEN_STEP_MS = 60 * 60 * 1000;
 
 @Injectable()
 export class AuthService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async register(dto: RegisterDto): Promise<AuthSessionDto> {
+  async register(dto: RegisterDto, userAgent?: string): Promise<AuthSessionDto> {
     if (dto.password.toLowerCase() === dto.email) {
       throw new ConflictException('Пароль не должен совпадать с email');
     }
@@ -32,7 +35,7 @@ export class AuthService {
         const user = await tx.user.create({
           data: { email: dto.email, passwordHash, name: dto.name, role: dto.role },
         });
-        return this.createSession(tx, user);
+        return this.createSession(tx, user, userAgent);
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -42,7 +45,7 @@ export class AuthService {
     }
   }
 
-  async login(dto: LoginDto): Promise<AuthSessionDto> {
+  async login(dto: LoginDto, userAgent?: string): Promise<AuthSessionDto> {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     // Пароль проверяется и для несуществующего email, чтобы не раскрывать его по времени ответа.
     const valid = await verifyPassword(user?.passwordHash ?? (await getDummyHash()), dto.password);
@@ -52,7 +55,7 @@ export class AuthService {
     await this.prisma.session.deleteMany({
       where: { userId: user.id, expiresAt: { lte: new Date() } },
     });
-    return this.createSession(this.prisma, user);
+    return this.createSession(this.prisma, user, userAgent);
   }
 
   async logout(sessionId: string): Promise<void> {
@@ -66,15 +69,33 @@ export class AuthService {
       where: { tokenHash: hashSessionToken(token) },
       include: { user: true },
     });
-    if (!session || session.expiresAt <= new Date()) return null;
+    const now = new Date();
+    if (!session || session.expiresAt <= now) return null;
+    if (!session.lastSeenAt || now.getTime() - session.lastSeenAt.getTime() > LAST_SEEN_STEP_MS) {
+      // Не ждём и не роняем запрос: это только отметка для списка устройств.
+      void this.prisma.session
+        .updateMany({ where: { id: session.id }, data: { lastSeenAt: now } })
+        .catch(() => undefined);
+    }
     return { user: session.user, sessionId: session.id };
   }
 
-  private async createSession(db: Prisma.TransactionClient, user: User): Promise<AuthSessionDto> {
+  private async createSession(
+    db: Prisma.TransactionClient,
+    user: User,
+    userAgent?: string,
+  ): Promise<AuthSessionDto> {
     const token = generateSessionToken();
-    const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
     await db.session.create({
-      data: { tokenHash: hashSessionToken(token), userId: user.id, expiresAt },
+      data: {
+        tokenHash: hashSessionToken(token),
+        userId: user.id,
+        expiresAt,
+        device: deviceLabel(userAgent),
+        lastSeenAt: now,
+      },
     });
     return { user: toUserDto(user), token, expiresAt: expiresAt.toISOString() };
   }

@@ -3,10 +3,12 @@
 import { USER_ROLE_LABELS, type UserRole } from '@agregator/shared';
 import { useActionState, useEffect, useId, useRef, useState } from 'react';
 import { logoutAction, type AuthFormState } from '@/app/(site)/(auth)/actions';
+import { UserAvatar } from './account/user-avatar';
 
 export interface MenuUser {
   name: string;
   role: UserRole;
+  avatarVersion: string | null;
 }
 
 type MenuLink = { href: string; label: string; soon?: boolean };
@@ -104,7 +106,6 @@ export function AccountMenu({ user }: { user: MenuUser }) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const panelId = useId();
-  const initial = user.name.trim().charAt(0).toUpperCase() || '?';
 
   useEffect(() => {
     if (!open) return;
@@ -168,12 +169,7 @@ export function AccountMenu({ user }: { user: MenuUser }) {
           onClick={() => setOpen((value) => !value)}
           className="inline-flex min-h-11 max-w-[55vw] items-center gap-2.5 rounded-full border border-line bg-surface/80 py-1 pl-1 pr-3.5 text-sm font-semibold text-ink transition-[background-color,border-color] duration-200 hover:border-ink/25 hover:bg-surface aria-expanded:border-ink/25 aria-expanded:bg-surface sm:max-w-xs"
         >
-          <span
-            aria-hidden="true"
-            className="grid size-9 shrink-0 place-items-center rounded-full bg-ink text-sm font-semibold text-canvas"
-          >
-            {initial}
-          </span>
+          <UserAvatar name={user.name} avatarVersion={user.avatarVersion} />
           <span className="min-w-0 truncate">{user.name}</span>
           <svg
             viewBox="0 0 16 16"
@@ -204,12 +200,11 @@ export function AccountMenu({ user }: { user: MenuUser }) {
               onClick={() => setOpen(false)}
               className="flex items-center gap-3 rounded-xl p-2.5 transition-colors duration-150 hover:bg-muted-tint"
             >
-              <span
-                aria-hidden="true"
-                className="grid size-11 shrink-0 place-items-center rounded-full bg-ink text-base font-semibold text-canvas"
-              >
-                {initial}
-              </span>
+              <UserAvatar
+                name={user.name}
+                avatarVersion={user.avatarVersion}
+                className="size-11 text-base"
+              />
               <span className="min-w-0">
                 <span className="block truncate font-semibold text-ink">{user.name}</span>
                 <span className="block text-sm text-ink-soft">
@@ -236,6 +231,9 @@ export function AccountMenu({ user }: { user: MenuUser }) {
             ))}
 
             <div className="mt-2 border-t border-line pt-2">
+              <a href="/account/settings" onClick={() => setOpen(false)} className={itemClass}>
+                Настройки
+              </a>
               <LogoutItem />
             </div>
           </nav>

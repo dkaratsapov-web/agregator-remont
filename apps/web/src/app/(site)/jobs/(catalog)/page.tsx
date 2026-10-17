@@ -66,7 +66,7 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pt-10 sm:px-6 md:pt-14">
+    <div className="mx-auto max-w-[1600px] px-4 pb-16 pt-10 sm:px-6 md:pt-14 lg:px-10">
       <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">Каталог</p>
@@ -83,65 +83,63 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
         ) : null}
       </header>
 
-      <div className="mt-8">
-        <CatalogSearch filters={filters} />
-      </div>
+      <div className="mt-8 grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)] lg:items-start lg:gap-10">
+        <aside className="flex min-w-0 flex-col gap-5 lg:sticky lg:top-24">
+          <CatalogSearch filters={filters} />
+          <CategoryFilter filters={filters} />
+        </aside>
 
-      <div className="mt-5">
-        <CategoryFilter filters={filters} />
+        <section aria-label="Заказы" className="min-w-0">
+          {data === null ? (
+            <ApiUnavailable
+              action={
+                <Link
+                  href={jobsHref({ ...filters, page })}
+                  className="font-semibold text-accent underline underline-offset-4"
+                >
+                  Повторить
+                </Link>
+              }
+            />
+          ) : data.items.length === 0 ? (
+            <div className="rounded-[24px] border border-dashed border-line bg-surface px-6 py-14 text-center">
+              <h2 className="text-lg font-semibold">
+                {data.total === 0
+                  ? searching
+                    ? 'Ничего не нашлось'
+                    : 'Пока нет заказов'
+                  : 'На этой странице пусто'}
+              </h2>
+              <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
+                {data.total === 0
+                  ? searching
+                    ? 'Попробуйте другой запрос, город или категорию.'
+                    : 'Новые заказы появятся здесь после публикации.'
+                  : 'Похоже, страниц меньше, чем указано в адресе.'}
+              </p>
+              {searching || data.total > 0 ? (
+                <Link
+                  href={data.total === 0 ? '/jobs' : jobsHref(filters)}
+                  className="mt-6 inline-flex min-h-11 items-center rounded-full bg-ink px-5 text-sm font-semibold text-canvas hover:bg-ink/85"
+                >
+                  {data.total === 0 ? 'Все заказы' : 'К первой странице'}
+                </Link>
+              ) : null}
+            </div>
+          ) : (
+            <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 min-[1800px]:grid-cols-4">
+              {data.items.map((job) => (
+                <li key={job.id}>
+                  <JobCard job={job} />
+                </li>
+              ))}
+            </ul>
+          )}
+          {data && data.items.length > 0 ? (
+            <Pagination page={page} totalPages={totalPages} filters={filters} />
+          ) : null}
+        </section>
       </div>
-
-      <div className="mt-8">
-        {data === null ? (
-          <ApiUnavailable
-            action={
-              <Link
-                href={jobsHref({ ...filters, page })}
-                className="font-semibold text-accent underline underline-offset-4"
-              >
-                Повторить
-              </Link>
-            }
-          />
-        ) : data.items.length === 0 ? (
-          <div className="rounded-[24px] border border-dashed border-line bg-surface px-6 py-14 text-center">
-            <h2 className="text-lg font-semibold">
-              {data.total === 0
-                ? searching
-                  ? 'Ничего не нашлось'
-                  : 'Пока нет заказов'
-                : 'На этой странице пусто'}
-            </h2>
-            <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
-              {data.total === 0
-                ? searching
-                  ? 'Попробуйте другой запрос, город или категорию.'
-                  : 'Новые заказы появятся здесь после публикации.'
-                : 'Похоже, страниц меньше, чем указано в адресе.'}
-            </p>
-            {searching || data.total > 0 ? (
-              <Link
-                href={data.total === 0 ? '/jobs' : jobsHref(filters)}
-                className="mt-6 inline-flex min-h-11 items-center rounded-full bg-ink px-5 text-sm font-semibold text-canvas hover:bg-[#1c2536]"
-              >
-                {data.total === 0 ? 'Все заказы' : 'К первой странице'}
-              </Link>
-            ) : null}
-          </div>
-        ) : (
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {data.items.map((job) => (
-              <li key={job.id}>
-                <JobCard job={job} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {data && data.items.length > 0 ? (
-        <Pagination page={page} totalPages={totalPages} filters={filters} />
-      ) : null}
     </div>
   );
 }

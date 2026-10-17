@@ -3,6 +3,9 @@ import {
   CURRENCIES,
   JOB_CATEGORIES,
   JOB_STATUSES,
+  UI_MOTIONS,
+  UI_SCALES,
+  UI_THEMES,
   USER_ROLES,
   type AuthSessionDto,
   type BidStatus,
@@ -16,6 +19,11 @@ import {
   type MyBidDto,
   type OwnJobDto,
   type Paginated,
+  type SessionDto,
+  type UiMotion,
+  type UiPreferences,
+  type UiScale,
+  type UiTheme,
   type UserDto,
   type UserRole,
 } from '@agregator/shared';
@@ -71,13 +79,46 @@ export class PaginatedOwnJobSchema implements Paginated<OwnJobDto> {
   @int() total!: number;
 }
 
+@ApiSchema({ name: 'UiPreferences' })
+export class UiPreferencesSchema implements UiPreferences {
+  @ApiProperty({ enum: UI_THEMES, enumName: 'UiTheme' }) theme!: UiTheme;
+  @ApiProperty({ enum: UI_SCALES, enumName: 'UiScale' }) scale!: UiScale;
+  @ApiProperty({ enum: UI_MOTIONS, enumName: 'UiMotion' }) motion!: UiMotion;
+}
+
 @ApiSchema({ name: 'UserDto' })
 export class UserSchema implements UserDto {
   @ApiProperty() id!: string;
   @ApiProperty() email!: string;
   @ApiProperty() name!: string;
   @ApiProperty({ enum: USER_ROLES, enumName: 'UserRole' }) role!: UserRole;
+  @ApiProperty({ type: String, nullable: true, pattern: '^\\+7[3489][0-9]{9}$' })
+  phone!: string | null;
+  @ApiProperty({ type: String, nullable: true }) city!: string | null;
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'Версия фото для адреса картинки; null — фото нет',
+  })
+  avatarVersion!: string | null;
+  @ApiProperty({ type: UiPreferencesSchema }) preferences!: UiPreferencesSchema;
   @dateTime() createdAt!: string;
+}
+
+@ApiSchema({ name: 'SessionDto' })
+export class SessionSchema implements SessionDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ type: String, nullable: true, description: 'Например «Chrome, Windows»' })
+  device!: string | null;
+  @dateTime() createdAt!: string;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) lastSeenAt!: string | null;
+  @ApiProperty({ description: 'Сессия, с которой сделан запрос' }) current!: boolean;
+}
+
+@ApiSchema({ name: 'SessionsRevoked' })
+export class SessionsRevokedSchema {
+  @int({ description: 'Сколько сессий завершено' }) revoked!: number;
 }
 
 @ApiSchema({ name: 'AuthSessionDto' })
