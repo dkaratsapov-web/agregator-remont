@@ -452,8 +452,8 @@ export interface components {
             /** @description Город или посёлок из списка SERVICE_CITIES (@agregator/shared): Москва и Московская область, Санкт-Петербург и Ленинградская область */
             city: string;
             description: string;
-            /** @description Ответы анкеты категории { id вопроса: значение }. Без поля: анкета не заполнена */
-            details?: {
+            /** @description Ответы анкеты категории { id вопроса: значение }. Обязательные вопросы категории должны быть отвечены */
+            details: {
                 [key: string]: string | number | boolean | string[];
             };
             title: string;
@@ -647,7 +647,7 @@ export interface components {
             /** @description Город или посёлок из списка SERVICE_CITIES (@agregator/shared): Москва и Московская область, Санкт-Петербург и Ленинградская область */
             city?: string;
             description?: string;
-            /** @description Ответы анкеты целиком (заменяют прежние); без поля: не менять. При смене категории без этого поля остаются только ответы, подходящие новой анкете */
+            /** @description Ответы анкеты целиком (заменяют прежние); без поля: не менять. При смене категории обязательно */
             details?: {
                 [key: string]: string | number | boolean | string[];
             };

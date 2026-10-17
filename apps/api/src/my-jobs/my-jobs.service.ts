@@ -67,8 +67,8 @@ export class MyJobsService {
 
   async create(ownerId: string, dto: CreateJobDto): Promise<OwnJobDto> {
     assertBudgetRange(dto.budgetMin, dto.budgetMax);
-    // Без поля details анкета считается незаполненной (совместимость с клиентами до анкеты).
-    const details = dto.details === undefined ? {} : checkDetails(dto.category, dto.details);
+    // Анкета обязательна: обязательные вопросы категории должны быть отвечены.
+    const details = checkDetails(dto.category, dto.details);
 
     const job = await this.prisma.$transaction(async (tx) => {
       // Блокировка строки пользователя сериализует создание заказов одним пользователем:
@@ -132,9 +132,11 @@ export class MyJobsService {
       if (dto.details !== undefined) {
         details = checkDetails(category, dto.details);
       } else if (category !== current.category) {
-        // Смена категории без новых ответов: остаются только ответы, подходящие новой анкете.
-        details = readJobDetails({ category, details: before });
+        // У новой категории своя анкета с обязательными вопросами: без ответов не меняем.
+        throw new BadRequestException('При смене категории заполните анкету новой категории');
       }
+      // Правка без details оставляет ответы как есть. У заказов, созданных до анкеты (legacy),
+      // ответов нет: владелец видит это на странице заказа и дополняет анкету через форму.
       if (details !== undefined) data.details = details;
       if (Object.keys(data).length === 0) {
         throw new BadRequestException('Нет полей для изменения');

@@ -2,7 +2,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { createTestApp } from './create-app';
-import { signUp } from './helpers';
+import { signUp, requiredAnswers } from './helpers';
 
 const prisma = new PrismaClient();
 
@@ -10,6 +10,7 @@ const job = {
   title: 'Укладка ламината в квартире',
   description: 'Две комнаты, около 40 м², основание ровное, ламинат куплен.',
   category: 'FLOORING',
+  details: requiredAnswers('FLOORING'),
   city: 'Гатчина',
   budgetMin: 30_000,
   budgetMax: 45_000,

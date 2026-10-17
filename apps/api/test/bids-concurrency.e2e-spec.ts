@@ -2,13 +2,14 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { createTestApp } from './create-app';
-import { signUp } from './helpers';
+import { signUp, requiredAnswers } from './helpers';
 
 const prisma = new PrismaClient();
 const job = {
   title: 'Заказ для гонок откликов',
   description: 'Проверка параллельных откликов, выбора исполнителя и отзыва.',
   category: 'OTHER',
+  details: requiredAnswers('OTHER'),
   city: 'Москва',
 };
 const bid = { price: 10_000, comment: 'Готов выполнить работу в срок.' };

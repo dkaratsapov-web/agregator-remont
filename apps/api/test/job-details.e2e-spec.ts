@@ -7,15 +7,6 @@ import { signUp } from './helpers';
 
 const prisma = new PrismaClient();
 
-const repairJob = {
-  title: 'Ремонт двушки в новостройке под ключ',
-  description: 'Квартира 54 м² в бетоне, нужны черновые и чистовые работы, есть планировка.',
-  category: 'REPAIR_TURNKEY' as const,
-  city: 'Химки',
-  budgetMin: 1_500_000,
-  budgetMax: 2_000_000,
-};
-
 const repairDetails = {
   objectType: 'apartment',
   housing: 'new',
@@ -26,6 +17,16 @@ const repairDetails = {
   works: ['warmFloor', 'electrics'],
   warmFloorType: 'electric',
   start: 'month',
+};
+
+const repairJob = {
+  title: 'Ремонт двушки в новостройке под ключ',
+  description: 'Квартира 54 м² в бетоне, нужны черновые и чистовые работы, есть планировка.',
+  category: 'REPAIR_TURNKEY' as const,
+  city: 'Химки',
+  budgetMin: 1_500_000,
+  budgetMax: 2_000_000,
+  details: repairDetails,
 };
 
 async function cleanDb(): Promise<void> {
@@ -95,9 +96,27 @@ describe('Job questionnaire and service area (e2e)', () => {
       expect(audit.changes).toMatchObject({ details: { from: {}, to: expected } });
     });
 
-    it('keeps jobs without a questionnaire valid', async () => {
-      const res = await create(repairJob).expect(201);
+    it('requires the questionnaire on create', async () => {
+      const missing = await create({ ...repairJob, details: undefined }).expect(400);
+      expect(JSON.stringify(missing.body.message)).toContain('Заполните анкету заказа');
+      const empty = await create({ ...repairJob, details: {} }).expect(400);
+      expect(empty.body.message).toBe('Анкета заказа: Ответьте на вопрос «Тип объекта»');
+      expect(await prisma.job.count()).toBe(0);
+    });
+
+    it('legacy jobs without answers stay editable and keep empty answers', async () => {
+      // Заказ, созданный до анкеты: в базе details = {} (значение по умолчанию).
+      const me = await http().get('/v1/me').set(auth).expect(200);
+      const legacy = await prisma.job.create({
+        data: { ...repairJob, details: undefined, ownerId: me.body.id },
+      });
+      expect(legacy.details).toEqual({});
+      const res = await patch(legacy.id, { title: 'Ремонт двушки: уточнили сроки' }).expect(200);
       expect(res.body.details).toEqual({});
+      // Дополнить анкету можно только целиком и по правилам категории.
+      await patch(legacy.id, { details: { objectType: 'apartment' } }).expect(400);
+      const filled = await patch(legacy.id, { details: repairDetails }).expect(200);
+      expect(filled.body.details).toMatchObject({ area: 54, repairLevel: 'capital' });
     });
 
     it.each<[string, unknown, string]>([
@@ -153,11 +172,13 @@ describe('Job questionnaire and service area (e2e)', () => {
       expect(Object.keys(audit[0].changes as object)).toEqual(['details']);
     });
 
-    it('changing the category drops answers that do not belong to it', async () => {
+    it('changing the category requires answers for the new questionnaire', async () => {
       const { body: job } = await create({ ...repairJob, details: repairDetails }).expect(201);
-      const res = await patch(job.id, { category: 'ELECTRICAL' }).expect(200);
-      // В анкете электрики есть «Тип объекта», «Количество комнат» и «Когда начать».
-      expect(res.body.details).toEqual({ objectType: 'apartment', rooms: '2', start: 'month' });
+      const res = await patch(job.id, { category: 'ELECTRICAL' }).expect(400);
+      expect(res.body.message).toBe('При смене категории заполните анкету новой категории');
+      const unchanged = await prisma.job.findUniqueOrThrow({ where: { id: job.id } });
+      expect(unchanged.category).toBe('REPAIR_TURNKEY');
+      expect(unchanged.details).toEqual(job.details);
 
       const moved = await patch(job.id, {
         category: 'PLUMBING',

@@ -8,6 +8,7 @@ import {
 } from '@agregator/shared';
 import { Transform } from 'class-transformer';
 import {
+  IsDefined,
   IsIn,
   IsInt,
   IsObject,
@@ -101,15 +102,15 @@ export class CreateJobDto {
   })
   budgetMax: number | null = null;
 
-  /** Проверяется в сервисе по анкете категории (validateJobDetails). */
-  @IsOptional()
+  /** Обязательна; ответы проверяются в сервисе по анкете категории (validateJobDetails). */
+  @IsDefined({ message: 'Заполните анкету заказа' })
   @IsObject({ message: 'Ответы на вопросы передаются объектом' })
-  @ApiPropertyOptional(
+  @ApiProperty(
     jobDetailsProperty(
-      'Ответы анкеты категории { id вопроса: значение }. Без поля: анкета не заполнена',
+      'Ответы анкеты категории { id вопроса: значение }. Обязательные вопросы категории должны быть отвечены',
     ),
   )
-  details?: Record<string, unknown>;
+  details!: Record<string, unknown>;
 }
 
 /** Правка: любые поля из CreateJobDto; владелец, статус и даты через API не меняются. */
@@ -175,7 +176,7 @@ export class UpdateJobDto {
   @IsObject({ message: 'Ответы на вопросы передаются объектом' })
   @ApiPropertyOptional(
     jobDetailsProperty(
-      'Ответы анкеты целиком (заменяют прежние); без поля: не менять. При смене категории без этого поля остаются только ответы, подходящие новой анкете',
+      'Ответы анкеты целиком (заменяют прежние); без поля: не менять. При смене категории обязательно',
     ),
   )
   details?: Record<string, unknown>;

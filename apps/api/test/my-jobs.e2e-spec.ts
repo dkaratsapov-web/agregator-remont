@@ -2,7 +2,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { createTestApp } from './create-app';
-import { signUp } from './helpers';
+import { signUp, requiredAnswers } from './helpers';
 
 const prisma = new PrismaClient();
 
@@ -10,6 +10,7 @@ const validJob = {
   title: 'Замена проводки в квартире',
   description: 'Нужна полная замена проводки в двухкомнатной квартире, около 50 м².',
   category: 'ELECTRICAL',
+  details: requiredAnswers('ELECTRICAL'),
   city: 'Санкт-Петербург',
   budgetMin: 80_000,
   budgetMax: 120_000,

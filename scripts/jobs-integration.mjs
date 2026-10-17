@@ -10,11 +10,14 @@ const job = {
   budgetMin: '40 000',
   budgetMax: '60 000',
   description: 'Укладка плитки в ванной, около 20 м². Материалы заказчика.',
-  // Обязательные вопросы анкеты плитки (packages/shared/src/job-questions.ts).
+  // Анкета плитки (packages/shared/src/job-questions.ts): обязательные вопросы, ответ в
+  // раскрытой ветке (floorArea при «Пол») и ответ в нераскрытой (apronLength без «Фартука»),
+  // который сервер должен отбросить.
   details: JSON.stringify({
     rooms: ['bathroom'],
     surfaces: ['floor'],
     floorArea: 6,
+    apronLength: 3.2,
     tileType: 'ceramic',
   }),
 };
@@ -24,6 +27,19 @@ const stranger = await registerViaApi('CUSTOMER');
 const contractor = await registerViaApi('CONTRACTOR');
 const ownerJobs = async () =>
   (await (await fetch(`${API}/v1/me/jobs?limit=50`, { headers: owner.auth })).json()).total;
+
+// --- без обязательных ответов анкеты заказ не создаётся: форма показывает ошибку у вопроса
+const unanswered = await submit(
+  '/account/jobs/new',
+  { ...job, details: JSON.stringify({ rooms: ['bathroom'] }) },
+  { cookie: owner.cookie },
+);
+check(
+  'form without required answers is rejected with a question error',
+  unanswered.status === 200 && unanswered.text.includes('Ответьте на вопрос «Поверхности»'),
+  `got ${unanswered.status}`,
+);
+check('rejected questionnaire creates no job', (await ownerJobs()) === 0);
 
 // --- создание через форму
 const created = await submit('/account/jobs/new', job, { cookie: owner.cookie });
@@ -40,6 +56,14 @@ check(
   'job is public with parsed budgets',
   publicBody.budgetMin === 40000 && publicBody.budgetMax === 60000,
 );
+check(
+  'answers are stored; the hidden branch answer is dropped',
+  JSON.stringify(publicBody.details) ===
+    JSON.stringify({ rooms: ['bathroom'], surfaces: ['floor'], floorArea: 6, tileType: 'ceramic' }),
+  JSON.stringify(publicBody.details),
+);
+const jobPage = await (await fetch(`${WEB}/jobs/${id}`)).text();
+check('job page shows the answers', jobPage.includes('Керамическая плитка'));
 check(
   'public job does not expose the owner',
   !('ownerId' in publicBody) && !JSON.stringify(publicBody).includes(owner.user.id),

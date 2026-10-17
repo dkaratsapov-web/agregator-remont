@@ -2,7 +2,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { createTestApp } from './create-app';
-import { signUp } from './helpers';
+import { signUp, requiredAnswers } from './helpers';
 
 const prisma = new PrismaClient();
 
@@ -32,6 +32,7 @@ describe('Write rate limit (e2e)', () => {
       title: 'Покраска стен',
       description: 'Покраска стен в двух комнатах, около 60 м².',
       category: 'FINISHING',
+      details: requiredAnswers('FINISHING'),
       city: 'Подольск',
     };
     const post = () =>

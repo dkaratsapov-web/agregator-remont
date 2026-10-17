@@ -5,7 +5,7 @@ import sharp from 'sharp';
 import request from 'supertest';
 import { expectContract, uncoveredResponses } from './contract';
 import { createTestApp } from './create-app';
-import { signUp, signUpAdmin } from './helpers';
+import { signUp, signUpAdmin, requiredAnswers } from './helpers';
 
 /**
  * Контракт: каждый ответ, объявленный в apps/api/openapi.json, получен от настоящего API
@@ -18,6 +18,7 @@ const job = {
   title: 'Замена проводки в однокомнатной квартире',
   description: 'Нужно заменить проводку и щиток, квартира 35 м², стены бетон.',
   category: 'ELECTRICAL',
+  details: requiredAnswers('ELECTRICAL'),
   city: 'Химки',
   budgetMin: 40_000,
   budgetMax: null,

@@ -1,4 +1,4 @@
-import { JOB_CATEGORY_LABELS } from '@agregator/shared';
+import { JOB_CATEGORY_LABELS, validateJobDetails } from '@agregator/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -85,6 +85,16 @@ export default async function MyJobPage({
         </div>
       ) : null}
 
+      {job.editable && !validateJobDetails(job.category, job.details).ok ? (
+        // Заказ создан до анкеты (или анкета стала строже): владелец дополняет её в форме ниже.
+        <p className="mt-6 rounded-xl border border-accent/40 bg-accent-tint px-4 py-3 text-sm text-ink">
+          Анкета заказа заполнена не полностью, подрядчики видят меньше деталей.{' '}
+          <a href="#edit-title" className="font-semibold text-accent hover:underline">
+            Ответить на вопросы
+          </a>
+        </p>
+      ) : null}
+
       <div className="mt-10 empty:hidden">
         <JobDetails category={job.category} details={job.details} />
       </div>
@@ -108,7 +118,9 @@ export default async function MyJobPage({
 
       {job.editable ? (
         <>
-          <h2 className="mt-10 text-lg font-semibold">Редактирование</h2>
+          <h2 id="edit-title" className="mt-10 scroll-mt-24 text-lg font-semibold">
+            Редактирование
+          </h2>
           <div className="mt-4">
             <JobForm
               action={updateJobAction.bind(null, job.id)}
