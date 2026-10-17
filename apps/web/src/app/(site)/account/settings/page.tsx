@@ -57,7 +57,7 @@ export default async function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pb-20 pt-10 sm:px-6 md:pt-14">
+    <div className="mx-auto max-w-[1600px] px-4 pb-20 pt-10 sm:px-6 lg:px-10 md:pt-14">
       <p className="text-sm text-ink-soft">
         <Link href="/account" className="hover:text-ink hover:underline">
           Кабинет

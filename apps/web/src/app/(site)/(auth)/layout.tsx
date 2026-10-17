@@ -3,7 +3,7 @@
  */
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto grid max-w-6xl gap-10 px-4 pb-12 pt-8 sm:px-6 md:pt-14 lg:grid-cols-2 lg:items-stretch lg:gap-12">
+    <div className="mx-auto grid max-w-[1600px] gap-10 px-4 pb-12 pt-8 sm:px-6 lg:px-10 md:pt-14 lg:grid-cols-2 lg:items-stretch lg:gap-12">
       <aside
         aria-hidden="true"
         className="relative hidden overflow-hidden rounded-[28px] bg-[#0d1320] p-10 text-[#eef1f6] shadow-[0_30px_60px_-30px_rgb(13_19_32/0.55)] lg:flex lg:flex-col lg:justify-between"

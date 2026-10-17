@@ -291,7 +291,7 @@ export default async function AccountPage() {
   const isAdmin = user.role === 'ADMIN';
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pt-10 sm:px-6 md:pt-14">
+    <div className="mx-auto max-w-[1600px] px-4 pt-10 sm:px-6 lg:px-10 md:pt-14">
       <ProfileCard user={user} />
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">

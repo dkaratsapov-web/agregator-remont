@@ -71,7 +71,7 @@ export default async function JobPage({
         : null;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pt-8 sm:px-6 md:pt-12">
+    <div className="mx-auto max-w-[1600px] px-4 pt-8 sm:px-6 lg:px-10 md:pt-12">
       <nav aria-label="Навигационная цепочка" className="text-sm text-ink-soft">
         <ol className="flex flex-wrap items-center gap-1.5">
           <li>

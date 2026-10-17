@@ -25,7 +25,7 @@ export function LandingHeader() {
       data-scrolled={scrolled}
       className="group fixed inset-x-0 top-0 z-40 border-b border-transparent transition-[background-color,border-color] duration-300 data-[scrolled=true]:border-line/80 data-[scrolled=true]:bg-canvas/95 supports-[backdrop-filter]:data-[scrolled=true]:bg-canvas/75 supports-[backdrop-filter]:data-[scrolled=true]:backdrop-blur-xl"
     >
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-10">
         <a
           href="#top"
           className="flex min-h-11 items-center rounded-lg"

@@ -107,7 +107,7 @@ export default async function LandingPage() {
         </section>
 
         {/* О сервисе */}
-        <section id="about" className="mx-auto max-w-7xl px-4 py-28 sm:px-6 lg:px-8 lg:py-40">
+        <section id="about" className="mx-auto max-w-[1600px] px-4 py-28 sm:px-6 lg:px-10 lg:py-40">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">О сервисе</p>
           <div className="mt-6 max-w-5xl">
             <Manifesto text="Мы делаем Гарантыч, чтобы цена и срок ремонта были известны до начала работ, а деньги переходили мастеру только после того, как вы приняли этап." />
@@ -115,7 +115,7 @@ export default async function LandingPage() {
         </section>
 
         {/* Заявка на закрытое тестирование */}
-        <section id="apply" className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+        <section id="apply" className="mx-auto max-w-[1600px] px-4 pb-24 sm:px-6 lg:px-10">
           <Reveal>
             <div className="iso-grid landing-shadow-lg relative grid gap-10 overflow-hidden rounded-[28px] border border-line/70 bg-surface px-6 py-12 sm:px-12 sm:py-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-16 lg:px-16">
               <div
@@ -143,7 +143,7 @@ export default async function LandingPage() {
       </main>
 
       <footer className="border-t border-line">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-10 pb-[max(2.5rem,env(safe-area-inset-bottom))] text-sm text-ink-soft sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-4 py-10 pb-[max(2.5rem,env(safe-area-inset-bottom))] text-sm text-ink-soft sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-10">
           <Wordmark />
           <p className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-6">
             <span>Площадка заказов на ремонт и строительство. Закрытое тестирование, 2026.</span>

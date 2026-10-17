@@ -110,6 +110,92 @@ html:has(.landing) {
   }
 }
 
+/* Название в заголовке героя: плашка-«печать» в цвете акцента. Слово поднимается, плашка
+   проезжает под ним слева направо, текст светлеет; затем изредка по плашке пробегает блик.
+   Плашка выступает влево за край колонки, чтобы буквы стояли ровно по левому краю. */
+.word-mask--brand {
+  margin-left: -0.16em;
+}
+
+.brand-mark {
+  position: relative;
+  isolation: isolate;
+  display: inline-block;
+  padding: 0.02em 0.16em 0.08em;
+  color: var(--accent-ink);
+}
+
+.brand-mark::before,
+.brand-mark::after {
+  content: '';
+  position: absolute;
+  inset: 0.04em 0 0;
+  z-index: -1;
+  border-radius: 0.2em;
+}
+
+.brand-mark::before {
+  background: var(--accent);
+  box-shadow: 0 0.12em 0.4em -0.18em color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.brand-mark::after {
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgb(255 255 255 / 0.32) 50%,
+    transparent 65%
+  );
+  background-size: 250% 100%;
+  background-position: 120% 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .brand-mark {
+    animation: brand-ink 500ms ease-out both;
+    animation-delay: 2900ms;
+  }
+  .brand-mark::before {
+    transform-origin: left center;
+    animation: brand-plate 700ms var(--ease-out-strong) both;
+    animation-delay: 2750ms;
+  }
+  .brand-mark::after {
+    animation: brand-shine 6s ease-in-out infinite;
+    animation-delay: 3600ms;
+  }
+}
+
+@keyframes brand-plate {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes brand-ink {
+  from {
+    color: var(--ink);
+  }
+  to {
+    color: var(--accent-ink);
+  }
+}
+
+@keyframes brand-shine {
+  0% {
+    background-position: 120% 0;
+  }
+  22%,
+  100% {
+    background-position: -20% 0;
+  }
+}
+
 @keyframes word-in {
   from {
     transform: translateY(105%);
