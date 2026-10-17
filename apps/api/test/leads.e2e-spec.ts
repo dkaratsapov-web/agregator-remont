@@ -4,7 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { LeadsService } from '../src/leads/leads.service';
 import { createTestApp } from './create-app';
-import { signUp } from './helpers';
+import { signUp, signUpAdmin } from './helpers';
 
 const prisma = new PrismaClient();
 const lead = { name: 'Ирина Петрова', phone: '+7 912 345-67-89', consent: true };
@@ -19,19 +19,16 @@ async function cleanDb(): Promise<void> {
 
 describe('Leads (e2e)', () => {
   let app: NestExpressApplication;
-  const adminEmail = `owner-${Date.now()}@example.ru`;
 
   beforeAll(async () => {
     await cleanDb();
     process.env.WRITE_RATE_LIMIT_PER_MIN = '1000';
-    process.env.ADMIN_EMAILS = adminEmail;
     app = await createTestApp(false, { leadsEnabled: true });
   });
 
   afterAll(async () => {
     await app.close();
     delete process.env.WRITE_RATE_LIMIT_PER_MIN;
-    delete process.env.ADMIN_EMAILS;
     await cleanDb();
     await prisma.$disconnect();
   });
@@ -133,17 +130,7 @@ describe('Leads (e2e)', () => {
     let adminAuth: { Authorization: string };
 
     beforeAll(async () => {
-      const res = await request(app.getHttpServer())
-        .post('/v1/auth/register')
-        .send({
-          email: adminEmail,
-          password: 'admin-password-1',
-          name: 'Владелец',
-          role: 'CUSTOMER',
-        })
-        .expect(201);
-      expect(res.body.user.role).toBe('ADMIN');
-      adminAuth = { Authorization: `Bearer ${res.body.token}` };
+      adminAuth = (await signUpAdmin(app, prisma)).auth;
     });
 
     it('lists leads newest first and filters by status', async () => {
@@ -202,23 +189,27 @@ describe('Leads (e2e)', () => {
       await request(server).get('/v1/admin/leads').expect(401);
     });
 
-    it('promotes an existing account on login once its email is listed', async () => {
-      const email = `late-${Date.now()}@example.ru`;
+    it('never grants ADMIN through registration or login', async () => {
       const server = app.getHttpServer();
+      const email = `admin-${Date.now()}@example.ru`;
       await request(server)
         .post('/v1/auth/register')
-        .send({ email, password: 'late-password-1', name: 'Поздний', role: 'CONTRACTOR' })
+        .send({ email, password: 'some-password-1', name: 'Кто-то', role: 'ADMIN' })
+        .expect(400);
+      const reg = await request(server)
+        .post('/v1/auth/register')
+        .send({ email, password: 'some-password-1', name: 'Кто-то', role: 'CUSTOMER' })
         .expect(201);
-      process.env.ADMIN_EMAILS = `${adminEmail},${email}`;
-      try {
-        const res = await request(server)
-          .post('/v1/auth/login')
-          .send({ email, password: 'late-password-1' })
-          .expect(200);
-        expect(res.body.user.role).toBe('ADMIN');
-      } finally {
-        process.env.ADMIN_EMAILS = adminEmail;
-      }
+      expect(reg.body.user.role).toBe('CUSTOMER');
+      const login = await request(server)
+        .post('/v1/auth/login')
+        .send({ email, password: 'some-password-1' })
+        .expect(200);
+      expect(login.body.user.role).toBe('CUSTOMER');
+      await request(server)
+        .get('/v1/admin/leads')
+        .set({ Authorization: `Bearer ${login.body.token}` })
+        .expect(403);
     });
   });
 });

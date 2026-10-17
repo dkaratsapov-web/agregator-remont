@@ -367,6 +367,10 @@ export default async function AccountPage() {
                   <time dateTime={user.createdAt}>{formatDate(user.createdAt)}</time>
                 </dd>
               </div>
+              <div>
+                <dt className="text-ink-soft">ID аккаунта</dt>
+                <dd className="mt-0.5 break-all font-mono text-xs">{user.id}</dd>
+              </div>
             </dl>
             <div className="mt-4 border-t border-line pt-4">
               <LogoutForm />

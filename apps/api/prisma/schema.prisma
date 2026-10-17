@@ -44,6 +44,7 @@ enum AuditAction {
   PROFILE_UPDATED
   LEAD_PROCESSED
   LEAD_REOPENED
+  USER_ROLE_CHANGED
 }
 
 // Синхронизировано с BID_STATUSES в packages/shared/src/bids.ts.

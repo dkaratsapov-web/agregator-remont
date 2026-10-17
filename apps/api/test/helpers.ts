@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 
@@ -23,4 +24,17 @@ export async function signUp(
     id: res.body.user.id,
     auth: { Authorization: `Bearer ${res.body.token}` },
   };
+}
+
+/**
+ * Администратор для тестов: обычная регистрация, затем роль меняется прямо в базе (как при
+ * назначении миграцией по известному userId, docs/SECURITY.md, раздел 10).
+ */
+export async function signUpAdmin(
+  app: NestExpressApplication,
+  prisma: PrismaClient,
+): Promise<{ token: string; id: string; auth: { Authorization: string } }> {
+  const user = await signUp(app, 'CUSTOMER');
+  await prisma.user.update({ where: { id: user.id }, data: { role: 'ADMIN' } });
+  return user;
 }

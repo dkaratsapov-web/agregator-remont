@@ -3,7 +3,6 @@ import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/co
 import { Prisma, User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { toUserDto } from '../users/user.mapper';
-import { isAdminEmail } from './admins';
 import type { AuthContext } from './auth.types';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -30,10 +29,8 @@ export class AuthService {
       // Пользователь и первая сессия создаются атомарно: при сбое записи сессии не остаётся
       // «осиротевшего» аккаунта, на повторную регистрацию которого пришёл бы 409.
       return await this.prisma.$transaction(async (tx) => {
-        // Email из списка администраторов (auth/admins.ts) получает роль ADMIN сразу.
-        const role = isAdminEmail(dto.email) ? 'ADMIN' : dto.role;
         const user = await tx.user.create({
-          data: { email: dto.email, passwordHash, name: dto.name, role },
+          data: { email: dto.email, passwordHash, name: dto.name, role: dto.role },
         });
         return this.createSession(tx, user);
       });
@@ -55,12 +52,7 @@ export class AuthService {
     await this.prisma.session.deleteMany({
       where: { userId: user.id, expiresAt: { lte: new Date() } },
     });
-    // Аккаунт, зарегистрированный до попадания email в список администраторов.
-    const current =
-      user.role !== 'ADMIN' && isAdminEmail(user.email)
-        ? await this.prisma.user.update({ where: { id: user.id }, data: { role: 'ADMIN' } })
-        : user;
-    return this.createSession(this.prisma, current);
+    return this.createSession(this.prisma, user);
   }
 
   async logout(sessionId: string): Promise<void> {

@@ -4,7 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { expectContract, uncoveredResponses } from './contract';
 import { createTestApp } from './create-app';
-import { signUp } from './helpers';
+import { signUp, signUpAdmin } from './helpers';
 
 /**
  * Контракт: каждый ответ, объявленный в apps/api/openapi.json, получен от настоящего API
@@ -268,87 +268,61 @@ describe('API contract (e2e)', () => {
       expectContract(res, 'post', '/v1/leads');
     });
 
-    const adminEmail = `admin-${Date.now()}@example.ru`;
-    process.env.ADMIN_EMAILS = adminEmail;
-    try {
-      await withApp(
-        high,
-        async (app) => {
-          const http = () => request(app.getHttpServer());
-          const check = async (
-            method: 'get' | 'post' | 'patch',
-            template: string,
-            req: request.Test,
-            status: number,
-          ) => {
-            const res = await req;
-            expect(res.status).toBe(status);
-            expectContract(res, method, template);
-            return res;
-          };
+    await withApp(
+      high,
+      async (app) => {
+        const http = () => request(app.getHttpServer());
+        const check = async (
+          method: 'get' | 'post' | 'patch',
+          template: string,
+          req: request.Test,
+          status: number,
+        ) => {
+          const res = await req;
+          expect(res.status).toBe(status);
+          expectContract(res, method, template);
+          return res;
+        };
 
-          await check('post', '/v1/leads', http().post('/v1/leads').send(lead), 201);
-          await check(
-            'post',
-            '/v1/leads',
-            http()
-              .post('/v1/leads')
-              .send({ ...lead, phone: '12345' }),
-            400,
-          );
+        await check('post', '/v1/leads', http().post('/v1/leads').send(lead), 201);
+        await check(
+          'post',
+          '/v1/leads',
+          http()
+            .post('/v1/leads')
+            .send({ ...lead, phone: '12345' }),
+          400,
+        );
 
-          const admin = await http()
-            .post('/v1/auth/register')
-            .send({
-              email: adminEmail,
-              password: 'admin-password-1',
-              name: 'Админ',
-              role: 'CUSTOMER',
-            })
-            .expect(201);
-          expect(admin.body.user.role).toBe('ADMIN');
-          const adminAuth = { Authorization: `Bearer ${admin.body.token}` };
-          const customer = await signUp(app, 'CUSTOMER');
+        const adminAuth = (await signUpAdmin(app, prisma)).auth;
+        const customer = await signUp(app, 'CUSTOMER');
 
-          const LIST = '/v1/admin/leads';
-          const listed = await check('get', LIST, http().get(LIST).set(adminAuth), 200);
-          await check('get', LIST, http().get(`${LIST}?status=bad`).set(adminAuth), 400);
-          await check('get', LIST, http().get(LIST), 401);
-          await check('get', LIST, http().get(LIST).set(customer.auth), 403);
+        const LIST = '/v1/admin/leads';
+        const listed = await check('get', LIST, http().get(LIST).set(adminAuth), 200);
+        await check('get', LIST, http().get(`${LIST}?status=bad`).set(adminAuth), 400);
+        await check('get', LIST, http().get(LIST), 401);
+        await check('get', LIST, http().get(LIST).set(customer.auth), 403);
 
-          const ONE = '/v1/admin/leads/{id}';
-          const url = `${LIST}/${listed.body.items[0].id}`;
-          await check(
-            'patch',
-            ONE,
-            http().patch(url).set(adminAuth).send({ processed: true }),
-            200,
-          );
-          await check(
-            'patch',
-            ONE,
-            http().patch(url).set(adminAuth).send({ processed: 'yes' }),
-            400,
-          );
-          await check(
-            'patch',
-            ONE,
-            http().patch(`${LIST}/missing`).set(adminAuth).send({ processed: true }),
-            404,
-          );
-          await check('patch', ONE, http().patch(url).send({ processed: true }), 401);
-          await check(
-            'patch',
-            ONE,
-            http().patch(url).set(customer.auth).send({ processed: true }),
-            403,
-          );
-        },
-        { leadsEnabled: true },
-      );
-    } finally {
-      delete process.env.ADMIN_EMAILS;
-    }
+        const ONE = '/v1/admin/leads/{id}';
+        const url = `${LIST}/${listed.body.items[0].id}`;
+        await check('patch', ONE, http().patch(url).set(adminAuth).send({ processed: true }), 200);
+        await check('patch', ONE, http().patch(url).set(adminAuth).send({ processed: 'yes' }), 400);
+        await check(
+          'patch',
+          ONE,
+          http().patch(`${LIST}/missing`).set(adminAuth).send({ processed: true }),
+          404,
+        );
+        await check('patch', ONE, http().patch(url).send({ processed: true }), 401);
+        await check(
+          'patch',
+          ONE,
+          http().patch(url).set(customer.auth).send({ processed: true }),
+          403,
+        );
+      },
+      { leadsEnabled: true },
+    );
   });
 
   it('429 responses match openapi.json for every limit mechanism', async () => {
