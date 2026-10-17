@@ -2,8 +2,25 @@
 # Один Dockerfile на монорепозиторий, цели: `api` (API + миграции) и `web` (Next.js standalone).
 
 FROM node:22-slim AS base
+# Зеркало Debian для apt (например, http://mirror.yandex.ru), если deb.debian.org недоступен
+# с сервера сборки. Пусто — штатный deb.debian.org. Задаётся DEBIAN_MIRROR в deploy/.env.
+# Только http:// (как у штатных источников образа: ca-certificates для https ещё не
+# установлены); подлинность пакетов apt проверяет по подписям Debian. Значение строго
+# проверяется до подстановки в sed: только [A-Za-z0-9.:/_~-], без `|`, `&`, `\`, `@`,
+# пробелов и переводов строк.
+ARG DEBIAN_MIRROR=""
 # OpenSSL нужен движку Prisma.
-RUN apt-get update \
+RUN if [ -n "$DEBIAN_MIRROR" ]; then \
+    case "$DEBIAN_MIRROR" in \
+      http://?*) ;; \
+      *) echo "DEBIAN_MIRROR: нужен адрес вида http://host[:port][/path]" >&2; exit 1 ;; \
+    esac; \
+    case "$DEBIAN_MIRROR" in \
+      *[!A-Za-z0-9.:/_~-]*) echo "DEBIAN_MIRROR: недопустимые символы" >&2; exit 1 ;; \
+    esac; \
+    sed -i "s|http://deb.debian.org|${DEBIAN_MIRROR%/}|g" /etc/apt/sources.list.d/debian.sources; \
+  fi \
+  && apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 ENV NEXT_TELEMETRY_DISABLED=1

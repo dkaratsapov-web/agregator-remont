@@ -26,7 +26,7 @@ services:
 
   # Одноразовый запуск: миграции и (по желанию) демо-заказы. API стартует только после успеха.
   migrate:
-    build: { context: .., target: api }
+    build: { context: .., target: api, args: { DEBIAN_MIRROR: '${DEBIAN_MIRROR:-}' } }
     image: agregator-api:local
     restart: 'no'
     environment:
@@ -69,7 +69,7 @@ services:
       migrate: { condition: service_completed_successfully }
 
   web:
-    build: { context: .., target: web }
+    build: { context: .., target: web, args: { DEBIAN_MIRROR: '${DEBIAN_MIRROR:-}' } }
     image: agregator-web:local
     restart: unless-stopped
     environment:

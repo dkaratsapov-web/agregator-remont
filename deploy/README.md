@@ -61,6 +61,60 @@ docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml u
 
 Миграции базы применяются автоматически контейнером `migrate` перед запуском API.
 
+### Если сборка зависает на `apt-get` (`deb.debian.org ... Connection timed out`)
+
+С некоторых российских VPS контейнеры сборки не достают `deb.debian.org`, хотя сам сервер его
+открывает. Тогда укажите в `deploy/.env` зеркало Debian (`DEBIAN_MIRROR`):
+
+- только **доверенное** зеркало, в котором есть и `/debian`, и `/debian-security` (например,
+  `http://mirror.yandex.ru`);
+- только `http://`: так устроены штатные источники образа (сертификатов для https в нём на
+  этом шаге ещё нет). Подлинность пакетов apt проверяет по подписям Debian, но содержимое
+  запросов по http не шифруется;
+- допустимы только символы `A-Z a-z 0-9 . : / _ ~ -`, без логина и пароля в адресе; иначе сборка
+  остановится с ошибкой `DEBIAN_MIRROR: ...`.
+
+Задать или заменить значение (команда не создаёт дубликатов) и проверить:
+
+```bash
+cd /opt/agregator
+grep -q '^DEBIAN_MIRROR=' deploy/.env \
+  && sed -i 's#^DEBIAN_MIRROR=.*#DEBIAN_MIRROR=http://mirror.yandex.ru#' deploy/.env \
+  || echo 'DEBIAN_MIRROR=http://mirror.yandex.ru' >> deploy/.env
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml config | grep DEBIAN_MIRROR
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml up -d --build
+```
+
+Если раньше на сервере вручную правили `Dockerfile`, перед `git pull` посмотрите правки
+(`git diff Dockerfile`) и, если там только замена зеркала, верните файл: `git checkout Dockerfile`
+(команда удаляет все локальные изменения в этом файле).
+
+### Если сертификат не выпускается (`NXDOMAIN` или `Timeout` в логах Caddy)
+
+Let's Encrypt проверяет домен из интернета. Проверьте по порядку:
+
+```bash
+# 1. Домен виден в публичном DNS и указывает на этот сервер (A), лишних AAAA нет
+dig +short A ваш-домен @8.8.8.8
+dig +short AAAA ваш-домен @8.8.8.8
+# 2. Домен делегирован на нужные DNS-серверы регистратора
+dig +short NS ваш-домен @8.8.8.8
+# 3. Caddy слушает 80 и 443, порты открыты в файрволе сервера и в панели провайдера
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml ps caddy
+ufw status
+```
+
+- `NXDOMAIN` и пустой ответ на шаге 1: домен ещё не опубликован (новый домен .рф — до суток)
+  **или** неверно указаны DNS-серверы, не создана зона, нет A-записи. Проверьте это у регистратора.
+- AAAA-запись на чужой IPv6 мешает проверке: удалите её или направьте на сервер.
+- Кириллический домен указывайте в punycode (`xn--...`) и в `DOMAIN`, и в `PUBLIC_ORIGIN`.
+
+Когда шаг 1 возвращает IP сервера, ускорьте повторную попытку:
+
+```bash
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml restart caddy
+```
+
 ### Полезные команды
 
 ```bash

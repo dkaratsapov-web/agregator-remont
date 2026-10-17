@@ -125,6 +125,20 @@ jobs:
           sed -i "s/^POSTGRES_PASSWORD=$/POSTGRES_PASSWORD=$(openssl rand -hex 16)/" deploy/.env
           echo "AUTH_RATE_LIMIT_PER_MIN=20" >> deploy/.env
 
+      # DEBIAN_MIRROR (Dockerfile, стадия base): корректное зеркало подставляется в источники apt,
+      # опасные значения отклоняются проверкой до sed, а не падением сети.
+      - name: DEBIAN_MIRROR is applied and validated
+        run: |
+          docker build --target base --build-arg DEBIAN_MIRROR=http://mirror.yandex.ru/ -t mirror-check .
+          docker run --rm --entrypoint grep mirror-check -q \
+            'URIs: http://mirror.yandex.ru/debian-security' /etc/apt/sources.list.d/debian.sources
+          for bad in 'http://x|e id|' 'http://x&y' 'http://user:pw@host' 'https://mirror.yandex.ru' 'ftp://host' 'http://a b'; do
+            if docker build --progress=plain --target base --build-arg "DEBIAN_MIRROR=$bad" . > build.log 2>&1; then
+              echo "accepted invalid DEBIAN_MIRROR: $bad"; exit 1
+            fi
+            grep -q 'DEBIAN_MIRROR:' build.log || { echo "failed for another reason: $bad"; tail -20 build.log; exit 1; }
+          done
+
       - name: Build images and start the stack
         run: $COMPOSE up -d --build
 
