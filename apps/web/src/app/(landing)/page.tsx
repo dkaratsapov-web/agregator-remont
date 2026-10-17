@@ -4,6 +4,7 @@ import { LeadForm } from '@/components/landing/lead-form';
 import { LandingHeader } from '@/components/landing/landing-header';
 import { Manifesto } from '@/components/landing/manifesto';
 import { Preloader } from '@/components/landing/preloader';
+import { ScrollReset } from '@/components/landing/scroll-reset';
 import { Reveal } from '@/components/landing/reveal';
 import { Story } from '@/components/landing/story';
 import { ViewerProvider } from '@/components/landing/viewer';
@@ -56,6 +57,7 @@ export default async function LandingPage() {
     <ViewerProvider
       viewer={user ? { name: user.name, role: user.role, avatarVersion: user.avatarVersion } : null}
     >
+      <ScrollReset />
       <Preloader />
       <span id="top" aria-hidden="true" className="absolute top-0" />
       <LandingHeader />
