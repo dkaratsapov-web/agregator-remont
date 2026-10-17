@@ -270,6 +270,16 @@ jobs:
             if [ "$path" = '/?x=1/../jobs' ]; then expected=200; else expected=401; fi
             [ "$code" = "$expected" ] || { echo "$path: expected $expected, got $code"; exit 1; }
           done
+          # Без пароля разрешено только чтение. Next.js принимает Server Actions POST-запросом на
+          # любой адрес, поэтому POST (и прочие методы) на открытые адреса тоже требуют пароль.
+          for method in POST PUT PATCH DELETE OPTIONS; do
+            for path in / /offline /robots.txt /_next/static/x; do
+              code=$(curl -sk -o /dev/null -w '%{http_code}' -X "$method" "https://localhost$path")
+              [ "$code" = "401" ] || { echo "$method $path: expected 401, got $code"; exit 1; }
+            done
+          done
+          test "$(curl -sk -o /dev/null -w '%{http_code}' -X POST -H 'Next-Action: 0' https://localhost/)" = "401"
+          test "$(curl -sk -o /dev/null -w '%{http_code}' -X POST -u tester:ci-password https://localhost/)" != "401"
           # Обход: «..», закодированные точки и слеши, двойное кодирование, регистр, «;», «.».
           # Ни один вариант не отдаёт страницу приложения (маркер — навигация шапки приложения).
           for path in /icons/../jobs /_next/static/../../jobs /_next/static/%2e%2e/%2e%2e/jobs //jobs \
