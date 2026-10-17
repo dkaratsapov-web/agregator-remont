@@ -12,7 +12,7 @@ export function NavLink({ href, children }: { href: string; children: React.Reac
     <Link
       href={href}
       aria-current={active ? 'page' : undefined}
-      className={`inline-flex min-h-11 items-center rounded-lg px-3 text-sm transition-colors duration-150 hover:bg-muted-tint ${
+      className={`inline-flex min-h-11 items-center rounded-full px-3.5 text-sm transition-colors duration-150 hover:bg-ink/5 ${
         active
           ? 'font-semibold text-ink underline decoration-accent decoration-2 underline-offset-[6px]'
           : 'font-medium text-ink-soft hover:text-ink'

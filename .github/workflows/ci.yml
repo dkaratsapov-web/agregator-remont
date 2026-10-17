@@ -65,6 +65,11 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Autodeploy script (shellcheck and scenarios)
+        run: |
+          shellcheck deploy/autodeploy/*.sh scripts/autodeploy-test.sh
+          bash scripts/autodeploy-test.sh
+
       - name: Build
         run: pnpm build
 

@@ -1,29 +1,17 @@
-import type { Metadata, Viewport } from 'next';
-import { Unbounded } from 'next/font/google';
+import type { Metadata } from 'next';
 import { MotionProvider } from '@/components/landing/motion-provider';
 import './landing.css';
 
-const unbounded = Unbounded({
-  subsets: ['latin', 'cyrillic'],
-  variable: '--font-unbounded',
-  display: 'swap',
-});
-
 export const metadata: Metadata = {
-  title: { absolute: 'Гарантыч: ремонт с понятной ценой и сроком' },
+  title: { absolute: 'Гарантыч: честный ремонт без лишнего риска' },
   description:
-    'Гарантыч соединяет заказчиков ремонта с мастерами и бригадами: заказ с бюджетом, отклики с ценой и сроком, выбор исполнителя.',
+    'Мы соединяем заказчиков ремонта с мастерами и бригадами: заказ с бюджетом, отклики с ценой и сроком, выбор исполнителя.',
   openGraph: {
-    title: 'Гарантыч: ремонт с понятной ценой и сроком',
+    title: 'Гарантыч: честный ремонт без лишнего риска',
     description: 'Заказ с бюджетом, отклики мастеров с ценой и сроком, выбор исполнителя.',
     locale: 'ru_RU',
     type: 'website',
   },
-};
-
-export const viewport: Viewport = {
-  themeColor: '#f4f5f7',
-  colorScheme: 'light',
 };
 
 /**
@@ -32,7 +20,7 @@ export const viewport: Viewport = {
  */
 export default function LandingLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`landing ${unbounded.variable}`}>
+    <div className="landing">
       <MotionProvider>{children}</MotionProvider>
     </div>
   );

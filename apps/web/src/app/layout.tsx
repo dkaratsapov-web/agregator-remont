@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Onest } from 'next/font/google';
+import { Onest, Unbounded } from 'next/font/google';
 import { ServiceWorkerRegister } from '@/components/sw-register';
 import './globals.css';
 
@@ -9,15 +9,20 @@ const onest = Onest({
   display: 'swap',
 });
 
+const unbounded = Unbounded({
+  subsets: ['latin', 'cyrillic'],
+  variable: '--font-unbounded',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
   title: {
-    default: 'Агрегатор Ремонт: заказы на ремонт и строительство',
-    template: '%s | Агрегатор Ремонт',
+    default: 'Гарантыч: честный ремонт без лишнего риска',
+    template: '%s | Гарантыч',
   },
-  description:
-    'Каталог заказов на ремонт и строительство: бюджет, город и описание работ в одном месте.',
-  applicationName: 'Агрегатор Ремонт',
-  appleWebApp: { capable: true, title: 'Ремонт', statusBarStyle: 'default' },
+  description: 'Гарантыч: заказы на ремонт с бюджетом, отклики мастеров и бригад с ценой и сроком.',
+  applicationName: 'Гарантыч',
+  appleWebApp: { capable: true, title: 'Гарантыч', statusBarStyle: 'default' },
   formatDetection: { telephone: false },
 };
 
@@ -25,15 +30,13 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#121925' },
-  ],
+  themeColor: '#f4f5f7',
+  colorScheme: 'light',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ru" className={onest.variable}>
+    <html lang="ru" className={`${onest.variable} ${unbounded.variable}`}>
       <body className="min-h-dvh font-sans antialiased">
         <a
           href="#main"

@@ -60,19 +60,13 @@ const BIDS = [
 const STAGES = ['Демонтаж', 'Черновые работы', 'Чистовая отделка'];
 
 function HeroCopy() {
-  const words = ['Ремонт', 'с понятной', 'ценой', 'и сроком'];
+  // Неразрывный пробел перед тире: тире не уходит в начало строки.
+  const words = ['Гарантыч\u00a0—', 'честный', 'ремонт', 'без', 'лишнего', 'риска!'];
   return (
     <div>
-      <p
-        className="fade-up inline-flex items-center gap-2 rounded-full border border-line bg-surface/70 px-3 py-1.5 text-xs font-semibold text-ink-soft"
-        style={{ '--d': '480ms' } as React.CSSProperties}
-      >
-        <span aria-hidden="true" className="size-1.5 rounded-full bg-accent" />
-        Закрытое тестирование
-      </p>
       <h1
         id="hero-title"
-        className="font-display mt-5 text-[2.15rem] font-semibold leading-[1.04] tracking-[-0.035em] text-ink sm:text-5xl lg:text-[3.9rem]"
+        className="font-display text-[2rem] font-semibold leading-[1.06] tracking-[-0.035em] text-ink sm:text-[2.75rem] lg:text-[3rem] xl:text-[3.2rem]"
       >
         {words.map((word, i) => (
           <span key={word}>
@@ -84,14 +78,14 @@ function HeroCopy() {
       </h1>
       <p
         className="fade-up mt-5 max-w-[30rem] text-base leading-relaxed text-ink-soft sm:text-lg"
-        style={{ '--d': '820ms' } as React.CSSProperties}
+        style={{ '--d': '2650ms' } as React.CSSProperties}
       >
-        Гарантыч соединяет заказчиков с мастерами и бригадами. Опишите задачу и сравните отклики с
-        ценой и сроком.
+        Мы соединяем заказчиков с мастерами и бригадами. Выступаем гарантом качества выполнения
+        вашего ремонта. Включаемся в решение спорных ситуаций без потери ваших денег!
       </p>
       <div
         className="fade-up mt-7 flex flex-wrap items-center gap-3"
-        style={{ '--d': '940ms' } as React.CSSProperties}
+        style={{ '--d': '2800ms' } as React.CSSProperties}
       >
         <PrimaryCta />
         <a
@@ -334,7 +328,7 @@ function ScrollyStory() {
       <span id="how-it-works" aria-hidden="true" className="absolute left-0 top-[19%]" />
       <div className="sticky top-0 h-svh overflow-hidden">
         <div className="mx-auto grid h-full max-w-7xl grid-rows-[minmax(0,1fr)_auto] gap-2 px-4 pb-10 pt-16 sm:px-6 lg:grid-cols-12 lg:grid-rows-1 lg:items-center lg:gap-8 lg:px-8 lg:pb-0 lg:pt-16">
-          <div className="relative order-2 grid lg:order-1 lg:col-span-5">
+          <div className="relative order-2 grid lg:order-1 lg:col-span-6">
             <motion.div
               className="relative z-10 [grid-area:1/1]"
               style={{ opacity: heroOpacity, y: heroY, pointerEvents: heroPointer }}
@@ -350,7 +344,7 @@ function ScrollyStory() {
           </div>
 
           <div
-            className="relative order-1 min-h-0 lg:order-2 lg:col-span-7 lg:h-[min(640px,80svh)]"
+            className="relative order-1 min-h-0 lg:order-2 lg:col-span-6 lg:h-[min(640px,80svh)]"
             onPointerMove={onPointerMove}
             onPointerLeave={onPointerLeave}
           >
@@ -391,10 +385,10 @@ function StaticStory() {
   return (
     <section aria-labelledby="hero-title" className="mx-auto max-w-7xl px-4 pt-24 sm:px-6 lg:px-8">
       <div className="grid items-center gap-8 lg:grid-cols-12">
-        <div className="lg:col-span-5">
+        <div className="lg:col-span-6">
           <HeroCopy />
         </div>
-        <div className="relative h-[340px] lg:col-span-7 lg:h-[520px]">
+        <div className="relative h-[340px] lg:col-span-6 lg:h-[520px]">
           <div className="absolute left-1/2 top-1/2 h-[460px] w-[520px] -translate-x-1/2 -translate-y-1/2 scale-[0.66] sm:scale-[0.8] lg:scale-100">
             <div className="size-full">
               <RoomScene progress={done} tiltX={zero} tiltY={zero} />
