@@ -18,8 +18,14 @@ import { SessionGuard } from '../auth/session.guard';
 import { BidsService } from './bids.service';
 import { CreateBidDto } from './dto/create-bid.dto';
 import { ListMyBidsQuery } from './dto/list-my-bids.query';
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiErrors, ApiRole } from '../openapi/decorators';
+import { JobBidSchema, MyBidSchema, PaginatedMyBidSchema } from '../openapi/schemas';
 
 /** Отклик на заказ: только подрядчик. */
+@ApiTags('bids')
+@ApiErrors(429)
+@ApiRole()
 @Controller('v1/jobs/:jobId/bids')
 @UseGuards(SessionGuard, RolesGuard)
 @Roles('CONTRACTOR')
@@ -28,6 +34,8 @@ export class JobBidsController {
 
   @Post()
   @WriteRateLimited()
+  @ApiCreatedResponse({ type: MyBidSchema })
+  @ApiErrors(400, 404, 409)
   create(
     @CurrentAuth() auth: AuthContext,
     @Param('jobId') jobId: string,
@@ -38,6 +46,9 @@ export class JobBidsController {
 }
 
 /** Свои отклики подрядчика. */
+@ApiTags('bids')
+@ApiErrors(429)
+@ApiRole()
 @Controller('v1/me/bids')
 @UseGuards(SessionGuard, RolesGuard)
 @Roles('CONTRACTOR')
@@ -45,6 +56,8 @@ export class MyBidsController {
   constructor(private readonly bids: BidsService) {}
 
   @Get()
+  @ApiOkResponse({ type: PaginatedMyBidSchema })
+  @ApiErrors(400)
   list(
     @CurrentAuth() auth: AuthContext,
     @Query() query: ListMyBidsQuery,
@@ -55,12 +68,17 @@ export class MyBidsController {
   @Post(':bidId/withdraw')
   @HttpCode(HttpStatus.OK)
   @WriteRateLimited()
+  @ApiOkResponse({ type: MyBidSchema })
+  @ApiErrors(404, 409)
   withdraw(@CurrentAuth() auth: AuthContext, @Param('bidId') bidId: string): Promise<MyBidDto> {
     return this.bids.withdraw(auth.user.id, bidId);
   }
 }
 
 /** Отклики на свой заказ: только заказчик-владелец. */
+@ApiTags('bids')
+@ApiErrors(429)
+@ApiRole()
 @Controller('v1/me/jobs/:jobId/bids')
 @UseGuards(SessionGuard, RolesGuard)
 @Roles('CUSTOMER')
@@ -68,6 +86,8 @@ export class OwnerBidsController {
   constructor(private readonly bids: BidsService) {}
 
   @Get()
+  @ApiOkResponse({ type: [JobBidSchema] })
+  @ApiErrors(404)
   list(@CurrentAuth() auth: AuthContext, @Param('jobId') jobId: string): Promise<JobBidDto[]> {
     return this.bids.listForOwner(auth.user.id, jobId);
   }
@@ -75,6 +95,8 @@ export class OwnerBidsController {
   @Post(':bidId/accept')
   @HttpCode(HttpStatus.OK)
   @WriteRateLimited()
+  @ApiOkResponse({ type: JobBidSchema })
+  @ApiErrors(404, 409)
   accept(
     @CurrentAuth() auth: AuthContext,
     @Param('jobId') jobId: string,

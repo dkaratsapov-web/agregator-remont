@@ -4,3 +4,5 @@ pnpm-lock.yaml
 **/coverage
 **/migrations/**/*.sql
 docs/
+apps/api/openapi.json
+packages/shared/src/generated/

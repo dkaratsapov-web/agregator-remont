@@ -10,13 +10,15 @@
     "test": "prisma generate && dotenv -e ../../.env -- jest --runInBand",
     "db:migrate": "dotenv -e ../../.env -- prisma migrate dev",
     "db:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
-    "db:seed": "dotenv -e ../../.env -- tsx prisma/seed.ts"
+    "db:seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
+    "openapi:generate": "pnpm run build && node dist/openapi/generate.js"
   },
   "dependencies": {
     "@agregator/shared": "workspace:*",
     "@nestjs/common": "^11.1.0",
     "@nestjs/core": "^11.1.0",
     "@nestjs/platform-express": "^11.1.0",
+    "@nestjs/swagger": "^11.4.7",
     "@nestjs/throttler": "^6.4.0",
     "@node-rs/argon2": "^2.2.2",
     "@prisma/client": "^6.19.3",
@@ -33,6 +35,8 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^22.0.0",
     "@types/supertest": "^6.0.0",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "dotenv-cli": "^11.0.0",
     "jest": "^30.0.0",
     "prisma": "^6.19.3",

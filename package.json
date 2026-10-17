@@ -12,6 +12,7 @@
     "format": "prettier --write .",
     "typecheck": "pnpm --filter @agregator/shared build && pnpm -r typecheck",
     "test": "pnpm --filter @agregator/shared build && pnpm -r test",
+    "openapi:generate": "pnpm --filter @agregator/shared build && pnpm --filter @agregator/api openapi:generate && pnpm --filter @agregator/shared openapi:types",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
     "db:migrate": "pnpm --filter @agregator/api db:migrate",

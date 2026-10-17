@@ -11,6 +11,7 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import { MULTI_LINE, SINGLE_LINE, trim, trimText } from '../../common/text';
 
@@ -35,6 +36,7 @@ export class CreateJobDto {
     message: `Название: от ${JOB_LIMITS.TITLE_MIN} до ${JOB_LIMITS.TITLE_MAX} символов`,
   })
   @Matches(SINGLE_LINE, { message: 'Название содержит недопустимые символы' })
+  @ApiProperty({ minLength: JOB_LIMITS.TITLE_MIN, maxLength: JOB_LIMITS.TITLE_MAX })
   title!: string;
 
   @Transform(trimText)
@@ -43,9 +45,14 @@ export class CreateJobDto {
     message: `Описание: от ${JOB_LIMITS.DESCRIPTION_MIN} до ${JOB_LIMITS.DESCRIPTION_MAX} символов`,
   })
   @Matches(MULTI_LINE, { message: 'Описание содержит недопустимые символы' })
+  @ApiProperty({
+    minLength: JOB_LIMITS.DESCRIPTION_MIN,
+    maxLength: JOB_LIMITS.DESCRIPTION_MAX,
+  })
   description!: string;
 
   @IsIn(JOB_CATEGORIES, { message: 'Выберите категорию из списка' })
+  @ApiProperty({ enum: JOB_CATEGORIES, enumName: 'JobCategory' })
   category!: JobCategory;
 
   @Transform(trim)
@@ -54,12 +61,27 @@ export class CreateJobDto {
     message: `Город: от ${JOB_LIMITS.CITY_MIN} до ${JOB_LIMITS.CITY_MAX} символов`,
   })
   @Matches(SINGLE_LINE, { message: 'Город содержит недопустимые символы' })
+  @ApiProperty({ minLength: JOB_LIMITS.CITY_MIN, maxLength: JOB_LIMITS.CITY_MAX })
   city!: string;
 
   @apply(IsOptional(), ...budget())
+  @ApiPropertyOptional({
+    type: 'integer',
+    nullable: true,
+    minimum: 0,
+    maximum: JOB_LIMITS.BUDGET_MAX,
+    description: 'Целые рубли; null или отсутствие — «по договорённости»',
+  })
   budgetMin: number | null = null;
 
   @apply(IsOptional(), ...budget())
+  @ApiPropertyOptional({
+    type: 'integer',
+    nullable: true,
+    minimum: 0,
+    maximum: JOB_LIMITS.BUDGET_MAX,
+    description: 'Целые рубли; null или отсутствие — «по договорённости»',
+  })
   budgetMax: number | null = null;
 }
 
@@ -72,6 +94,7 @@ export class UpdateJobDto {
     message: `Название: от ${JOB_LIMITS.TITLE_MIN} до ${JOB_LIMITS.TITLE_MAX} символов`,
   })
   @Matches(SINGLE_LINE, { message: 'Название содержит недопустимые символы' })
+  @ApiPropertyOptional({ minLength: JOB_LIMITS.TITLE_MIN, maxLength: JOB_LIMITS.TITLE_MAX })
   title?: string;
 
   @IsOptional()
@@ -81,10 +104,15 @@ export class UpdateJobDto {
     message: `Описание: от ${JOB_LIMITS.DESCRIPTION_MIN} до ${JOB_LIMITS.DESCRIPTION_MAX} символов`,
   })
   @Matches(MULTI_LINE, { message: 'Описание содержит недопустимые символы' })
+  @ApiPropertyOptional({
+    minLength: JOB_LIMITS.DESCRIPTION_MIN,
+    maxLength: JOB_LIMITS.DESCRIPTION_MAX,
+  })
   description?: string;
 
   @IsOptional()
   @IsIn(JOB_CATEGORIES, { message: 'Выберите категорию из списка' })
+  @ApiPropertyOptional({ enum: JOB_CATEGORIES, enumName: 'JobCategory' })
   category?: JobCategory;
 
   @IsOptional()
@@ -94,13 +122,28 @@ export class UpdateJobDto {
     message: `Город: от ${JOB_LIMITS.CITY_MIN} до ${JOB_LIMITS.CITY_MAX} символов`,
   })
   @Matches(SINGLE_LINE, { message: 'Город содержит недопустимые символы' })
+  @ApiPropertyOptional({ minLength: JOB_LIMITS.CITY_MIN, maxLength: JOB_LIMITS.CITY_MAX })
   city?: string;
 
   @apply(...budget())
   @IsOptional()
+  @ApiPropertyOptional({
+    type: 'integer',
+    nullable: true,
+    minimum: 0,
+    maximum: JOB_LIMITS.BUDGET_MAX,
+    description: 'Целые рубли; null — «по договорённости»; отсутствие — не менять',
+  })
   budgetMin?: number | null;
 
   @apply(...budget())
   @IsOptional()
+  @ApiPropertyOptional({
+    type: 'integer',
+    nullable: true,
+    minimum: 0,
+    maximum: JOB_LIMITS.BUDGET_MAX,
+    description: 'Целые рубли; null — «по договорённости»; отсутствие — не менять',
+  })
   budgetMax?: number | null;
 }

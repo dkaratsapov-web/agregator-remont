@@ -68,6 +68,14 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # ADR 0001/0003: спецификация и типы генерируются из кода; ручные правки и забытая
+      # перегенерация ломают сборку.
+      - name: OpenAPI and generated types are up to date
+        run: |
+          node apps/api/dist/openapi/generate.js
+          pnpm --filter @agregator/shared openapi:types
+          git diff --exit-code -- apps/api/openapi.json packages/shared/src/generated
+
       - name: Migrations and seed apply cleanly
         run: |
           pnpm --filter @agregator/api exec prisma migrate deploy

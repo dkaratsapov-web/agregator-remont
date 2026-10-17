@@ -16,6 +16,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { MULTI_LINE_OR_EMPTY, SINGLE_LINE, trimText } from '../../common/text';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /** Города: trim каждого значения, регистронезависимые дубликаты убираются. */
 const normalizeCities = ({ value }: { value: unknown }) => {
@@ -44,12 +45,19 @@ export class UpsertProfileDto {
     message: `О себе: не больше ${PROFILE_LIMITS.ABOUT_MAX} символов`,
   })
   @Matches(MULTI_LINE_OR_EMPTY, { message: 'Текст «о себе» содержит недопустимые символы' })
+  @ApiProperty({ maxLength: PROFILE_LIMITS.ABOUT_MAX })
   about!: string;
 
   @IsArray()
   @ArrayMaxSize(PROFILE_LIMITS.CATEGORIES_MAX)
   @ArrayUnique()
   @IsIn(JOB_CATEGORIES, { each: true, message: 'Неизвестная категория работ' })
+  @ApiProperty({
+    enum: JOB_CATEGORIES,
+    enumName: 'JobCategory',
+    isArray: true,
+    maxItems: PROFILE_LIMITS.CATEGORIES_MAX,
+  })
   categories!: JobCategory[];
 
   @Transform(normalizeCities)
@@ -63,6 +71,11 @@ export class UpsertProfileDto {
     message: `Город: от ${PROFILE_LIMITS.CITY_MIN} до ${PROFILE_LIMITS.CITY_MAX} символов`,
   })
   @Matches(SINGLE_LINE, { each: true, message: 'Город содержит недопустимые символы' })
+  @ApiProperty({
+    type: [String],
+    maxItems: PROFILE_LIMITS.CITIES_MAX,
+    description: `Каждый город: от ${PROFILE_LIMITS.CITY_MIN} до ${PROFILE_LIMITS.CITY_MAX} символов`,
+  })
   cities!: string[];
 
   @IsOptional()
@@ -70,5 +83,11 @@ export class UpsertProfileDto {
   @IsInt({ message: 'Опыт указывается целым числом лет' })
   @Min(0)
   @Max(PROFILE_LIMITS.EXPERIENCE_MAX_YEARS)
+  @ApiPropertyOptional({
+    type: 'integer',
+    nullable: true,
+    minimum: 0,
+    maximum: PROFILE_LIMITS.EXPERIENCE_MAX_YEARS,
+  })
   experienceYears: number | null = null;
 }
