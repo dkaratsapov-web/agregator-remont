@@ -202,54 +202,6 @@ html:has(.landing) {
   }
 }
 
-/* ---------- Поток денег в «безопасной сделке» ---------- */
-
-.flow-line {
-  position: relative;
-  height: 2px;
-  background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 10px);
-}
-
-.flow-line::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 0;
-  width: 10px;
-  height: 10px;
-  margin-top: -5px;
-  border-radius: 999px;
-  background: var(--accent);
-  box-shadow: 0 0 0 4px rgb(194 65 12 / 0.15);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .flow-line::after {
-    animation: flow 3.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
-  }
-}
-
-@keyframes flow {
-  0% {
-    left: 0;
-    opacity: 0;
-  }
-  12% {
-    opacity: 1;
-  }
-  45%,
-  55% {
-    left: calc(50% - 5px);
-  }
-  88% {
-    opacity: 1;
-  }
-  100% {
-    left: calc(100% - 10px);
-    opacity: 0;
-  }
-}
-
 /* ---------- Бегущая строка категорий ---------- */
 
 .marquee {
@@ -391,5 +343,222 @@ html.is-ready .preloader {
 @media (prefers-reduced-motion: reduce) {
   .preloader {
     display: none;
+  }
+}
+
+/* ---------- Возможности: мини-сцены карточек ----------
+ * Сцена стартует, когда карточка в экране (data-on="true"). Циклы только без reduced motion;
+ * при reduced motion показывается конечное состояние.
+ */
+
+.feature-card--dark::before {
+  background: radial-gradient(
+    420px circle at var(--mx, 50%) var(--my, 50%),
+    rgb(246 201 168 / 0.12),
+    transparent 60%
+  );
+}
+
+.feature-card--dark {
+  box-shadow:
+    0 30px 60px -30px rgb(13 19 32 / 0.55),
+    inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+
+.stage-bar {
+  transform: scaleX(var(--fill));
+}
+
+.bid-fan {
+  transform: translateY(calc(-50% + (var(--i) - 1) * 62px)) scale(calc(0.94 + var(--i) * 0.03));
+}
+
+.deal-grid {
+  background-image:
+    radial-gradient(60% 50% at 50% 40%, rgb(194 65 12 / 0.16), transparent 70%),
+    linear-gradient(rgb(255 255 255 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.05) 1px, transparent 1px);
+  background-size:
+    auto,
+    32px 32px,
+    32px 32px;
+}
+
+.bid-fan:nth-child(1),
+.bid-fan:nth-child(2) {
+  opacity: 0.85;
+}
+
+.route-draw {
+  stroke-dashoffset: 0;
+}
+
+.chat-pop,
+.log-row {
+  opacity: 1;
+}
+
+.deal-chip {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .stage-bar {
+    transform: scaleX(0);
+    transition: transform 1100ms var(--ease-out-strong) var(--d, 0ms);
+  }
+  [data-on='true'] .stage-bar {
+    transform: scaleX(var(--fill));
+  }
+
+  .bid-fan {
+    transform: translateY(-50%) scale(0.96);
+    transition: transform 900ms var(--ease-out-strong) calc(250ms + var(--i) * 120ms);
+  }
+  [data-on='true'] .bid-fan {
+    transform: translateY(calc(-50% + (var(--i) - 1) * 62px)) scale(calc(0.94 + var(--i) * 0.03));
+  }
+  .feature-card:hover .bid-fan {
+    transition-delay: 0ms;
+    transform: translateY(calc(-50% + (var(--i) - 1) * 68px)) scale(calc(0.94 + var(--i) * 0.03));
+  }
+
+  .route-draw {
+    animation: route-march 1.2s linear infinite;
+  }
+
+  .chat-pop,
+  .log-row {
+    opacity: 0;
+    transform: translateY(10px);
+    transition:
+      opacity 500ms ease var(--d, 0ms),
+      transform 600ms var(--ease-out-strong) var(--d, 0ms);
+  }
+  [data-on='true'] .chat-pop,
+  [data-on='true'] .log-row {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .phone-float {
+    transform: rotateY(-18deg) rotateX(8deg);
+    animation: phone-float 6s ease-in-out infinite;
+  }
+
+  .deal-coin {
+    animation: deal-coin 6.5s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  }
+  .deal-vault {
+    animation: deal-vault 6.5s ease-in-out infinite;
+  }
+  .deal-chip {
+    opacity: 0.25;
+    animation: deal-chip 6.5s ease infinite;
+  }
+  .deal-chip--1 {
+    animation-name: deal-chip-1;
+  }
+  .deal-chip--2 {
+    animation-name: deal-chip-2;
+  }
+  .deal-chip--3 {
+    animation-name: deal-chip-3;
+  }
+}
+
+@keyframes route-march {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+@keyframes phone-float {
+  0%,
+  100% {
+    transform: rotateY(-18deg) rotateX(8deg) translateY(0);
+  }
+  50% {
+    transform: rotateY(-10deg) rotateX(4deg) translateY(-8px);
+  }
+}
+
+/* Монета: к провайдеру (0-25%), ждёт приёмки (25-60%), к мастеру (60-85%), исчезает. */
+@keyframes deal-coin {
+  0% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  25%,
+  60% {
+    transform: translateX(50%);
+    opacity: 1;
+  }
+  85% {
+    transform: translateX(100%);
+    opacity: 1;
+  }
+  95%,
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes deal-vault {
+  0%,
+  20%,
+  65%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(194 65 12 / 0);
+  }
+  32%,
+  52% {
+    box-shadow: 0 0 0 10px rgb(194 65 12 / 0.22);
+  }
+}
+
+@keyframes deal-chip-1 {
+  0%,
+  20% {
+    opacity: 0.25;
+  }
+  27%,
+  92% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes deal-chip-2 {
+  0%,
+  42% {
+    opacity: 0.25;
+  }
+  50%,
+  92% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes deal-chip-3 {
+  0%,
+  78% {
+    opacity: 0.25;
+  }
+  86%,
+  92% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.25;
   }
 }
