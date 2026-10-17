@@ -23,9 +23,11 @@ const decode = (v) =>
 
 /** Скрытые поля первой формы Server Action на странице. */
 async function actionForm(path, cookie) {
-  const html = await (
+  const page = await (
     await fetch(WEB + path, { headers: cookie ? { Cookie: cookie } : {} })
   ).text();
+  // Только формы в <main>: в шапке есть форма выхода из меню кабинета.
+  const html = page.slice(Math.max(0, page.indexOf('<main')));
   const form = [...html.matchAll(/<form[^>]*>([\s\S]*?)<\/form>/g)].find((m) =>
     m[1].includes('$ACTION'),
   );

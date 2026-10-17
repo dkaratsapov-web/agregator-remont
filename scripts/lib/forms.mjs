@@ -32,7 +32,9 @@ export async function actionForm(path, { cookie, pick = () => true } = {}) {
     redirect: 'manual',
   });
   if (res.status !== 200) throw new Error(`GET ${path} -> HTTP ${res.status} (expected 200)`);
-  const html = await res.text();
+  // Только формы в <main>: в шапке есть форма выхода из меню кабинета.
+  const page = await res.text();
+  const html = page.slice(Math.max(0, page.indexOf('<main')));
   const form = [...html.matchAll(/<form[^>]*>([\s\S]*?)<\/form>/g)].find(
     (m) => m[1].includes('$ACTION') && pick(m[1]),
   );
