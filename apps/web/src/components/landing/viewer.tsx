@@ -1,11 +1,10 @@
 'use client';
 
 import { createContext, useContext } from 'react';
+import type { MenuUser } from '../account-menu';
 
-/** Вошедший пользователь на главной: только имя, остальные данные сюда не передаются. */
-export interface LandingViewer {
-  name: string;
-}
+/** Вошедший пользователь на главной: имя и роль для меню, остальные данные сюда не передаются. */
+export type LandingViewer = MenuUser;
 
 const ViewerContext = createContext<LandingViewer | null>(null);
 

@@ -2,6 +2,7 @@
 
 import { motion, useMotionValueEvent, useScroll, useSpring } from 'motion/react';
 import { useState } from 'react';
+import { AccountMenu } from '../account-menu';
 import { useViewer } from './viewer';
 import { Wordmark } from './wordmark';
 
@@ -44,22 +45,7 @@ export function LandingHeader() {
           ))}
         </nav>
         {viewer ? (
-          <a
-            href="/account"
-            aria-label={`Личный кабинет: ${viewer.name}`}
-            className="inline-flex min-h-11 max-w-[60vw] items-center gap-2.5 rounded-full border border-line bg-surface/80 py-1 pl-1 pr-4 text-sm font-semibold text-ink transition-[background-color,border-color,transform] duration-200 hover:border-ink/25 hover:bg-surface active:scale-[0.97] sm:max-w-xs"
-          >
-            <span
-              aria-hidden="true"
-              className="grid size-9 shrink-0 place-items-center rounded-full bg-ink text-sm font-semibold text-canvas"
-            >
-              {viewer.name.trim().charAt(0).toUpperCase()}
-            </span>
-            <span className="min-w-0 truncate">{viewer.name}</span>
-            <span aria-hidden="true" className="hidden text-ink-soft sm:inline">
-              · Кабинет
-            </span>
-          </a>
+          <AccountMenu user={viewer} />
         ) : (
           <div className="flex items-center gap-2">
             <a

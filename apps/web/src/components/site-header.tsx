@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/session';
+import { AccountMenu } from './account-menu';
 import { Wordmark } from './landing/wordmark';
 import { NavLink } from './nav-link';
 
@@ -21,7 +22,7 @@ export async function SiteHeader() {
             <NavLink href="/#how-it-works">Как это работает</NavLink>
           </span>
           {user ? (
-            <NavLink href="/account">Кабинет</NavLink>
+            <AccountMenu user={{ name: user.name, role: user.role }} />
           ) : (
             <Link
               href="/login"
