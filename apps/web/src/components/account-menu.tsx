@@ -23,7 +23,10 @@ const ROLE_LINKS: Record<UserRole, MenuLink[]> = {
     { href: '/account/profile', label: 'Профиль мастера' },
     { href: '/jobs?open=1', label: 'Найти заказ' },
   ],
-  ADMIN: [{ href: '/jobs', label: 'Каталог заказов' }],
+  ADMIN: [
+    { href: '/admin/leads', label: 'Заявки на тестирование' },
+    { href: '/jobs', label: 'Каталог заказов' },
+  ],
 };
 
 /** Разделы в разработке: страницы есть и честно говорят, что раздел скоро появится. */

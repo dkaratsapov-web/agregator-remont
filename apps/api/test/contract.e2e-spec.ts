@@ -32,6 +32,7 @@ const profile = {
 const LIMIT_ENV = ['RATE_LIMIT_PER_MIN', 'AUTH_RATE_LIMIT_PER_MIN', 'WRITE_RATE_LIMIT_PER_MIN'];
 
 async function cleanDb(): Promise<void> {
+  await prisma.lead.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.bid.deleteMany();
   await prisma.job.deleteMany({ where: { ownerId: { not: null } } });
@@ -41,10 +42,11 @@ async function cleanDb(): Promise<void> {
 async function withApp(
   limits: Record<string, string>,
   run: (app: NestExpressApplication) => Promise<void>,
+  options: { leadsEnabled?: boolean } = {},
 ): Promise<void> {
   for (const name of LIMIT_ENV) delete process.env[name];
   Object.assign(process.env, limits);
-  const app = await createTestApp();
+  const app = await createTestApp(false, options);
   try {
     await run(app);
   } finally {
@@ -249,6 +251,104 @@ describe('API contract (e2e)', () => {
         );
       },
     );
+  });
+
+  it('lead endpoints match openapi.json', async () => {
+    const high = {
+      RATE_LIMIT_PER_MIN: '1000',
+      AUTH_RATE_LIMIT_PER_MIN: '1000',
+      WRITE_RATE_LIMIT_PER_MIN: '1000',
+    };
+    const lead = { name: 'Ирина', phone: '8 (912) 345-67-89', consent: true };
+
+    // Пока нет реквизитов оператора, приём выключен.
+    await withApp(high, async (app) => {
+      const res = await request(app.getHttpServer()).post('/v1/leads').send(lead);
+      expect(res.status).toBe(503);
+      expectContract(res, 'post', '/v1/leads');
+    });
+
+    const adminEmail = `admin-${Date.now()}@example.ru`;
+    process.env.ADMIN_EMAILS = adminEmail;
+    try {
+      await withApp(
+        high,
+        async (app) => {
+          const http = () => request(app.getHttpServer());
+          const check = async (
+            method: 'get' | 'post' | 'patch',
+            template: string,
+            req: request.Test,
+            status: number,
+          ) => {
+            const res = await req;
+            expect(res.status).toBe(status);
+            expectContract(res, method, template);
+            return res;
+          };
+
+          await check('post', '/v1/leads', http().post('/v1/leads').send(lead), 201);
+          await check(
+            'post',
+            '/v1/leads',
+            http()
+              .post('/v1/leads')
+              .send({ ...lead, phone: '12345' }),
+            400,
+          );
+
+          const admin = await http()
+            .post('/v1/auth/register')
+            .send({
+              email: adminEmail,
+              password: 'admin-password-1',
+              name: 'Админ',
+              role: 'CUSTOMER',
+            })
+            .expect(201);
+          expect(admin.body.user.role).toBe('ADMIN');
+          const adminAuth = { Authorization: `Bearer ${admin.body.token}` };
+          const customer = await signUp(app, 'CUSTOMER');
+
+          const LIST = '/v1/admin/leads';
+          const listed = await check('get', LIST, http().get(LIST).set(adminAuth), 200);
+          await check('get', LIST, http().get(`${LIST}?status=bad`).set(adminAuth), 400);
+          await check('get', LIST, http().get(LIST), 401);
+          await check('get', LIST, http().get(LIST).set(customer.auth), 403);
+
+          const ONE = '/v1/admin/leads/{id}';
+          const url = `${LIST}/${listed.body.items[0].id}`;
+          await check(
+            'patch',
+            ONE,
+            http().patch(url).set(adminAuth).send({ processed: true }),
+            200,
+          );
+          await check(
+            'patch',
+            ONE,
+            http().patch(url).set(adminAuth).send({ processed: 'yes' }),
+            400,
+          );
+          await check(
+            'patch',
+            ONE,
+            http().patch(`${LIST}/missing`).set(adminAuth).send({ processed: true }),
+            404,
+          );
+          await check('patch', ONE, http().patch(url).send({ processed: true }), 401);
+          await check(
+            'patch',
+            ONE,
+            http().patch(url).set(customer.auth).send({ processed: true }),
+            403,
+          );
+        },
+        { leadsEnabled: true },
+      );
+    } finally {
+      delete process.env.ADMIN_EMAILS;
+    }
   });
 
   it('429 responses match openapi.json for every limit mechanism', async () => {

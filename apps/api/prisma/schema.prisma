@@ -42,6 +42,8 @@ enum AuditAction {
   BID_ACCEPTED
   BID_REJECTED
   PROFILE_UPDATED
+  LEAD_PROCESSED
+  LEAD_REOPENED
 }
 
 // Синхронизировано с BID_STATUSES в packages/shared/src/bids.ts.
@@ -169,4 +171,20 @@ model Bid {
   @@index([contractorId, createdAt(sort: Desc)])
   @@index([jobId, status])
   @@map("bids")
+}
+
+/// Заявка на участие в закрытом тестировании (форма на главной). Персональные данные:
+/// доступ только у администраторов, согласие фиксируется версией политики.
+model Lead {
+  id             String    @id @default(cuid())
+  name           String    @db.VarChar(80)
+  /// +7XXXXXXXXXX
+  phone          String    @db.VarChar(12)
+  consentVersion String    @map("consent_version") @db.VarChar(20)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  processedAt    DateTime? @map("processed_at")
+
+  @@index([createdAt(sort: Desc)])
+  @@index([phone, createdAt])
+  @@map("leads")
 }

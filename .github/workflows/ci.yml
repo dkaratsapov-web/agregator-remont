@@ -280,6 +280,20 @@ jobs:
           done
           test "$(curl -sk -o /dev/null -w '%{http_code}' -X POST -H 'Next-Action: 0' https://localhost/)" = "401"
           test "$(curl -sk -o /dev/null -w '%{http_code}' -X POST -u tester:ci-password https://localhost/)" != "401"
+          # Политика открыта для чтения; единственный открытый POST — заявка (POST /lead). Пока
+          # реквизиты оператора не заданы, приём выключен: 503 от web, а не 401 от Caddy.
+          test "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost/privacy)" = "200"
+          test "$(curl -sk -o /dev/null -w '%{http_code}' -X POST https://localhost/privacy)" = "401"
+          test "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost/lead)" = "401"
+          test "$(curl -sk -o /dev/null -w '%{http_code}' -X PUT https://localhost/lead)" = "401"
+          test "$(curl -sk -o /dev/null -w '%{http_code}' -X POST https://localhost/lead/x)" = "401"
+          code=$(curl -sk -o /dev/null -w '%{http_code}' -X POST -H 'Origin: https://localhost' \
+            -H 'Content-Type: application/json' -d '{"name":"Тест","phone":"+79001234567","consent":true}' \
+            https://localhost/lead)
+          [ "$code" = "503" ] || { echo "POST /lead: expected 503, got $code"; exit 1; }
+          code=$(curl -sk -o /dev/null -w '%{http_code}' -X POST -H 'Origin: https://evil.example' \
+            -H 'Content-Type: application/json' -d '{}' https://localhost/lead)
+          [ "$code" = "403" ] || { echo "POST /lead from a foreign origin: expected 403, got $code"; exit 1; }
           # Обход: «..», закодированные точки и слеши, двойное кодирование, регистр, «;», «.».
           # Ни один вариант не отдаёт страницу приложения (маркер — навигация шапки приложения).
           for path in /icons/../jobs /_next/static/../../jobs /_next/static/%2e%2e/%2e%2e/jobs //jobs \

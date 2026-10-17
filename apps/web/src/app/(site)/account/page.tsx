@@ -288,6 +288,7 @@ export default async function AccountPage() {
   if (!user || !token) redirect('/login?next=/account');
 
   const isContractor = user.role === 'CONTRACTOR';
+  const isAdmin = user.role === 'ADMIN';
 
   return (
     <div className="mx-auto max-w-6xl px-4 pt-10 sm:px-6 md:pt-14">
@@ -304,11 +305,29 @@ export default async function AccountPage() {
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0">
-          {isContractor ? <ContractorSummary token={token} /> : <CustomerSummary token={token} />}
+          {isAdmin ? (
+            <p className="rounded-[20px] border border-line/80 bg-surface p-5 text-ink-soft">
+              Аккаунт администратора: заявки на закрытое тестирование и каталог заказов.
+            </p>
+          ) : isContractor ? (
+            <ContractorSummary token={token} />
+          ) : (
+            <CustomerSummary token={token} />
+          )}
         </div>
 
         <aside className="flex flex-col gap-3">
-          {isContractor ? (
+          {isAdmin ? (
+            <>
+              <ActionCard
+                primary
+                href="/admin/leads"
+                title="Заявки"
+                text="Заявки на закрытое тестирование"
+              />
+              <ActionCard href="/jobs" title="Каталог" text="Все опубликованные заказы" />
+            </>
+          ) : isContractor ? (
             <>
               <ActionCard
                 primary

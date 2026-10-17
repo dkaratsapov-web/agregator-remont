@@ -12,6 +12,7 @@ import {
   type JobCategory,
   type JobDto,
   type JobStatus,
+  type LeadDto,
   type MyBidDto,
   type OwnJobDto,
   type Paginated,
@@ -144,6 +145,34 @@ export class BidContractorSchema {
 @ApiSchema({ name: 'JobBidDto' })
 export class JobBidSchema extends BidFields implements JobBidDto {
   @ApiProperty({ type: BidContractorSchema }) contractor!: BidContractorSchema;
+}
+
+@ApiSchema({ name: 'LeadDto' })
+export class LeadSchema implements LeadDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() name!: string;
+  @ApiProperty({ pattern: '^\\+7[3489][0-9]{9}$', example: '+79001234567' }) phone!: string;
+  @dateTime() createdAt!: string;
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'null — заявка ещё не обработана',
+  })
+  processedAt!: string | null;
+}
+
+@ApiSchema({ name: 'PaginatedLeadDto' })
+export class PaginatedLeadSchema implements Paginated<LeadDto> {
+  @ApiProperty({ type: [LeadSchema] }) items!: LeadSchema[];
+  @int() page!: number;
+  @int() limit!: number;
+  @int() total!: number;
+}
+
+@ApiSchema({ name: 'LeadReceived' })
+export class LeadReceivedSchema {
+  @ApiProperty({ enum: [true] }) received!: true;
 }
 
 @ApiSchema({ name: 'Health' })

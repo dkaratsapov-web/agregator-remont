@@ -10,6 +10,8 @@ import type {
   JobDto,
   JobInput,
   JobStatus,
+  LeadDto,
+  LeadInput,
   OwnJobDto,
   Paginated,
   UserDto,
@@ -291,4 +293,41 @@ export async function acceptBid(
     { method: 'POST', token, clientIp },
   );
   return expectJson<JobBidDto>(res, 'POST /v1/me/jobs/:id/bids/:bidId/accept');
+}
+
+// --- Заявки на закрытое тестирование
+
+/** Публичная отправка заявки с главной; ответ одинаковый для новой заявки и повтора. */
+export async function submitLead(input: LeadInput, clientIp?: string): Promise<void> {
+  const res = await request('/v1/leads', { method: 'POST', body: input, clientIp });
+  await expectJson<{ received: true }>(res, 'POST /v1/leads');
+}
+
+export type LeadFilter = 'new' | 'processed';
+
+/** Список заявок для администратора (роль проверяет API). */
+export async function listLeads(
+  token: string,
+  page: number,
+  status?: LeadFilter,
+): Promise<Paginated<LeadDto>> {
+  const query = new URLSearchParams({ page: String(page), limit: '20' });
+  if (status) query.set('status', status);
+  const res = await request(`/v1/admin/leads?${query.toString()}`, { token });
+  return expectJson<Paginated<LeadDto>>(res, 'GET /v1/admin/leads');
+}
+
+export async function setLeadProcessed(
+  token: string,
+  id: string,
+  processed: boolean,
+  clientIp?: string,
+): Promise<LeadDto> {
+  const res = await request(`/v1/admin/leads/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: { processed },
+    token,
+    clientIp,
+  });
+  return expectJson<LeadDto>(res, 'PATCH /v1/admin/leads/:id');
 }

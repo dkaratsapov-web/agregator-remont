@@ -20,6 +20,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/leads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminLeads_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/leads/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["AdminLeads_update"];
+        trace?: never;
+    };
     "/v1/auth/login": {
         parameters: {
             query?: never;
@@ -110,6 +142,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["JobBids_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/leads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Leads_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -305,6 +353,18 @@ export interface components {
             description: string;
             title: string;
         };
+        CreateLeadDto: {
+            /**
+             * @description Согласие на обработку персональных данных
+             * @enum {boolean}
+             */
+            consent: true;
+            name: string;
+            /** @example +7 900 123-45-67 */
+            phone: string;
+            /** @description Ловушка для ботов: людям не показывается, должна быть пустой */
+            website?: string;
+        };
         /** @enum {string} */
         Currency: "RUB";
         ErrorResponse: {
@@ -347,6 +407,23 @@ export interface components {
         };
         /** @enum {string} */
         JobStatus: "OPEN" | "IN_PROGRESS" | "CLOSED";
+        LeadDto: {
+            /** Format: date-time */
+            createdAt: string;
+            id: string;
+            name: string;
+            /** @example +79001234567 */
+            phone: string;
+            /**
+             * Format: date-time
+             * @description null — заявка ещё не обработана
+             */
+            processedAt: string | null;
+        };
+        LeadReceived: {
+            /** @enum {boolean} */
+            received: true;
+        };
         LoginDto: {
             /** Format: email */
             email: string;
@@ -395,6 +472,12 @@ export interface components {
             page: number;
             total: number;
         };
+        PaginatedLeadDto: {
+            items: components["schemas"]["LeadDto"][];
+            limit: number;
+            page: number;
+            total: number;
+        };
         PaginatedMyBidDto: {
             items: components["schemas"]["MyBidDto"][];
             limit: number;
@@ -425,6 +508,10 @@ export interface components {
             city?: string;
             description?: string;
             title?: string;
+        };
+        UpdateLeadDto: {
+            /** @description true — заявка обработана, false — вернуть в новые */
+            processed: boolean;
         };
         UpsertProfileDto: {
             about: string;
@@ -467,6 +554,136 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Health"];
+                };
+            };
+        };
+    };
+    AdminLeads_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                /** @description new — необработанные, processed — обработанные */
+                status?: "new" | "processed";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedLeadDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Роль не допускает операцию */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminLeads_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLeadDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Роль не допускает операцию */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ресурса нет или он принадлежит другому пользователю */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -762,6 +979,56 @@ export interface operations {
             };
             /** @description Превышен лимит частоты запросов или суточная квота */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Leads_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLeadDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadReceived"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Функция временно выключена */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

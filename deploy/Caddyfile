@@ -13,9 +13,17 @@
 	# Без пароля разрешено только чтение (GET, HEAD): Next.js принимает Server Actions
 	# POST-запросом на любой адрес, в том числе на «/», поэтому POST на открытые адреса тоже
 	# идёт через пароль, иначе вход, регистрация и действия кабинета обходили бы его.
-	@private not {
-		method GET HEAD
-		path / /offline /sw.js /robots.txt /manifest.webmanifest /icon.svg /apple-icon.png /icons/* /_next/static/*
+	# Единственный открытый POST — заявка на тестирование с главной (POST /lead, Route Handler,
+	# не Server Action; проверки и лимиты в API).
+	@private {
+		not {
+			method GET HEAD
+			path / /offline /privacy /sw.js /robots.txt /manifest.webmanifest /icon.svg /apple-icon.png /icons/* /_next/static/*
+		}
+		not {
+			method POST
+			path /lead
+		}
 	}
 	basic_auth @private {
 		{$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
