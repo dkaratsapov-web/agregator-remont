@@ -11,6 +11,8 @@ export interface MenuUser {
   /** Короткий номер аккаунта («ID 100245»). */
   publicId: number;
   avatarVersion: string | null;
+  /** Мини-фото, встроенное в страницу (главная): без отдельного запроса к /account/avatar. */
+  avatarSrc?: string | null;
 }
 
 type MenuLink = { href: string; label: string; soon?: boolean };
@@ -187,6 +189,7 @@ export function AccountMenu({ user, app = false }: { user: MenuUser; app?: boole
           <UserAvatar
             name={user.name}
             avatarVersion={user.avatarVersion}
+            src={user.avatarSrc}
             shape={app ? 'rounded-[8px]' : 'rounded-full'}
           />
           <span className="min-w-0 truncate max-sm:sr-only">{user.name}</span>
@@ -222,6 +225,7 @@ export function AccountMenu({ user, app = false }: { user: MenuUser; app?: boole
               <UserAvatar
                 name={user.name}
                 avatarVersion={user.avatarVersion}
+                src={user.avatarSrc}
                 className="size-11 text-base"
               />
               <span className="min-w-0">
