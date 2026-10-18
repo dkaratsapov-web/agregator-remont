@@ -481,3 +481,126 @@ export async function fetchAvatar(token: string): Promise<ArrayBuffer | null> {
   if (!res.ok) throw new ApiError(`GET /v1/me/avatar responded ${res.status}`, res.status);
   return res.arrayBuffer();
 }
+
+// --- Вход через банк (Сбер ID, Т-Банк ID). Секреты банка только у API, см. lib/bank-login.ts
+
+export type BankId = 'sber' | 'tbank';
+
+export interface BankProvider {
+  id: BankId;
+  title: string;
+}
+
+/** Ошибка входа через банк с кодом API (OAUTH_*) и данными незавершённого входа. */
+export class BankLoginError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string | undefined,
+    readonly userMessage: string | undefined,
+    readonly pending?: string,
+    readonly bankName?: string | null,
+  ) {
+    super(`bank login failed: ${status} ${code ?? ''}`);
+    this.name = 'BankLoginError';
+  }
+}
+
+async function bankJson<T>(res: Response, label: string): Promise<T> {
+  if (res.ok) return (await res.json()) as T;
+  let body: { code?: unknown; message?: unknown; pending?: unknown; name?: unknown } = {};
+  try {
+    body = (await res.json()) as typeof body;
+  } catch {
+    // тело не JSON
+  }
+  if (res.status >= 500 && res.status !== 502) {
+    throw new ApiError(`${label} responded ${res.status}`, res.status);
+  }
+  throw new BankLoginError(
+    res.status,
+    typeof body.code === 'string' ? body.code : undefined,
+    typeof body.message === 'string' ? body.message : undefined,
+    typeof body.pending === 'string' ? body.pending : undefined,
+    typeof body.name === 'string' ? body.name : null,
+  );
+}
+
+/** Банки, вход через которые настроен на сервере; при недоступном API — пустой список. */
+export async function getBankProviders(): Promise<BankProvider[]> {
+  try {
+    const res = await request('/v1/auth/oauth/providers');
+    return res.ok ? ((await res.json()) as BankProvider[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function bankAuthorizeUrl(
+  bank: BankId,
+  input: { state: string; nonce: string; codeChallenge: string },
+  clientIp?: string,
+): Promise<string> {
+  const res = await request(`/v1/auth/oauth/${bank}/authorize`, {
+    method: 'POST',
+    body: input,
+    clientIp,
+  });
+  return (await bankJson<{ url: string }>(res, `POST /v1/auth/oauth/${bank}/authorize`)).url;
+}
+
+export interface BankCodeInput {
+  code: string;
+  codeVerifier: string;
+  nonce: string;
+}
+
+export async function bankSignIn(
+  bank: BankId,
+  input: BankCodeInput & { role?: string },
+  clientIp?: string,
+  userAgent?: string,
+): Promise<AuthSessionDto> {
+  const res = await request(`/v1/auth/oauth/${bank}/callback`, {
+    method: 'POST',
+    body: input,
+    clientIp,
+    userAgent,
+  });
+  return bankJson<AuthSessionDto>(res, `POST /v1/auth/oauth/${bank}/callback`);
+}
+
+export async function bankComplete(
+  input: { pending: string; role: string },
+  clientIp?: string,
+  userAgent?: string,
+): Promise<AuthSessionDto> {
+  const res = await request('/v1/auth/oauth/complete', {
+    method: 'POST',
+    body: input,
+    clientIp,
+    userAgent,
+  });
+  return bankJson<AuthSessionDto>(res, 'POST /v1/auth/oauth/complete');
+}
+
+export async function linkBank(
+  token: string,
+  bank: BankId,
+  input: BankCodeInput,
+  clientIp?: string,
+): Promise<void> {
+  const res = await request(`/v1/me/oauth/${bank}/link`, {
+    method: 'POST',
+    body: input,
+    token,
+    clientIp,
+  });
+  if (res.status !== 204) await bankJson(res, `POST /v1/me/oauth/${bank}/link`);
+}
+
+export async function getLinkedBanks(
+  token: string,
+): Promise<{ provider: BankId; linkedAt: string }[]> {
+  const res = await request('/v1/me/oauth', { token });
+  return expectJson(res, 'GET /v1/me/oauth');
+}

@@ -15,6 +15,10 @@ STATE_DIR=${STATE_DIR:-/var/lib/agregator-deploy}
 section() { printf '\n== %s ==\n' "$1"; }
 cd "$REPO_DIR" || { echo "Нет $REPO_DIR"; exit 1; }
 compose=(docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml)
+# Вход через банк (Сбер ID, Т-Банк ID): API получает выход к банку и сертификат (deploy/README.md).
+if grep -Eq '^BANK_LOGIN=true[[:space:]]*$' deploy/.env 2> /dev/null; then
+  compose+=(-f deploy/docker-compose.bank-login.yml)
+fi
 
 section 'Время и версия'
 date -u '+%Y-%m-%d %H:%M:%S UTC'

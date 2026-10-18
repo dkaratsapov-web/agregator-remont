@@ -273,3 +273,11 @@ button {
 body:has(.auth-screen) .site-footer {
   display: none;
 }
+
+/* Низкий экран (ноутбук 1366×768 с панелями браузера): поля входа и регистрации ниже, чтобы
+   форма с кнопками банков помещалась без прокрутки. */
+@media (max-height: 46rem) {
+  .auth-screen input:not([type='radio']):not([type='checkbox']) {
+    min-height: 2.75rem;
+  }
+}

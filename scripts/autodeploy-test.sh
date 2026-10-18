@@ -248,6 +248,16 @@ for case_ in 'HOME_CODE=502|главная через Caddy отвечает 502
   check "health ($expect): not deployed" "$(failed)" "$(dev_head)"
 done
 
+# 12б. Вход через банк включён в deploy/.env: compose получает файл docker-compose.bank-login.yml.
+echo 'BANK_LOGIN=true' >> "$WORK/server/deploy/.env"
+push_commit 'bank login'
+all_green
+run
+check 'bank login: deployed' "$(deployed)" "$(dev_head)"
+check 'bank login: compose with bank-login file' \
+  "$(grep -c 'compose .*docker-compose.bank-login.yml.* build$' "$STUB_LOG" || true)" 1
+sed -i '/^BANK_LOGIN=/d' "$WORK/server/deploy/.env"
+
 # 13. Локальная правка на сервере мешает fast-forward: стоп без пересборки.
 echo local > "$WORK/server/app.txt"
 git -C "$WORK/server" -c user.email=s@example.ru -c user.name=s commit -qam local

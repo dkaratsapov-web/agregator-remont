@@ -9,7 +9,9 @@ import { ProfileForm } from '@/components/account/profile-form';
 import { SessionsList } from '@/components/account/sessions-list';
 import { PageHeader } from '@/components/ui/page-header';
 import { Sheet, SheetBody, SheetHeader } from '@/components/ui/sheet';
-import { listSessions } from '@/lib/api';
+import { BankLinks } from '@/components/account/bank-links';
+import { getBankProviders, getLinkedBanks, listSessions } from '@/lib/api';
+import { bankErrorMessage, isBankId } from '@/lib/bank-login';
 import { getCurrentUser, getSessionToken } from '@/lib/session';
 
 export const metadata: Metadata = { title: 'Настройки', robots: { index: false } };
@@ -18,6 +20,7 @@ const SECTIONS = [
   { id: 'profile', title: 'Профиль' },
   { id: 'appearance', title: 'Оформление' },
   { id: 'security', title: 'Пароль' },
+  { id: 'banks', title: 'Вход через банк' },
   { id: 'devices', title: 'Устройства' },
 ];
 
@@ -42,9 +45,30 @@ function Section({
   );
 }
 
-export default async function SettingsPage() {
-  const [user, token] = await Promise.all([getCurrentUser(), getSessionToken()]);
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const [user, token, query, banks] = await Promise.all([
+    getCurrentUser(),
+    getSessionToken(),
+    searchParams,
+    getBankProviders(),
+  ]);
   if (!user || !token) redirect('/login?next=/account/settings');
+  const one = (key: string) => (Array.isArray(query[key]) ? query[key][0] : query[key]);
+  const bank = one('bank');
+  const bankError = bankErrorMessage(one('bank_error'), isBankId(bank) ? bank : undefined);
+  const bankLinked = one('bank_linked') === '1' && isBankId(bank) ? bank : undefined;
+  let linked: { provider: string }[] = [];
+  if (banks.length > 0) {
+    try {
+      linked = await getLinkedBanks(token);
+    } catch (error) {
+      console.error('Settings: failed to load linked banks', error);
+    }
+  }
 
   let sessions: SessionDto[] | null = null;
   try {
@@ -66,7 +90,7 @@ export default async function SettingsPage() {
       <div className="mt-8 grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8">
         <nav aria-label="Разделы настроек" className="min-w-0 lg:sticky lg:top-24 lg:self-start">
           <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] lg:mx-0 lg:flex-col lg:gap-0 lg:divide-y lg:divide-line lg:overflow-hidden lg:rounded-[14px] lg:border lg:border-line lg:bg-surface lg:px-0">
-            {SECTIONS.map((s) => (
+            {SECTIONS.filter((s) => s.id !== 'banks' || banks.length > 0).map((s) => (
               <li key={s.id}>
                 <a
                   href={`#${s.id}`}
@@ -102,6 +126,21 @@ export default async function SettingsPage() {
           <Section id="security" title="Пароль" text="Для смены нужен текущий пароль.">
             <PasswordForm />
           </Section>
+
+          {banks.length > 0 ? (
+            <Section
+              id="banks"
+              title="Вход через банк"
+              text="Привяжите банк, чтобы входить без пароля. Банк передаёт только имя, email и телефон."
+            >
+              <BankLinks
+                banks={banks}
+                linked={linked.map((l) => l.provider)}
+                error={bankError}
+                justLinked={bankLinked}
+              />
+            </Section>
+          ) : null}
 
           <Section
             id="devices"

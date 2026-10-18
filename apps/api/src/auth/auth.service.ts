@@ -80,7 +80,8 @@ export class AuthService {
     return { user: session.user, sessionId: session.id };
   }
 
-  private async createSession(
+  /** Новая сессия пользователя (вход по паролю или через банк, oauth/oauth.service.ts). */
+  async createSession(
     db: Prisma.TransactionClient,
     user: User,
     userAgent?: string,

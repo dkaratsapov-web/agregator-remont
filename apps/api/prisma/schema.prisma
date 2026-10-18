@@ -123,34 +123,36 @@ model JobDraft {
 }
 
 model User {
-  id              String             @id @default(cuid())
+  id               String             @id @default(cuid())
   /// Короткий номер для пользователя и поддержки («ID 100245»). Ничего не открывает: доступ
   /// только по сессии. Последовательность с 100001 (миграция user_public_id).
-  publicId        Int                @unique @default(autoincrement()) @map("public_id")
+  publicId         Int                @unique @default(autoincrement()) @map("public_id")
   /// Хранится в нижнем регистре после trim; уникальность обеспечивает индекс.
-  email           String             @unique @db.VarChar(254)
+  email            String             @unique @db.VarChar(254)
   /// argon2id в PHC-формате. Никогда не попадает в ответы API.
-  passwordHash    String             @map("password_hash")
-  name            String             @db.VarChar(80)
-  role            UserRole
+  passwordHash     String             @map("password_hash")
+  name             String             @db.VarChar(80)
+  role             UserRole
   /// +7XXXXXXXXXX (CHECK в базе), необязательный.
-  phone           String?            @db.VarChar(12)
-  city            String?            @db.VarChar(80)
+  phone            String?            @db.VarChar(12)
+  city             String?            @db.VarChar(80)
   /// Время последней загрузки фото; null — фото нет. Само фото в user_avatars.
-  avatarUpdatedAt DateTime?          @map("avatar_updated_at")
+  avatarUpdatedAt  DateTime?          @map("avatar_updated_at")
   /// Оформление кабинета (значения проверяет CHECK в базе и DTO).
-  uiTheme         String             @default("light") @map("ui_theme") @db.VarChar(10)
-  uiScale         String             @default("normal") @map("ui_scale") @db.VarChar(10)
-  uiMotion        String             @default("system") @map("ui_motion") @db.VarChar(10)
-  createdAt       DateTime           @default(now()) @map("created_at")
-  updatedAt       DateTime           @updatedAt @map("updated_at")
-  avatar          UserAvatar?
-  sessions        Session[]
-  jobs            Job[]
-  jobDrafts       JobDraft[]
-  auditLogs       AuditLog[]
-  profile         ContractorProfile?
-  bids            Bid[]
+  uiTheme          String             @default("light") @map("ui_theme") @db.VarChar(10)
+  uiScale          String             @default("normal") @map("ui_scale") @db.VarChar(10)
+  uiMotion         String             @default("system") @map("ui_motion") @db.VarChar(10)
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  avatar           UserAvatar?
+  sessions         Session[]
+  jobs             Job[]
+  jobDrafts        JobDraft[]
+  auditLogs        AuditLog[]
+  profile          ContractorProfile?
+  bids             Bid[]
+  /// Входы через банки (Сбер ID, Т-Банк ID), привязанные к аккаунту.
+  externalAccounts ExternalAccount[]
 
   @@map("users")
 }
@@ -171,6 +173,27 @@ model Session {
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
+}
+
+enum ExternalProvider {
+  SBER
+  TBANK
+}
+
+/// Аккаунт пользователя у банка, через который он входит (Сбер ID, Т-Банк ID). Субъект —
+/// постоянный идентификатор человека у банка (sub); токены банка не хранятся.
+model ExternalAccount {
+  id        String           @id @default(cuid())
+  provider  ExternalProvider
+  subject   String           @db.VarChar(255)
+  userId    String           @map("user_id")
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  @@unique([provider, subject])
+  /// Один аккаунт каждого банка на пользователя.
+  @@unique([userId, provider])
+  @@map("external_accounts")
 }
 
 /// Журнал изменений: кто, что и когда изменил. Пишется в той же транзакции, что и изменение.

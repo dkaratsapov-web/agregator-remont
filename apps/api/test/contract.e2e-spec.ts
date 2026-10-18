@@ -5,6 +5,7 @@ import sharp from 'sharp';
 import request from 'supertest';
 import { expectContract, uncoveredResponses } from './contract';
 import { createTestApp } from './create-app';
+import { CHALLENGE, NONCE, STATE, VERIFIER, startFakeBank } from './fake-bank';
 import { signUp, signUpAdmin, requiredAnswers } from './helpers';
 
 /**
@@ -39,13 +40,14 @@ async function cleanDb(): Promise<void> {
   await prisma.bid.deleteMany();
   await prisma.jobDraft.deleteMany();
   await prisma.job.deleteMany({ where: { ownerId: { not: null } } });
+  await prisma.externalAccount.deleteMany();
   await prisma.user.deleteMany();
 }
 
 async function withApp(
   limits: Record<string, string>,
   run: (app: NestExpressApplication) => Promise<void>,
-  options: { leadsEnabled?: boolean } = {},
+  options: Parameters<typeof createTestApp>[1] = {},
 ): Promise<void> {
   for (const name of LIMIT_ENV) delete process.env[name];
   Object.assign(process.env, limits);
@@ -538,6 +540,143 @@ describe('API contract (e2e)', () => {
       },
       { leadsEnabled: true },
     );
+  });
+
+  it('bank login endpoints match openapi.json', async () => {
+    const bank = await startFakeBank();
+    const high = { RATE_LIMIT_PER_MIN: '1000', AUTH_RATE_LIMIT_PER_MIN: '1000' };
+    try {
+      await withApp(
+        high,
+        async (app) => {
+          const http = () => request(app.getHttpServer());
+          const check = async (
+            method: 'get' | 'post',
+            template: string,
+            req: request.Test,
+            status: number,
+          ) => {
+            const res = await req;
+            expect(res.status).toBe(status);
+            expectContract(res, method, template);
+            return res;
+          };
+          const authorize = { state: STATE, nonce: NONCE, codeChallenge: CHALLENGE };
+          const code = (user: { sub: string; email?: string }, extra = {}) => ({
+            code: bank.grant(user, extra),
+            codeVerifier: VERIFIER,
+            nonce: NONCE,
+          });
+
+          await check(
+            'get',
+            '/v1/auth/oauth/providers',
+            http().get('/v1/auth/oauth/providers'),
+            200,
+          );
+
+          const AUTH = '/v1/auth/oauth/{provider}/authorize';
+          await check(
+            'post',
+            AUTH,
+            http().post('/v1/auth/oauth/sber/authorize').send(authorize),
+            200,
+          );
+          await check('post', AUTH, http().post('/v1/auth/oauth/sber/authorize').send({}), 400);
+          await check(
+            'post',
+            AUTH,
+            http().post('/v1/auth/oauth/vk/authorize').send(authorize),
+            404,
+          );
+
+          const CB = '/v1/auth/oauth/{provider}/callback';
+          const cb = (provider: string, body: object) =>
+            http().post(`/v1/auth/oauth/${provider}/callback`).send(body);
+          await check(
+            'post',
+            CB,
+            cb('sber', { ...code({ sub: 'c-1', email: 'c1@example.ru' }), role: 'CUSTOMER' }),
+            200,
+          );
+          await check(
+            'post',
+            CB,
+            cb('sber', { code: 'bad code', codeVerifier: VERIFIER, nonce: NONCE }),
+            400,
+          );
+          await check('post', CB, cb('vk', code({ sub: 'x' })), 404);
+          const needRole = await check(
+            'post',
+            CB,
+            cb('tbank', code({ sub: 't-1', email: 't1@example.ru' })),
+            409,
+          );
+          await check(
+            'post',
+            CB,
+            cb('sber', { ...code({ sub: 'no-mail' }), role: 'CUSTOMER' }),
+            422,
+          );
+          await check(
+            'post',
+            CB,
+            cb('sber', code({ sub: 'c-2', email: 'c2@example.ru' }, { nonce: 'x'.repeat(32) })),
+            502,
+          );
+
+          const DONE = '/v1/auth/oauth/complete';
+          const done = (body: object) => http().post(DONE).send(body);
+          await check('post', DONE, done({ pending: needRole.body.pending, role: 'ADMIN' }), 400);
+          await check(
+            'post',
+            DONE,
+            done({ pending: `${needRole.body.pending}x`, role: 'CUSTOMER' }),
+            410,
+          );
+          // Email заняли регистрацией по паролю, пока человек выбирал роль.
+          const taken = await http()
+            .post('/v1/auth/oauth/tbank/callback')
+            .send(code({ sub: 't-2', email: 'taken@example.ru' }));
+          await http()
+            .post('/v1/auth/register')
+            .send({
+              email: 'taken@example.ru',
+              password: 'correct-horse-battery',
+              name: 'Занят',
+              role: 'CUSTOMER',
+            })
+            .expect(201);
+          await check('post', DONE, done({ pending: taken.body.pending, role: 'CUSTOMER' }), 409);
+          await check(
+            'post',
+            DONE,
+            done({ pending: needRole.body.pending, role: 'CONTRACTOR' }),
+            201,
+          );
+
+          const user = await signUp(app, 'CUSTOMER');
+          const other = await signUp(app, 'CUSTOMER');
+          await check('get', '/v1/me/oauth', http().get('/v1/me/oauth').set(user.auth), 200);
+          await check('get', '/v1/me/oauth', http().get('/v1/me/oauth'), 401);
+          const LINK = '/v1/me/oauth/{provider}/link';
+          const link = (provider: string, auth: object | null, body: object) => {
+            const req = http().post(`/v1/me/oauth/${provider}/link`);
+            return (auth ? req.set(auth as Record<string, string>) : req).send(body);
+          };
+          await check('post', LINK, link('sber', user.auth, code({ sub: 'link-1' })), 204);
+          await check('post', LINK, link('sber', user.auth, {}), 400);
+          await check('post', LINK, link('sber', null, code({ sub: 'link-2' })), 401);
+          await check('post', LINK, link('vk', user.auth, code({ sub: 'link-3' })), 404);
+          await check('post', LINK, link('sber', other.auth, code({ sub: 'link-1' })), 409);
+          bank.setTokenStatus(500);
+          await check('post', LINK, link('tbank', user.auth, code({ sub: 'link-4' })), 502);
+        },
+        { oauth: bank.config },
+      );
+    } finally {
+      await bank.close();
+    }
   });
 
   it('429 responses match openapi.json for every limit mechanism', async () => {
