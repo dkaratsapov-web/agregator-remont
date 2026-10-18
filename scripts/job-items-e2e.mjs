@@ -18,6 +18,8 @@ await context.addCookies(
   }),
 );
 const page = await context.newPage();
+// Уникальное название: заказы прошлых запусков на той же базе не мешают проверке каталога.
+const title = `Ванная: плитка и сантехника ${Date.now().toString(36)}`;
 
 // Общий пакет собран (pnpm build); импорт по пути: в корне репозитория его нет в node_modules.
 const shared = await import(new URL('../packages/shared/dist/index.js', import.meta.url).href);
@@ -51,7 +53,7 @@ async function answerRequired(category, prefix = '') {
 
 try {
   await page.goto(`${WEB}/account/jobs/new`, { waitUntil: 'networkidle' });
-  await page.fill('input[name="title"]', 'Ванная: плитка и сантехника');
+  await page.fill('input[name="title"]', title);
   await page.click('#field-category');
   await page.getByRole('option', { name: 'Плиточные работы' }).click();
   await page.fill('#field-city', 'Москва');
@@ -89,7 +91,7 @@ try {
   await page.goto(`${WEB}/jobs?category=PLUMBING`, { waitUntil: 'networkidle' });
   check(
     'catalog finds the job by the extra category',
-    await page.getByRole('link', { name: 'Ванная: плитка и сантехника' }).isVisible(),
+    await page.getByRole('link', { name: title }).isVisible(),
   );
 } catch (error) {
   check(
