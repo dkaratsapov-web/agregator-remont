@@ -56,7 +56,7 @@ export async function POST(request: Request): Promise<Response> {
   const attempt = reserveGateAttempt(ip);
   if (attempt !== 'ok') return back(attempt, next);
 
-  let ok = false;
+  let ok: boolean;
   try {
     ok = await checkGateCredentials(config, form.get('login') ?? '', form.get('password') ?? '');
   } finally {
