@@ -9,6 +9,7 @@ import { Reveal } from '@/components/landing/reveal';
 import { Story } from '@/components/landing/story';
 import { ViewerProvider } from '@/components/landing/viewer';
 import { Wordmark } from '@/components/landing/wordmark';
+import { getAvatarThumb } from '@/lib/avatar-thumb';
 import { getCurrentUser } from '@/lib/session';
 
 const SERVICE_ROWS = [
@@ -53,6 +54,7 @@ const SERVICE_ROWS = [
 export default async function LandingPage() {
   // Запрос к API только при cookie сессии: гость получает страницу без обращения к API.
   const user = await getCurrentUser();
+  const avatarSrc = user?.avatarVersion ? await getAvatarThumb() : null;
   return (
     <ViewerProvider
       viewer={
@@ -61,10 +63,11 @@ export default async function LandingPage() {
               name: user.name,
               role: user.role,
               publicId: user.publicId,
-              // Фото отдаётся из закрытой части (/account/avatar): если браузер ещё не знает пароль
-              // тестировщика, запрос картинки при загрузке главной вызвал бы окно ввода пароля.
-              // На главной вместо фото — первая буква имени; фото показывает приложение.
-              avatarVersion: null,
+              // Фото не грузится отдельным запросом из закрытой части (/account/avatar): если браузер
+              // ещё не знает пароль тестировщика, это вызвало бы окно ввода пароля. Мини-фото
+              // встроено в страницу; без него — первая буква имени.
+              avatarVersion: avatarSrc ? user.avatarVersion : null,
+              avatarSrc,
             }
           : null
       }

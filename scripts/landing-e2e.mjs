@@ -73,7 +73,8 @@ try {
 
     // 1б. Вошедший пользователь с фото: главная тоже не обращается в закрытую часть. Фото
     // отдаётся по /account/avatar за паролем, и запрос картинки при загрузке вызвал бы окно
-    // ввода пароля у того, кто не вводил его в этом браузере.
+    // ввода пароля у того, кто не вводил его в этом браузере. Поэтому мини-фото встроено в
+    // страницу (data:), и в шапке видно именно фото, а не первую букву имени.
     {
       const user = await registerViaApi('CUSTOMER');
       const png = Buffer.from(
@@ -122,6 +123,14 @@ try {
       check(
         'signed-in landing offers the cabinet',
         await page2.getByRole('link', { name: 'Перейти в кабинет' }).first().isVisible(),
+      );
+      const avatar = page2.locator('button[aria-controls] img').first();
+      const avatarSrc = (await avatar.count()) ? await avatar.getAttribute('src') : null;
+      check(
+        'signed-in landing shows the profile photo inline',
+        avatarSrc?.startsWith('data:image/webp;base64,') === true &&
+          (await avatar.evaluate((img) => img.naturalWidth > 0)),
+        `src ${avatarSrc?.slice(0, 40)}`,
       );
       await signedIn.close();
     }
