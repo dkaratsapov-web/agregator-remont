@@ -23,7 +23,12 @@ export async function SiteHeader() {
           </span>
           {user ? (
             <AccountMenu
-              user={{ name: user.name, role: user.role, avatarVersion: user.avatarVersion }}
+              user={{
+                name: user.name,
+                role: user.role,
+                publicId: user.publicId,
+                avatarVersion: user.avatarVersion,
+              }}
             />
           ) : (
             <Link

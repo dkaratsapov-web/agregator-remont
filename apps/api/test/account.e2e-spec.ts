@@ -55,6 +55,26 @@ describe('Account (e2e)', () => {
   const login = (email: string, password = PASSWORD) =>
     http().post('/v1/auth/login').send({ email, password });
 
+  describe('public id', () => {
+    it('gives each new account the next short number, starting at 100001', async () => {
+      const a = await register();
+      const b = await register();
+      const meA = (await http().get('/v1/me').set(a.auth).expect(200)).body;
+      const meB = (await http().get('/v1/me').set(b.auth).expect(200)).body;
+      expect(Number.isInteger(meA.publicId)).toBe(true);
+      expect(meA.publicId).toBeGreaterThanOrEqual(100001);
+      expect(meB.publicId).toBe(meA.publicId + 1);
+      // Номер не меняется при правке профиля и не подменяется из запроса.
+      const patched = await http()
+        .patch('/v1/me')
+        .set(a.auth)
+        .send({ name: 'Ирина П.', publicId: 1 })
+        .expect((res) => expect([200, 400]).toContain(res.status));
+      if (patched.status === 200) expect(patched.body.publicId).toBe(meA.publicId);
+      expect((await http().get('/v1/me').set(a.auth)).body.publicId).toBe(meA.publicId);
+    });
+  });
+
   describe('profile', () => {
     it('updates name, normalizes the phone and clears fields with null or ""', async () => {
       const user = await register();

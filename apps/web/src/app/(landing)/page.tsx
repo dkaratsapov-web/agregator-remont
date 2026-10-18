@@ -55,7 +55,16 @@ export default async function LandingPage() {
   const user = await getCurrentUser();
   return (
     <ViewerProvider
-      viewer={user ? { name: user.name, role: user.role, avatarVersion: user.avatarVersion } : null}
+      viewer={
+        user
+          ? {
+              name: user.name,
+              role: user.role,
+              publicId: user.publicId,
+              avatarVersion: user.avatarVersion,
+            }
+          : null
+      }
     >
       <ScrollReset />
       <Preloader />

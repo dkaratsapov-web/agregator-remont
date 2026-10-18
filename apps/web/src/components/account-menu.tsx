@@ -8,6 +8,8 @@ import { UserAvatar } from './account/user-avatar';
 export interface MenuUser {
   name: string;
   role: UserRole;
+  /** Короткий номер аккаунта («ID 100245»). */
+  publicId: number;
   avatarVersion: string | null;
 }
 
@@ -208,7 +210,8 @@ export function AccountMenu({ user }: { user: MenuUser }) {
               <span className="min-w-0">
                 <span className="block truncate font-semibold text-ink">{user.name}</span>
                 <span className="block text-sm text-ink-soft">
-                  {USER_ROLE_LABELS[user.role]} · Личный кабинет
+                  {USER_ROLE_LABELS[user.role]} · ID{' '}
+                  <span className="tabular-nums">{user.publicId}</span>
                 </span>
               </span>
             </a>

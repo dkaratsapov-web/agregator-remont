@@ -94,6 +94,9 @@ model Job {
 
 model User {
   id              String             @id @default(cuid())
+  /// Короткий номер для пользователя и поддержки («ID 100245»). Ничего не открывает: доступ
+  /// только по сессии. Последовательность с 100001 (миграция user_public_id).
+  publicId        Int                @unique @default(autoincrement()) @map("public_id")
   /// Хранится в нижнем регистре после trim; уникальность обеспечивает индекс.
   email           String             @unique @db.VarChar(254)
   /// argon2id в PHC-формате. Никогда не попадает в ответы API.

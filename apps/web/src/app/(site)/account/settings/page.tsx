@@ -65,7 +65,7 @@ export default async function SettingsPage() {
       </p>
       <h1 className="mt-1 text-3xl font-semibold tracking-tight md:text-[2.6rem]">Настройки</h1>
       <p className="mt-2 text-ink-soft">
-        {USER_ROLE_LABELS[user.role]} · {user.email}
+        {USER_ROLE_LABELS[user.role]} · ID {user.publicId} · {user.email}
       </p>
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">

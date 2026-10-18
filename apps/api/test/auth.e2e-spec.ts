@@ -49,6 +49,7 @@ describe('Auth (e2e)', () => {
       const res = await register({ email: '  Ivan@Example.RU ' }).expect(201);
       expect(res.body.user).toEqual({
         id: expect.any(String),
+        publicId: expect.any(Number),
         email: 'ivan@example.ru',
         name: 'Иван Петров',
         role: 'CUSTOMER',

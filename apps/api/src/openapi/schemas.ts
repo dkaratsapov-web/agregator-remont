@@ -97,6 +97,8 @@ export class UiPreferencesSchema implements UiPreferences {
 @ApiSchema({ name: 'UserDto' })
 export class UserSchema implements UserDto {
   @ApiProperty() id!: string;
+  @ApiProperty({ type: 'integer', minimum: 1, description: 'Короткий номер для поддержки' })
+  publicId!: number;
   @ApiProperty() email!: string;
   @ApiProperty() name!: string;
   @ApiProperty({ enum: USER_ROLES, enumName: 'UserRole' }) role!: UserRole;

@@ -1,6 +1,7 @@
 import { USER_ROLE_LABELS, type UserDto } from '@agregator/shared';
 import Link from 'next/link';
 import { formatDate } from '@/lib/format';
+import { CopyId } from './copy-id';
 import { UserAvatar } from './user-avatar';
 
 const formatPhone = (phone: string) =>
@@ -52,6 +53,9 @@ export function ProfileCard({ user }: { user: UserDto }) {
             >
               Здравствуйте, {user.name}
             </h1>
+            <div className="mt-3">
+              <CopyId publicId={user.publicId} />
+            </div>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
