@@ -2,7 +2,7 @@
 // Ожидает web за Caddy с deploy/Caddyfile на BASE_URL (http://localhost подходит для service
 // worker), логин/пароль тестировщика (страница /gate) в BASIC_USER/BASIC_PASS и команду STOP_PROXY_CMD, которая
 // останавливает Caddy (для проверки офлайн-страницы; запускается последней).
-/* global window, getComputedStyle -- выполняется в браузере через page.evaluate */
+/* global window, document, getComputedStyle -- выполняется в браузере через page.evaluate */
 import { execSync } from 'node:child_process';
 import { chromium } from 'playwright';
 import { API, registerViaApi } from './lib/forms.mjs';
@@ -43,6 +43,28 @@ async function controlledBySw(page) {
   return page.evaluate(() => Boolean(navigator.serviceWorker.controller));
 }
 
+/**
+ * Главная загружена и видео пролёта готово к показу. Не networkidle: видео пролёта докачивается
+ * в фоне после загрузки страницы, и сеть может не затихать дольше таймаута.
+ */
+async function openLanding(page) {
+  const res = await page.goto(`${BASE}/`, { waitUntil: 'load' });
+  const video = await page
+    .waitForFunction(
+      () =>
+        [...document.querySelectorAll('video')].some(
+          (v) => v.currentSrc.includes('-forward.') && v.readyState >= 2,
+        ),
+      null,
+      { timeout: 30000 },
+    )
+    .then(
+      () => true,
+      () => false,
+    );
+  return { res, video };
+}
+
 try {
   // 1. Главная без пароля: 200, без ошибок и без запросов в закрытую часть.
   {
@@ -62,8 +84,9 @@ try {
       if (res.status() >= 400) bad.push(`${res.status()} ${res.url()}`);
     });
     page.on('pageerror', (err) => bad.push(`pageerror ${err.message}`));
-    const res = await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+    const { res, video } = await openLanding(page);
     check('landing is public (200)', res?.status() === 200, `got ${res?.status()}`);
+    check('flight video loads', video);
     check('landing title', (await page.title()).includes('Гарантыч'));
     for (let y = 0; y <= 12000; y += 800) {
       await page.evaluate((v) => window.scrollTo(0, v), y);
@@ -116,7 +139,7 @@ try {
           privateRequests.push(url.pathname);
         }
       });
-      await page2.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+      await openLanding(page2);
       check(
         'signed-in landing makes no private requests',
         privateRequests.length === 0,
@@ -151,7 +174,7 @@ try {
   {
     const context = await browser.newContext({ reducedMotion: 'reduce' });
     const page = await context.newPage();
-    await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+    await page.goto(`${BASE}/`, { waitUntil: 'load' });
     const display = await page.$eval('.preloader', (el) => getComputedStyle(el).display);
     check('reduced motion: no preloader', display === 'none', `display ${display}`);
     check('reduced motion: steps as a list', await page.locator('h2#how-it-works').isVisible());
