@@ -8,8 +8,10 @@ import { NavLink } from './nav-link';
 export async function SiteHeader() {
   const user = await getCurrentUser();
   return (
-    <header className="sticky top-0 z-30 border-b border-line/80 bg-canvas/95 supports-[backdrop-filter]:bg-canvas/75 supports-[backdrop-filter]:backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-10">
+    <header className="sticky top-0 z-30 bg-canvas/95 supports-[backdrop-filter]:bg-canvas/80 supports-[backdrop-filter]:backdrop-blur-xl">
+      {/* Нижняя кромка — шкала рулетки; терракотовая полоса на ней — сколько страницы прокручено. */}
+      <div aria-hidden="true" className="header-ruler" />
+      <div className="mx-auto flex h-[4.25rem] max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-10">
         <Link
           href="/"
           className="flex min-h-11 shrink-0 items-center rounded-lg"
@@ -18,17 +20,19 @@ export async function SiteHeader() {
           <Wordmark />
         </Link>
         <div className="flex min-w-0 flex-1 items-center justify-end gap-1 lg:gap-4">
-          <HeaderSearch />
-          <nav aria-label="Основная навигация" className="flex shrink-0 items-center gap-1">
-            {/* На самых узких экранах каталог открывается через поиск и меню кабинета. */}
-            <span className="contents max-[400px]:hidden">
+          <HeaderSearch app />
+          <nav aria-label="Основная навигация" className="flex shrink-0 items-center gap-2">
+            {/* Разделы — как переключатель: активный залит, с терракотовой меткой. На самых узких
+                экранах каталог открывается через поиск и меню кабинета. */}
+            <div className="flex items-center gap-0.5 rounded-[12px] border border-line bg-surface/70 p-1 max-[400px]:hidden">
               <NavLink href="/jobs">Заказы</NavLink>
-            </span>
-            <span className="hidden sm:contents">
-              <NavLink href="/#how-it-works">Как это работает</NavLink>
-            </span>
+              <span className="hidden sm:contents">
+                <NavLink href="/#how-it-works">Как это работает</NavLink>
+              </span>
+            </div>
             {user ? (
               <AccountMenu
+                app
                 user={{
                   name: user.name,
                   role: user.role,
@@ -39,7 +43,7 @@ export async function SiteHeader() {
             ) : (
               <Link
                 href="/login"
-                className="ml-1 inline-flex min-h-11 items-center rounded-full bg-ink px-5 text-sm font-semibold text-canvas transition-[background-color,transform] duration-200 hover:bg-ink/85 active:scale-[0.97]"
+                className="inline-flex min-h-11 items-center rounded-[12px] bg-ink px-5 text-sm font-semibold text-canvas transition-[background-color,transform] duration-200 hover:bg-ink/85 active:scale-[0.97]"
               >
                 Войти
               </Link>

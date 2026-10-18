@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+/** Пункт переключателя разделов в шапке. Активный — тёмная плашка с терракотовой меткой. */
 export function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
   const pathname = usePathname();
   const isAnchor = href.includes('#');
@@ -12,12 +13,11 @@ export function NavLink({ href, children }: { href: string; children: React.Reac
     <Link
       href={href}
       aria-current={active ? 'page' : undefined}
-      className={`inline-flex min-h-11 items-center rounded-full px-3.5 text-sm transition-colors duration-150 hover:bg-ink/5 ${
-        active
-          ? 'font-semibold text-ink underline decoration-accent decoration-2 underline-offset-[6px]'
-          : 'font-medium text-ink-soft hover:text-ink'
+      className={`inline-flex min-h-9 items-center gap-2 rounded-[9px] px-3.5 text-sm font-semibold transition-colors duration-150 ${
+        active ? 'bg-ink text-canvas' : 'text-ink-soft hover:bg-ink/5 hover:text-ink'
       }`}
     >
+      {active ? <span aria-hidden="true" className="size-1.5 rounded-[1px] bg-accent" /> : null}
       {children}
     </Link>
   );

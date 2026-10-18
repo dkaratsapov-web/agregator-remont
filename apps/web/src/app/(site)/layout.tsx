@@ -16,6 +16,12 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       data-ui-scale={prefs.scale}
       data-ui-motion={prefs.motion}
     >
+      {/* Чертёжная сетка за страницами приложения; главная со своим фоном её не получает. */}
+      <div aria-hidden="true" className="site-backdrop">
+        <div className="site-backdrop__grid" />
+        <div className="site-backdrop__glow" />
+        <div className="site-backdrop__fade" />
+      </div>
       <SiteHeader />
       <main id="main" className="pb-[env(safe-area-inset-bottom)]">
         {children}
