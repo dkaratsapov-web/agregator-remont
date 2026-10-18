@@ -1,0 +1,311 @@
+{
+  "keyframes/K-final.png": {
+    "job_id": "fa21eec9-aced-4b9a-bd04-5eec629f1f36",
+    "model": "nano_banana_pro",
+    "created_at": "2026-10-18T18:18:38.185687Z",
+    "inputs": {
+      "reference": "c0c9883f-df62-47be-8d9a-984ae914f0d9"
+    },
+    "params": {
+      "aspect_ratio": "16:9",
+      "resolution": "4k",
+      "width": 5504,
+      "height": 3072
+    },
+    "prompt": "Keep this exact photograph: identical room, identical camera position, framing, perspective, furniture, objects and their placement, identical window, curtains and geometry. Change only the lighting and time of day to a warm golden-hour evening: low warm sun entering through the window on the right, long soft amber light patches stretching across the oak floor and rug and onto the left wall, gentle warm bounce light, slightly deeper soft shadows, a faint warm glow in the sky outside, the graphite floor lamp switched on with a soft warm glow. Keep the left part of the frame calm and uncluttered. Ultra-realistic architectural interior photograph, true-to-life materials, physically accurate light, subtle film grain. No people, no text, no logos, no watermarks, no oversaturation."
+  },
+  "keyframes/K-final-day.png": {
+    "job_id": "c0c9883f-df62-47be-8d9a-984ae914f0d9",
+    "model": "nano_banana_pro",
+    "note": "вариант A первого экрана (дневной свет), основа K-final",
+    "prompt": "Ultra-realistic architectural interior photograph, indistinguishable from a real photo shot on a full-frame camera with a 35mm lens at eye level. A freshly renovated living room of about 36 square meters in a typical Russian panel-house apartment, wide establishing shot composed as a full-screen website hero background: the left 40% of the frame is a calm, uncluttered cool off-white wall with soft graded daylight (quiet negative space for headline text), the interior detail sits in the right part of the frame. One large modern window on the right with sheer linen curtains, soft evening sun entering at a low angle and casting long warm light patches across the floor. Light oak engineered wood floor with visible natural grain and subtle reflections, smooth matte painted walls with a slight real-world texture, a low terracotta orange (#C2410C) boucle sofa with realistic fabric weave and soft creases, graphite metal floor lamp, a large fiddle-leaf fig in a ceramic pot by the window, a light wool rug, a small graphite side table with a ceramic cup and a book, flush ceiling, shadow-gap skirting. Natural global illumination, physically accurate soft shadows and contact shadows, gentle bounce light, true-to-life material detail, fine dust in the sunbeam, slight lens vignette, subtle film grain, editorial interior photography in the style of a high-end architecture magazine. Straight vertical lines, correct perspective, consistent geometry. No people, no hands, no text, no logos, no watermarks, no CGI look, no plastic surfaces, no oversaturation.",
+    "params": {
+      "aspect_ratio": "16:9",
+      "resolution": "4k"
+    }
+  },
+  "keyframes/K-before.png": {
+    "job_id": "8fe8c711-eb61-4d4c-bbb5-d4e36dd1d3be",
+    "model": "nano_banana_pro",
+    "created_at": "2026-10-18T18:22:11.99778Z",
+    "inputs": {
+      "reference": "5ca184e5-add7-42a5-9ffe-880e603f3477"
+    },
+    "params": {
+      "aspect_ratio": "16:9",
+      "resolution": "4k",
+      "width": 5504,
+      "height": 3072
+    },
+    "prompt": "Keep this exact photograph's camera position, lens, field of view, framing and perspective pixel-for-pixel: the corner between the long left wall and the back wall stays at the same place (about 55% of the frame width), the ceiling line, floor line and the white PVC window with balcony door on the right stay exactly where they are, same size. Static locked camera, same shot, same empty room, only the surfaces and objects change. Transform it into the same room BEFORE renovation, old and worn: faded beige floral Soviet wallpaper on all walls, partly peeling at a seam near the window with a hairline crack, worn brown patterned linoleum on the floor, an old dark lacquered Soviet wardrobe standing against the left wall close to the back corner, an old worn wooden armchair near the window, a bare incandescent bulb hanging on a cord from the ceiling, an old white cast-iron radiator under the window, an old yellowed tulle curtain, a dusty windowsill. Cold soft overcast morning daylight from the window, slightly bluish. Lived-in, tired, but clean. Ultra-realistic architectural interior photograph, typical Russian panel-house apartment, true-to-life materials, physically accurate light, subtle film grain. No people, no hands, no text, no logos, no watermarks, straight vertical lines."
+  },
+  "keyframes/K-wall.png": {
+    "job_id": "88aeae78-e89b-4057-905a-de92026039c4",
+    "model": "nano_banana_pro",
+    "created_at": "2026-10-18T18:31:33.326067Z",
+    "inputs": {
+      "reference": "8fe8c711-eb61-4d4c-bbb5-d4e36dd1d3be"
+    },
+    "params": {
+      "aspect_ratio": "16:9",
+      "resolution": "4k",
+      "width": 5504,
+      "height": 3072
+    },
+    "prompt": "The same old room as in the reference photo (same faded beige floral Soviet wallpaper, same white PVC window with balcony door, same old cast-iron radiator, same cold overcast morning light). Close-up shot: the camera has moved up close to the wall right beside the window. The old floral wallpaper is peeling off at a seam and curling, with a visible diagonal crack in the plaster beneath it. On the dusty white windowsill in the foreground lie a yellow tape measure, an open paper notebook with a simple hand-drawn room floor plan sketch (lines only, no words), a pencil and a smartphone lying face down. Shallow depth of field, focus on the tape measure and the peeling wallpaper. Ultra-realistic architectural interior photograph, 35mm lens, eye level, true-to-life materials, physically accurate light, subtle film grain. No people, no hands, no text, no readable writing, no logos, no brand names, no watermarks, straight vertical lines."
+  },
+  "keyframes/K-tools.png": {
+    "job_id": "9a4898e7-241a-415e-a77f-05a6f84ddc72",
+    "model": "nano_banana_pro",
+    "created_at": "2026-10-18T18:31:33.420144Z",
+    "inputs": {
+      "reference": "8fe8c711-eb61-4d4c-bbb5-d4e36dd1d3be"
+    },
+    "params": {
+      "aspect_ratio": "16:9",
+      "resolution": "4k",
+      "width": 5504,
+      "height": 3072
+    },
+    "prompt": "The same old room as in the reference photo (same faded beige floral Soviet wallpaper, same worn brown patterned linoleum, same cold overcast morning daylight). The camera has turned away from the window and now looks at the opposite end of the room: an open doorway with an old white-painted wooden door frame leading to a dim hallway. On the linoleum against the wallpapered wall next to the doorway stand three different professional toolboxes side by side, clearly belonging to three different work crews: a grey metal toolbox on the left, a black plastic toolbox in the middle, and a terracotta orange (#C2410C) toolbox on the right with a pair of work gloves lying on top of it, plus a folded measuring tape. No brand logos on the tools. Ultra-realistic architectural interior photograph, 35mm lens, eye level, true-to-life materials, physically accurate light, subtle film grain. No people, no hands, no text, no readable writing, no logos, no brand names, no watermarks, straight vertical lines."
+  },
+  "keyframes/K-demo.png": {
+    "job_id": "95fabff1-7890-4f01-b4cf-52055c61bf27",
+    "model": "nano_banana_pro",
+    "created_at": "2026-10-18T18:19:57.600547Z",
+    "inputs": {
+      "reference": "fa21eec9-aced-4b9a-bd04-5eec629f1f36"
+    },
+    "params": {
+      "aspect_ratio": "16:9",
+      "resolution": "4k",
+      "width": 5504,
+      "height": 3072
+    },
+    "prompt": "Keep this exact photograph's camera position, lens, framing, perspective and room geometry: identical walls, ceiling, corner, window with balcony door on the right, floor plane and proportions. Static locked camera, same shot. The same room DURING DEMOLITION, all furniture removed: old wallpaper and plaster stripped to bare grey concrete panel walls with visible panel seams, linoleum removed revealing a rough grey concrete floor slab, a few white construction debris bags and a stack of old wallpaper strips in the corner, light construction dust in the air, the window protected with transparent plastic film taped at the edges, the ceiling bare concrete with a temporary hanging work lamp. Neutral soft daylight from the window. Ultra-realistic architectural interior photograph, typical Russian panel-house apartment, true-to-life materials, physically accurate light, subtle film grain. No people, no hands, no text, no logos, no brand names, no watermarks, straight vertical lines."
+  },
+  "keyframes/K-rough.png": {
+    "job_id": "5ca184e5-add7-42a5-9ffe-880e603f3477",
+    "model": "nano_banana_pro",
+    "created_at": "2026-10-18T18:19:57.844819Z",
+    "inputs": {
+      "reference": "fa21eec9-aced-4b9a-bd04-5eec629f1f36"
+    },
+    "params": {
+      "aspect_ratio": "16:9",
+      "resolution": "4k",
+      "width": 5504,
+      "height": 3072
+    },
+    "prompt": "Keep this exact photograph's camera position, lens, framing, perspective and room geometry: identical walls, ceiling, corner, window with balcony door on the right, floor plane and proportions. Static locked camera, same shot. The same room AFTER ROUGH WORKS, no furniture: walls freshly plastered smooth and evenly in light grey gypsum plaster, a fresh smooth cement-sand floor screed, new electrical cable runs chased into the walls and new round socket boxes installed at standard heights, a neat new radiator under the window, the ceiling levelled and primed, a tripod LED construction floodlight standing on the floor, a plastic bucket and a long aluminium rule leaning against the wall. Neutral clean daylight from the window. Ultra-realistic architectural interior photograph, typical Russian panel-house apartment, true-to-life materials, physically accurate light, subtle film grain. No people, no hands, no text, no logos, no brand names, no watermarks, straight vertical lines."
+  },
+  "keyframes/K-rough2.png": {
+    "job_id": "5f7f8815-d086-49f1-99b3-6966d5229c07",
+    "model": "nano_banana_pro",
+    "created_at": "2026-10-18T18:31:33.324931Z",
+    "inputs": {
+      "reference": "5ca184e5-add7-42a5-9ffe-880e603f3477"
+    },
+    "params": {
+      "aspect_ratio": "16:9",
+      "resolution": "4k",
+      "width": 5504,
+      "height": 3072
+    },
+    "prompt": "The same room in the same rough-works state as in the reference photo (smooth light grey gypsum-plastered walls, fresh cement floor screed, new socket boxes and cable runs, new radiator under the window, white PVC window with balcony door, tripod LED construction floodlight, bucket and aluminium rule), but photographed from a different camera position: the camera has moved diagonally across the room, standing near the window side and slightly raised, looking back along the long left wall toward the far corner, so the window is now at the left edge of the frame and the long plastered wall recedes in perspective. Same room, same proportions, neutral clean daylight. Ultra-realistic architectural interior photograph, 35mm lens, eye level, true-to-life materials, physically accurate light, subtle film grain. No people, no hands, no text, no readable writing, no logos, no brand names, no watermarks, straight vertical lines."
+  },
+  "clips/C1.mp4": {
+    "job_id": "dfdecd26-64db-492c-b900-230b9fa95e42",
+    "model": "kling_o3_flf",
+    "created_at": "2026-10-18T18:33:18.11249Z",
+    "inputs": {
+      "start_image": "8fe8c711-eb61-4d4c-bbb5-d4e36dd1d3be",
+      "end_image": "88aeae78-e89b-4057-905a-de92026039c4"
+    },
+    "params": {
+      "aspect_ratio": "16:9",
+      "duration": 5,
+      "mode": "pro",
+      "width": 1920,
+      "height": 1080
+    },
+    "prompt": "The camera glides slowly forward across the old room toward the window and drifts to the right, closing in on the peeling floral wallpaper and the crack beside the window, ending close to the windowsill where a tape measure, an open notebook and a phone lie. Cold soft morning light. Photorealistic, one continuous shot, smooth steady gimbal camera at eye level, consistent room geometry, straight vertical lines, no people, no hands, no text, no logos, no shaky camera, no cuts, no flicker."
+  },
+  "clips/C2.mp4": {
+    "job_id": "d65a749f-46c0-44dd-be1d-9939892df04e",
+    "model": "kling_o3_flf",
+    "created_at": "2026-10-18T18:33:18.738628Z",
+    "inputs": {
+      "start_image": "88aeae78-e89b-4057-905a-de92026039c4",
+      "end_image": "9a4898e7-241a-415e-a77f-05a6f84ddc72"
+    },
+    "params": {
+      "aspect_ratio": "16:9",
+      "duration": 5,
+      "mode": "pro",
+      "width": 1920,
+      "height": 1080
+    },
+    "prompt": "The camera pulls back from the windowsill and smoothly swings around in a wide continuous turn, gliding back through the old room to face its opposite end, arriving at the open doorway where three different toolboxes stand on the linoleum against the wallpapered wall. Cold soft morning light. Photorealistic, one continuous shot, smooth steady gimbal camera at eye level, consistent room geometry, straight vertical lines, no people, no hands, no text, no logos, no shaky camera, no cuts, no flicker."
+  },
+  "clips/C3.mp4": {
+    "job_id": "992d9e8d-d498-426c-8de9-6bdd652d72a2",
+    "model": "kling_o3_flf",
+    "created_at": "2026-10-18T18:33:18.100889Z",
+    "inputs": {
+      "start_image": "9a4898e7-241a-415e-a77f-05a6f84ddc72"
+    },
+    "params": {
+      "aspect_ratio": "16:9",
+      "duration": 5,
+      "mode": "pro",
+      "width": 1920,
+      "height": 1080
+    },
+    "prompt": "Slow gentle push-in toward the terracotta orange toolbox on the right with work gloves on top; rack focus: the grey and the black toolboxes gradually fall into soft blur while the terracotta toolbox stays crisp and sharp. Nothing else moves. Cold soft morning light. Photorealistic, one continuous shot, smooth steady gimbal camera at eye level, consistent room geometry, straight vertical lines, no people, no hands, no text, no logos, no shaky camera, no cuts, no flicker."
+  },
+  "clips/C4.mp4": {
+    "job_id": "21b9b902-47f8-42f6-9330-63cd3be41abb",
+    "model": "kling_o3_flf",
+    "created_at": "2026-10-18T18:37:48.467011Z",
+    "inputs": {
+      "start_image": "f1daf7f9-bb78-4e66-9d60-625f9b767167",
+      "end_image": "95fabff1-7890-4f01-b4cf-52055c61bf27"
+    },
+    "params": {
+      "aspect_ratio": "16:9",
+      "duration": 5,
+      "mode": "pro",
+      "width": 1920,
+      "height": 1080
+    },
+    "prompt": "The camera pulls back from the toolboxes, rises slightly and flies back into the room in a slow continuous turn toward the window, while demolition happens around it in a seamless timelapse: the old floral wallpaper peels off the walls in sheets and disappears, the wardrobe and the armchair vanish, the linoleum lifts and rolls away revealing the bare concrete floor slab, walls become bare grey concrete panels, white construction debris bags appear in the corner, the window gets covered with protective plastic film. The radiator stays in place. Neutral soft daylight. Photorealistic, one continuous shot, smooth steady gimbal camera at eye level, consistent room geometry, straight vertical lines, no people, no hands, no text, no logos, no shaky camera, no cuts, no flicker."
+  },
+  "clips/C5.mp4": {
+    "job_id": "3c1fe191-2394-4fd8-9e9e-f4081060819b",
+    "model": "kling_o3_flf",
+    "created_at": "2026-10-18T18:33:18.224284Z",
+    "inputs": {
+      "start_image": "95fabff1-7890-4f01-b4cf-52055c61bf27",
+      "end_image": "5f7f8815-d086-49f1-99b3-6966d5229c07"
+    },
+    "params": {
+      "aspect_ratio": "16:9",
+      "duration": 5,
+      "mode": "pro",
+      "width": 1920,
+      "height": 1080
+    },
+    "prompt": "The camera keeps flying in one slow continuous arc diagonally across the room toward the window side and turns to look back along the long wall, while the room is renovated around it in a seamless timelapse: bare concrete walls get smoothly plastered light grey, a fresh cement floor screed spreads across the floor, new cables and socket boxes appear in the walls, a new white radiator appears under the window, a construction floodlight, a bucket and a long rule appear. Neutral daylight. Photorealistic, one continuous shot, smooth steady gimbal camera at eye level, consistent room geometry, straight vertical lines, no people, no hands, no text, no logos, no shaky camera, no cuts, no flicker."
+  },
+  "clips/C6.mp4": {
+    "job_id": "bc448ed5-2dce-4647-a071-6c0163d1840a",
+    "model": "kling_o3_flf",
+    "created_at": "2026-10-18T18:33:17.987427Z",
+    "inputs": {
+      "start_image": "5f7f8815-d086-49f1-99b3-6966d5229c07",
+      "end_image": "fa21eec9-aced-4b9a-bd04-5eec629f1f36"
+    },
+    "params": {
+      "aspect_ratio": "16:9",
+      "duration": 5,
+      "mode": "pro",
+      "width": 1920,
+      "height": 1080
+    },
+    "prompt": "The camera continues its slow continuous arc, swinging back across the room to the wide view from the corner toward the window, while the final finishing happens around it in a seamless timelapse: walls get painted warm off-white, light oak boards are laid across the floor, the construction tools vanish, curtains, a rug, a terracotta sofa, a floor lamp, a side table and a large plant appear, and the light gradually turns into warm golden evening sun. Photorealistic, one continuous shot, smooth steady gimbal camera at eye level, consistent room geometry, straight vertical lines, no people, no hands, no text, no logos, no shaky camera, no cuts, no flicker."
+  },
+  "clips/C7.mp4": {
+    "job_id": "390dbb11-0256-4ab6-8672-e31350376896",
+    "model": "kling_o3_flf",
+    "created_at": "2026-10-18T18:33:17.955652Z",
+    "inputs": {
+      "start_image": "fa21eec9-aced-4b9a-bd04-5eec629f1f36"
+    },
+    "params": {
+      "aspect_ratio": "16:9",
+      "duration": 5,
+      "mode": "pro",
+      "width": 1920,
+      "height": 1080
+    },
+    "prompt": "Very slow gentle dolly out from the finished living room, warm golden evening sunlight, sun patches on the wall shift slightly, the floor lamp glows softly, the sheer curtains move very slightly. Calm and cozy, nothing else changes. Photorealistic, one continuous shot, smooth steady gimbal camera at eye level, consistent room geometry, straight vertical lines, no people, no hands, no text, no logos, no shaky camera, no cuts, no flicker."
+  },
+  "clips/C3-last.png": {
+    "upload_id": "f1daf7f9-bb78-4e66-9d60-625f9b767167",
+    "note": "последний кадр C3, загружен как начальный кадр C4"
+  },
+  "flight/flight-master.mp4": {
+    "note": "склейка C1–C7 (у C2–C7 отброшен первый кадр-стык), 841 кадр, 24 кадр/с, H.264 CRF 14"
+  },
+  "flight/flight-preview.mp4": {
+    "note": "flight-master, уменьшенный до 1280 px для просмотра"
+  },
+  "drafts/K-before-same-angle.png": {
+    "job_id": "f64cecf1-aab4-421e-8610-198b8c321580",
+    "model": "nano_banana_pro",
+    "created_at": "2026-10-18T18:19:57.660398Z",
+    "inputs": {
+      "reference": "fa21eec9-aced-4b9a-bd04-5eec629f1f36"
+    },
+    "params": {
+      "aspect_ratio": "16:9",
+      "resolution": "4k",
+      "width": 5504,
+      "height": 3072
+    },
+    "prompt": "Keep this exact photograph's camera position, lens, framing, perspective and room geometry: identical walls, ceiling, corner, window with balcony door on the right, floor plane and proportions. Static locked camera, same shot. The same room BEFORE renovation, old and worn, all new furniture removed: faded beige floral Soviet wallpaper, partly peeling at the seams near the window, a hairline crack in the wall, worn brown patterned linoleum on the floor, an old dark lacquered Soviet wardrobe standing against the left wall, an old worn armchair, a bare incandescent bulb hanging from the ceiling on a cord, an old white-painted radiator under the window, old yellowed tulle curtain, dusty windowsill. Cold, soft overcast morning daylight from the window, slightly bluish. Lived-in, tired, but clean. Ultra-realistic architectural interior photograph, typical Russian panel-house apartment, true-to-life materials, physically accurate light, subtle film grain. No people, no hands, no text, no logos, no brand names, no watermarks, straight vertical lines."
+  },
+  "drafts/K-before-alt.png": {
+    "job_id": "38ce5a88-7289-48af-af4c-8c47cc7934e5",
+    "model": "nano_banana_pro",
+    "created_at": "2026-10-18T18:22:11.959083Z",
+    "inputs": {
+      "reference": "5ca184e5-add7-42a5-9ffe-880e603f3477"
+    },
+    "params": {
+      "aspect_ratio": "16:9",
+      "resolution": "4k",
+      "width": 5504,
+      "height": 3072
+    },
+    "prompt": "Keep this exact photograph's camera position, lens, field of view, framing and perspective pixel-for-pixel: the corner between the long left wall and the back wall stays at the same place (about 55% of the frame width), the ceiling line, floor line and the white PVC window with balcony door on the right stay exactly where they are, same size. Static locked camera, same shot, same empty room, only the surfaces and objects change. Transform it into the same room BEFORE renovation, old and worn: faded beige floral Soviet wallpaper on all walls, partly peeling at a seam near the window with a hairline crack, worn brown patterned linoleum on the floor, an old dark lacquered Soviet wardrobe standing against the left wall close to the back corner, an old worn wooden armchair near the window, a bare incandescent bulb hanging on a cord from the ceiling, an old white cast-iron radiator under the window, an old yellowed tulle curtain, a dusty windowsill. Cold soft overcast morning daylight from the window, slightly bluish. Lived-in, tired, but clean. Ultra-realistic architectural interior photograph, typical Russian panel-house apartment, true-to-life materials, physically accurate light, subtle film grain. No people, no hands, no text, no logos, no watermarks, straight vertical lines."
+  },
+  "drafts/K-final-v1.png": {
+    "job_id": "c34a8d51-c1cd-4d25-9061-309c54627aaf",
+    "model": "nano_banana_pro",
+    "note": "первый K-final по брифу (окно слева), отклонён: не под полноэкранный первый экран"
+  },
+  "drafts/K-before-v1.png": {
+    "job_id": "2afee3b1-078f-414e-b631-d10f1bf55a49",
+    "model": "nano_banana_pro",
+    "note": "K-before от K-final-v1, отклонён вместе с ним"
+  },
+  "drafts/hero-B-gpt.png": {
+    "job_id": "45975173-3760-4f97-8c4c-4b072548f2d6",
+    "model": "gpt_image_2_5",
+    "note": "вариант B первого экрана, отклонён",
+    "prompt": "Ultra-realistic architectural interior photograph, indistinguishable from a real photo shot on a full-frame camera with a 35mm lens at eye level. A freshly renovated living room of about 36 square meters in a typical Russian panel-house apartment, wide establishing shot composed as a full-screen website hero background: the left 40% of the frame is a calm, uncluttered cool off-white wall with soft graded daylight (quiet negative space for headline text), the interior detail sits in the right part of the frame. One large modern window on the right with sheer linen curtains, soft evening sun entering at a low angle and casting long warm light patches across the floor. Light oak engineered wood floor with visible natural grain and subtle reflections, smooth matte painted walls with a slight real-world texture, a low terracotta orange (#C2410C) boucle sofa with realistic fabric weave and soft creases, graphite metal floor lamp, a large fiddle-leaf fig in a ceramic pot by the window, a light wool rug, a small graphite side table with a ceramic cup and a book, flush ceiling, shadow-gap skirting. Natural global illumination, physically accurate soft shadows and contact shadows, gentle bounce light, true-to-life material detail, fine dust in the sunbeam, slight lens vignette, subtle film grain, editorial interior photography in the style of a high-end architecture magazine. Straight vertical lines, correct perspective, consistent geometry. No people, no hands, no text, no logos, no watermarks, no CGI look, no plastic surfaces, no oversaturation.",
+    "params": {
+      "aspect_ratio": "16:9",
+      "resolution": "4k, quality high"
+    }
+  },
+  "drafts/test-flight.mp4": {
+    "job_id": "49555e04-bc82-4778-bc55-8f6471a924d7",
+    "model": "kling_o3_flf",
+    "created_at": "2026-10-18T18:24:38.723835Z",
+    "inputs": {
+      "start_image": "8fe8c711-eb61-4d4c-bbb5-d4e36dd1d3be",
+      "end_image": "95fabff1-7890-4f01-b4cf-52055c61bf27"
+    },
+    "params": {
+      "aspect_ratio": "16:9",
+      "duration": 5,
+      "mode": "pro",
+      "width": 1920,
+      "height": 1080
+    },
+    "prompt": "One continuous smooth cinematic camera flight through the same living room: the camera glides forward and arcs to the right in a slow steady move, like a gimbal operator walking through the space at eye level. While the camera moves, the room is renovated around it in a seamless timelapse transformation: the old floral wallpaper peels away and disappears, the wardrobe, armchair and curtain vanish, the linoleum lifts away revealing the bare concrete floor slab, walls become bare grey concrete, construction bags appear in the corner, the window gets covered with protective film. Photorealistic, consistent room geometry, straight vertical lines, natural daylight, no people, no hands, no text, no logos, no shaky camera, no cuts."
+  }
+}

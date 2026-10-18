@@ -149,7 +149,8 @@ K-final `fa21eec9-aced-4b9a-bd04-5eec629f1f36`.
 **На сайте**:
 - Кадры: `apps/web/public/landing/flight-v1` — 180 широких 1280×712 (5,1 МБ) и 120 вертикальных
   602×1072 (2,0 МБ, обрезка для телефона), WebP; `final.webp` — готовая комната для reduced motion.
-  Нарезка: `scripts/landing-flight-frames.py`. Исходные ролики в репозиторий не кладутся.
+  Нарезка: `scripts/landing-flight-frames.py`. Исходники (опорные кадры 4K, ролики, склейка,
+  промпты) — `media-src/landing-video`, в Git LFS (см. README там).
 - Привязка к прокрутке: `apps/web/src/lib/flight.ts` (опорные точки «прогресс → секунда»),
   canvas: `apps/web/src/components/landing/flight-canvas.tsx`, блок: `story.tsx`.
 - Кадры грузятся от грубой сетки к частой; до загрузки виден первый кадр. В режиме экономии
