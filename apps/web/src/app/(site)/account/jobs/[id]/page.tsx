@@ -1,11 +1,15 @@
-import { JOB_CATEGORY_LABELS, validateJobDetails } from '@agregator/shared';
+import { validateJobDetails } from '@agregator/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ApiUnavailable } from '@/components/api-unavailable';
 import { CloseJobForm } from '@/components/jobs/close-job-form';
 import { CustomersOnly } from '@/components/jobs/customers-only';
-import { JobDetails, JobHighlights } from '@/components/jobs/job-details';
+import {
+  JobHighlights,
+  JobPositionsDetails,
+  jobCategoryLabels,
+} from '@/components/jobs/job-details';
 import { JobForm } from '@/components/jobs/job-form';
 import { Notice } from '@/components/notice';
 import { StatusBadge } from '@/components/status-badge';
@@ -68,7 +72,7 @@ export default async function MyJobPage({
         <StatusBadge status={job.status} />
       </div>
       <p className="mt-2 text-sm text-ink-soft">
-        {JOB_CATEGORY_LABELS[job.category]}, {job.city}, опубликован{' '}
+        {jobCategoryLabels(job).join(' · ')}, {job.city}, опубликован{' '}
         <time dateTime={job.createdAt}>{formatDate(job.createdAt)}</time>{' '}
         <Link href={`/jobs/${job.id}`} className="font-medium text-accent hover:underline">
           Как видят подрядчики
@@ -96,7 +100,7 @@ export default async function MyJobPage({
       ) : null}
 
       <div className="mt-10 empty:hidden">
-        <JobDetails category={job.category} details={job.details} />
+        <JobPositionsDetails job={job} />
       </div>
 
       <section aria-labelledby="bids-title" className="mt-10">
@@ -132,6 +136,7 @@ export default async function MyJobPage({
                 budgetMin: job.budgetMin === null ? '' : formatAmount(job.budgetMin),
                 budgetMax: job.budgetMax === null ? '' : formatAmount(job.budgetMax),
                 details: JSON.stringify(job.details),
+                extraItems: JSON.stringify(job.extraItems),
               }}
               submitLabel="Сохранить изменения"
               pendingLabel="Сохраняем…"

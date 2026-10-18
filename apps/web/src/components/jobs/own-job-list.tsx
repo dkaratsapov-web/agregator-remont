@@ -1,4 +1,5 @@
-import { JOB_CATEGORY_LABELS, type OwnJobDto } from '@agregator/shared';
+import type { OwnJobDto } from '@agregator/shared';
+import { jobCategoryLabels } from './job-details';
 import Link from 'next/link';
 import { StatusBadge } from '@/components/status-badge';
 import { formatBudget, formatDate } from '@/lib/format';
@@ -15,7 +16,7 @@ export function OwnJobList({ jobs }: { jobs: OwnJobDto[] }) {
             <span className="min-w-0">
               <span className="block break-words font-semibold">{job.title}</span>
               <span className="mt-0.5 block text-sm text-ink-soft">
-                {JOB_CATEGORY_LABELS[job.category]}, {job.city},{' '}
+                {jobCategoryLabels(job).join(' · ')}, {job.city},{' '}
                 <time dateTime={job.createdAt}>{formatDate(job.createdAt)}</time>
               </span>
             </span>

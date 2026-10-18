@@ -6,7 +6,11 @@ import { cache } from 'react';
 import { StatusBadge } from '@/components/status-badge';
 import type { MyBidDto, UserDto } from '@agregator/shared';
 import { RespondPanel } from '@/components/bids/respond-panel';
-import { JobDetails, JobHighlights } from '@/components/jobs/job-details';
+import {
+  JobHighlights,
+  JobPositionsDetails,
+  jobCategoryLabels,
+} from '@/components/jobs/job-details';
 import { getJob, getMyJob, listMyBids } from '@/lib/api';
 import { getCurrentUser, getSessionToken } from '@/lib/session';
 import { formatBudget, formatDate } from '@/lib/format';
@@ -118,7 +122,7 @@ export default async function JobPage({
             <JobHighlights category={job.category} details={job.details} size="md" />
           </div>
           <div className="mt-8">
-            <JobDetails category={job.category} details={job.details} />
+            <JobPositionsDetails job={job} />
           </div>
           <h2 className="mt-8 text-lg font-semibold">Описание работ</h2>
           <p className="mt-3 max-w-[65ch] whitespace-pre-line leading-relaxed text-ink-soft">
@@ -139,8 +143,10 @@ export default async function JobPage({
               <dd className="mt-1 font-medium">{job.city}</dd>
             </div>
             <div>
-              <dt className="text-sm text-ink-soft">Категория</dt>
-              <dd className="mt-1 font-medium">{JOB_CATEGORY_LABELS[job.category]}</dd>
+              <dt className="text-sm text-ink-soft">
+                {job.extraItems.length > 0 ? 'Категории' : 'Категория'}
+              </dt>
+              <dd className="mt-1 font-medium">{jobCategoryLabels(job).join(', ')}</dd>
             </div>
           </dl>
           {own ? null : (

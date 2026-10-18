@@ -81,6 +81,7 @@ describe('parseJobForm', () => {
       'city',
       'description',
       'details',
+      'extraItems',
       'title',
     ]);
   });
@@ -185,6 +186,7 @@ describe('drafts', () => {
       budgetMin: null,
       budgetMax: null,
       details: {},
+      extraItems: [],
     });
   });
 
@@ -208,6 +210,7 @@ describe('drafts', () => {
       budgetMin: null,
       budgetMax: 60000,
       details: {},
+      extraItems: [],
     });
   });
 
@@ -228,5 +231,49 @@ describe('drafts', () => {
     expect(parsed.ok && parsed.input.draftId).toBe('cm1draft');
     const plain = parseJobForm(form(base));
     expect(plain.ok && 'draftId' in plain.input).toBe(false);
+  });
+});
+
+describe('several categories', () => {
+  const plumbing = { category: 'PLUMBING', details: { task: 'leak', leakPlace: 'riser' } };
+
+  it('sends valid extra positions with normalized answers', () => {
+    const result = parseJobForm(form({ ...base, extraItems: JSON.stringify([plumbing]) }));
+    expect(result.ok && result.input.extraItems).toEqual([plumbing]);
+  });
+
+  it('reports a position without category and a repeated category by position number', () => {
+    const result = parseJobForm(
+      form({
+        ...base,
+        extraItems: JSON.stringify([{ category: null, details: {} }, { category: 'TILING' }]),
+      }),
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(
+      result.issues.filter((i) => i.field === 'items').map((i) => [i.position, i.message]),
+    ).toEqual([
+      [2, 'Позиция 2: выберите категорию'],
+      [3, 'Категория «Плиточные работы» уже есть в заказе'],
+    ]);
+  });
+
+  it('points to the question inside a position', () => {
+    const result = parseJobForm(
+      form({ ...base, extraItems: JSON.stringify([{ category: 'PLUMBING', details: {} }]) }),
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    const issue = result.issues.find((i) => i.field === 'items');
+    expect(issue).toMatchObject({ position: 2, questionId: 'task' });
+  });
+
+  it('keeps positions in a draft without checking them', () => {
+    const items = [{ category: 'PLUMBING', details: {} }, { category: null }];
+    expect(
+      parseDraftForm(form({ title: 'Ванная', extraItems: JSON.stringify(items) })).extraItems,
+    ).toEqual(items);
+    expect(parseDraftForm(form({ extraItems: '{битый' })).extraItems).toEqual([]);
   });
 });

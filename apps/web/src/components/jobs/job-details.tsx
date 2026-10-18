@@ -1,10 +1,12 @@
 import {
+  JOB_CATEGORY_LABELS,
   groupJobDetails,
   jobDetailHighlights,
   summarizeJobDetails,
   type JobCategory,
   type JobDetailItem,
   type JobDetails as JobDetailsData,
+  type JobDto,
 } from '@agregator/shared';
 
 interface Props {
@@ -12,10 +14,20 @@ interface Props {
   details: JobDetailsData;
   /** Уровень заголовка блока. */
   headingLevel?: 2 | 3;
+  /** Заголовок блока; в заказе с несколькими позициями — название категории. */
+  title?: string;
+  /** Уникальная часть id заголовка, если блоков на странице несколько. */
+  idSuffix?: string;
 }
 
 /** Блок «Подробности»: ответы анкеты по разделам. Ничего не выводит, если анкета пуста. */
-export function JobDetails({ category, details, headingLevel = 2 }: Props) {
+export function JobDetails({
+  category,
+  details,
+  headingLevel = 2,
+  title = 'Подробности',
+  idSuffix = '',
+}: Props) {
   const items = summarizeJobDetails(category, details);
   if (items.length === 0) return null;
   const sections = groupJobDetails(items);
@@ -23,10 +35,10 @@ export function JobDetails({ category, details, headingLevel = 2 }: Props) {
   const Sub = `h${headingLevel + 1}` as 'h3' | 'h4';
 
   return (
-    <section aria-labelledby="job-details-title">
+    <section aria-labelledby={`job-details-title${idSuffix}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <Heading id="job-details-title" className="text-lg font-semibold">
-          Подробности
+        <Heading id={`job-details-title${idSuffix}`} className="text-lg font-semibold">
+          {title}
         </Heading>
         <p className="text-sm text-ink-soft tabular-nums">Ответов: {items.length}</p>
       </div>
@@ -130,5 +142,43 @@ export function JobHighlights({
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * Подробности всех позиций заказа: у заказа с одной категорией — обычный блок «Подробности»,
+ * с несколькими — по блоку на категорию.
+ */
+export function JobPositionsDetails({
+  job,
+  headingLevel = 2,
+}: {
+  job: Pick<JobDto, 'category' | 'details' | 'extraItems'>;
+  headingLevel?: 2 | 3;
+}) {
+  if (job.extraItems.length === 0) {
+    return <JobDetails category={job.category} details={job.details} headingLevel={headingLevel} />;
+  }
+  const positions = [{ category: job.category, details: job.details }, ...job.extraItems];
+  return (
+    <div className="space-y-8">
+      {positions.map((position, index) => (
+        <JobDetails
+          key={position.category}
+          category={position.category}
+          details={position.details}
+          headingLevel={headingLevel}
+          title={JOB_CATEGORY_LABELS[position.category]}
+          idSuffix={`-${index + 1}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Подписи всех категорий заказа: основная первой. */
+export function jobCategoryLabels(job: Pick<JobDto, 'category' | 'extraItems'>): string[] {
+  return [job.category, ...job.extraItems.map((item) => item.category)].map(
+    (category) => JOB_CATEGORY_LABELS[category],
   );
 }

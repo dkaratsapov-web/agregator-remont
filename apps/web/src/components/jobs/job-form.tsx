@@ -4,6 +4,7 @@ import {
   isJobCategory,
   JOB_CATEGORIES,
   JOB_CATEGORY_LABELS,
+  JOB_ITEM_LIMITS,
   JOB_LIMITS,
   SERVICE_AREA_ERROR,
   validateJobDetails,
@@ -21,6 +22,7 @@ import { Select } from '@/components/ui/select';
 import {
   checkJobForm,
   parseDetailsField,
+  parseItemsField,
   readJobForm,
   type JobFormIssue,
   type JobFormValues,
@@ -79,7 +81,36 @@ const FIELD_IDS: Record<JobFormIssue['field'], string> = {
   budget: 'field-budgetMin',
   description: 'field-description',
   details: 'job-questions',
+  items: 'job-positions',
 };
+
+/** Позиция другой категории в форме; key — для React, пока категория не выбрана. */
+interface ExtraPosition {
+  key: string;
+  category: JobCategory | '';
+  answers: JobDetails;
+}
+
+let positionKeys = 0;
+const nextPositionKey = () => `position-${(positionKeys += 1)}`;
+
+/** Позиции из скрытого поля (сохранённый заказ, черновик, ответ сервера с ошибкой). */
+function initialExtras(raw: string | undefined): ExtraPosition[] {
+  const parsed = parseItemsField(raw ?? '');
+  if (!Array.isArray(parsed)) return [];
+  return parsed.slice(0, JOB_ITEM_LIMITS.MAX_EXTRA).map((item: unknown) => {
+    const record = (typeof item === 'object' && item !== null ? item : {}) as {
+      category?: unknown;
+      details?: unknown;
+    };
+    const category = isJobCategory(record.category) ? record.category : '';
+    return {
+      key: nextPositionKey(),
+      category,
+      answers: category ? fitAnswers(category, record.details ?? {}) : {},
+    };
+  });
+}
 
 /** Ответы, подходящие анкете категории (скрытые и некорректные отбрасываются). */
 const fitAnswers = (category: JobCategory, answers: unknown): JobDetails => {
@@ -112,12 +143,69 @@ export function JobForm({
       ? { [values.category]: fitAnswers(values.category, parseDetailsField(values.details ?? '')) }
       : {},
   );
+  const [extras, setExtras] = useState<ExtraPosition[]>(() => initialExtras(values.extraItems));
   const [issues, setIssues] = useState<JobFormIssue[]>(state.issues ?? []);
   const [lastState, setLastState] = useState(state);
   if (state !== lastState) {
     setLastState(state);
     setIssues(state.issues ?? []);
   }
+
+  // Все позиции уходят в форму, даже без категории: проверка подскажет «выберите категорию».
+  const extraItemsJson = JSON.stringify(
+    extras.map((extra) => ({
+      category: extra.category || null,
+      details: extra.category ? fitAnswers(extra.category, extra.answers) : {},
+    })),
+  );
+  const usedCategories = new Set<JobCategory>(
+    [category, ...extras.map((extra) => extra.category)].filter(isJobCategory),
+  );
+  const positionIssues = (position: number) =>
+    issues.filter((issue) => issue.field === 'items' && issue.position === position);
+  const clearPositionIssues = (position: number, questionIds?: string[]) =>
+    setIssues((current) =>
+      current.filter(
+        (issue) =>
+          issue.field !== 'items' ||
+          issue.position !== position ||
+          (questionIds ? !questionIds.includes(issue.questionId ?? '') : false),
+      ),
+    );
+
+  const addExtra = () =>
+    setExtras((current) =>
+      current.length >= JOB_ITEM_LIMITS.MAX_EXTRA
+        ? current
+        : [...current, { key: nextPositionKey(), category: '', answers: {} }],
+    );
+  const removeExtra = (key: string) => {
+    setExtras((current) => current.filter((extra) => extra.key !== key));
+    // Номера позиций сдвигаются: старые ошибки по позициям больше не на своих местах.
+    setIssues((current) => current.filter((issue) => issue.field !== 'items'));
+  };
+  const chooseExtraCategory = (index: number, next: string) => {
+    if (!isJobCategory(next)) return;
+    setExtras((current) =>
+      current.map((extra, i) =>
+        i !== index || extra.category === next
+          ? extra
+          : // Общие ответы основной позиции (тип объекта, сроки) переносятся в новую анкету.
+            { ...extra, category: next, answers: fitAnswers(next, category ? answers : {}) },
+      ),
+    );
+    clearPositionIssues(index + 2);
+  };
+  const changeExtraAnswers = (index: number, next: JobDetails) => {
+    const before = extras[index]?.answers ?? {};
+    const changed = Object.keys({ ...before, ...next }).filter(
+      (id) => JSON.stringify(before[id]) !== JSON.stringify(next[id]),
+    );
+    setExtras((current) =>
+      current.map((extra, i) => (i === index ? { ...extra, answers: next } : extra)),
+    );
+    if (changed.length > 0) clearPositionIssues(index + 2, changed);
+  };
 
   const answers = category ? (answersByCategory[category] ?? {}) : {};
   const detailsJson = category ? JSON.stringify(fitAnswers(category, answers)) : '{}';
@@ -255,7 +343,7 @@ export function JobForm({
       return;
     }
     scheduleSave();
-  }, [category, city, answersByCategory, scheduleSave]);
+  }, [category, city, answersByCategory, extras, scheduleSave]);
 
   useEffect(() => {
     if (!drafts) return;
@@ -322,7 +410,11 @@ export function JobForm({
     const targetId =
       first.field === 'details' && first.questionId
         ? `q-${first.questionId}`
-        : FIELD_IDS[first.field];
+        : first.field === 'items' && first.position
+          ? first.questionId
+            ? `q-p${first.position}-${first.questionId}`
+            : `job-position-${first.position}`
+          : FIELD_IDS[first.field];
     const target = document.getElementById(targetId);
     if (target) {
       const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -378,7 +470,12 @@ export function JobForm({
                   <Select
                     id="field-category"
                     name="category"
-                    options={CATEGORY_OPTIONS}
+                    // Категории дополнительных позиций основной стать не могут.
+                    options={CATEGORY_OPTIONS.filter(
+                      (option) =>
+                        option.value === category ||
+                        !extras.some((extra) => extra.category === option.value),
+                    )}
                     value={category}
                     onChange={chooseCategory}
                     placeholder="Выберите категорию"
@@ -442,9 +539,15 @@ export function JobForm({
             id="job-questions"
           >
             <input type="hidden" name="details" value={detailsJson} />
+            <input type="hidden" name="extraItems" value={extraItemsJson} />
             {category ? (
               <>
                 {generalDetailsError ? <FormError message={generalDetailsError} /> : null}
+                {extras.length > 0 ? (
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-accent">
+                    Позиция 1 · {JOB_CATEGORY_LABELS[category]}
+                  </p>
+                ) : null}
                 <JobQuestionnaire
                   key={category}
                   category={category}
@@ -452,6 +555,48 @@ export function JobForm({
                   onChange={changeAnswers}
                   errors={questionErrors}
                 />
+                <div id="job-positions" tabIndex={-1} className="space-y-4 pt-2 outline-none">
+                  {issues
+                    .filter((issue) => issue.field === 'items' && !issue.position)
+                    .map((issue) => (
+                      <FormError key={issue.message} message={issue.message} />
+                    ))}
+                  {extras.map((extra, index) => (
+                    <ExtraPositionCard
+                      key={extra.key}
+                      position={index + 2}
+                      extra={extra}
+                      used={usedCategories}
+                      issues={positionIssues(index + 2)}
+                      onCategory={(next) => chooseExtraCategory(index, next)}
+                      onAnswers={(next) => changeExtraAnswers(index, next)}
+                      onRemove={() => removeExtra(extra.key)}
+                    />
+                  ))}
+                  {extras.length < JOB_ITEM_LIMITS.MAX_EXTRA ? (
+                    <button
+                      type="button"
+                      onClick={addExtra}
+                      className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-line px-5 py-4 text-left transition-colors duration-150 hover:border-accent/50 hover:bg-accent-tint/40"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="grid size-9 shrink-0 place-items-center rounded-full bg-accent-tint text-lg font-semibold text-accent"
+                      >
+                        +
+                      </span>
+                      <span>
+                        <span className="block font-semibold text-ink">
+                          Добавить работы другой категории
+                        </span>
+                        <span className="block text-sm text-ink-soft">
+                          Например, к плитке сантехнику и электрику. Мастер оценит всё вместе, до{' '}
+                          {JOB_ITEM_LIMITS.MAX_EXTRA + 1} категорий в заказе.
+                        </span>
+                      </span>
+                    </button>
+                  ) : null}
+                </div>
               </>
             ) : (
               <div className="flex items-start gap-4 rounded-2xl border border-dashed border-line bg-canvas/60 px-5 py-6">
@@ -624,5 +769,88 @@ function DraftControls({ status, onSave }: { status: DraftStatus; onSave: () => 
         {text}
       </p>
     </div>
+  );
+}
+
+function ExtraPositionCard({
+  position,
+  extra,
+  used,
+  issues,
+  onCategory,
+  onAnswers,
+  onRemove,
+}: {
+  position: number;
+  extra: ExtraPosition;
+  used: Set<JobCategory>;
+  issues: JobFormIssue[];
+  onCategory: (next: string) => void;
+  onAnswers: (next: JobDetails) => void;
+  onRemove: () => void;
+}) {
+  const labelId = `job-position-${position}-label`;
+  const categoryError = issues.find((issue) => !issue.questionId)?.message;
+  const questionErrors: Record<string, string> = {};
+  for (const issue of issues) {
+    if (issue.questionId) questionErrors[issue.questionId] ??= issue.message;
+  }
+  // Категории, уже выбранные в заказе, не предлагаются (кроме своей).
+  const options = CATEGORY_OPTIONS.filter(
+    (option) => option.value === extra.category || !used.has(option.value),
+  );
+  return (
+    <section
+      id={`job-position-${position}`}
+      tabIndex={-1}
+      aria-labelledby={labelId}
+      className="rounded-2xl border border-line bg-canvas/50 p-4 outline-none sm:p-5"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h3 id={labelId} className="text-xs font-semibold uppercase tracking-[0.08em] text-accent">
+          Позиция {position}
+          {extra.category ? ` · ${JOB_CATEGORY_LABELS[extra.category]}` : ''}
+        </h3>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="inline-flex min-h-9 items-center rounded-full px-3 text-sm font-medium text-ink-soft transition-colors duration-150 hover:bg-ink/5 hover:text-ink"
+        >
+          Убрать
+        </button>
+      </div>
+      <div className="mt-3 max-w-sm">
+        <p id={`${labelId}-category`} className="block text-sm font-medium text-ink">
+          Категория
+        </p>
+        <div className="mt-1.5">
+          <Select
+            id={`job-position-${position}-category`}
+            options={options}
+            value={extra.category}
+            onChange={onCategory}
+            placeholder="Выберите категорию"
+            aria-labelledby={`${labelId}-category`}
+            invalid={Boolean(categoryError)}
+          />
+        </div>
+        {categoryError ? (
+          <p className="mt-1.5 text-sm font-medium text-accent">{categoryError}</p>
+        ) : null}
+      </div>
+      {extra.category ? (
+        <div className="mt-2">
+          <JobQuestionnaire
+            key={extra.category}
+            category={extra.category}
+            answers={extra.answers}
+            onChange={onAnswers}
+            errors={questionErrors}
+            idPrefix={`p${position}-`}
+            stickyProgress={false}
+          />
+        </div>
+      ) : null}
+    </section>
   );
 }

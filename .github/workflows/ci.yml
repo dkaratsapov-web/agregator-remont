@@ -108,6 +108,8 @@ jobs:
           node scripts/bids-integration.mjs
           # Черновики в браузере: автосохранение, продолжение, удаление, публикация.
           node scripts/drafts-e2e.mjs
+          # Заказ с несколькими категориями: позиции в форме, страница заказа, каталог.
+          node scripts/job-items-e2e.mjs
           # Главная за настоящим deploy/Caddyfile (http://localhost:8080, подходит для service
           # worker): публичность, отсутствие запросов в закрытую часть, клавиатура, reduced motion,
           # диалог пароля мимо SW и офлайн-страница при остановленном Caddy (scripts/landing-e2e.mjs).

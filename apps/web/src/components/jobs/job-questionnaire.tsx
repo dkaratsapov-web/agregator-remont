@@ -24,13 +24,27 @@ interface Props {
   onChange: (answers: JobDetails) => void;
   /** Ошибки по id вопроса. */
   errors?: Record<string, string>;
+  /**
+   * Приставка к id элементов: в заказе с несколькими позициями анкеты разных категорий стоят
+   * на одной странице, и одинаковые вопросы («Тип объекта») не должны совпадать по id.
+   */
+  idPrefix?: string;
+  /** Полоса «Заполнено» прилипает к шапке; в карточке позиции — обычная строка. */
+  stickyProgress?: boolean;
 }
 
 /**
  * Анкета категории: вопросы по разделам, вложенные ветки раскрываются по ответам.
  * Ответы хранит родитель; в форму они уходят скрытым полем (см. JobForm).
  */
-export function JobQuestionnaire({ category, answers, onChange, errors = {} }: Props) {
+export function JobQuestionnaire({
+  category,
+  answers,
+  onChange,
+  errors = {},
+  idPrefix = '',
+  stickyProgress = true,
+}: Props) {
   const questionnaire = JOB_QUESTIONNAIRES[category];
   const visible = visibleJobQuestionIds(category, answers);
   const progress = jobDetailsProgress(category, answers);
@@ -52,6 +66,7 @@ export function JobQuestionnaire({ category, answers, onChange, errors = {} }: P
         className={depth === 0 && !visible.has(question.id) ? '@3xl:hidden' : ''}
       >
         <QuestionBlock
+          idPrefix={idPrefix}
           question={question}
           depth={depth}
           value={answers[question.id]}
@@ -65,7 +80,13 @@ export function JobQuestionnaire({ category, answers, onChange, errors = {} }: P
 
   return (
     <div>
-      <div className="sticky top-16 z-20 -mx-5 border-b border-line/70 bg-surface/95 px-5 py-3 backdrop-blur-md sm:-mx-6 sm:px-6">
+      <div
+        className={
+          stickyProgress
+            ? 'sticky top-16 z-20 -mx-5 border-b border-line/70 bg-surface/95 px-5 py-3 backdrop-blur-md sm:-mx-6 sm:px-6'
+            : 'pt-1'
+        }
+      >
         <div className="flex items-center justify-between gap-4 text-sm">
           <p className="font-medium text-ink" aria-live="polite">
             Заполнено{' '}
@@ -92,9 +113,13 @@ export function JobQuestionnaire({ category, answers, onChange, errors = {} }: P
 
       <div className="mt-2 @container">
         {questionnaire.sections.map((section) => (
-          <section key={section.id} aria-labelledby={`qs-${section.id}`} className="pt-5">
+          <section
+            key={section.id}
+            aria-labelledby={`qs-${idPrefix}${section.id}`}
+            className="pt-5"
+          >
             <h3
-              id={`qs-${section.id}`}
+              id={`qs-${idPrefix}${section.id}`}
               className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-soft"
             >
               {section.title}
@@ -145,6 +170,7 @@ function Reveal({
 }
 
 interface BlockProps {
+  idPrefix: string;
   question: JobQuestion;
   depth: number;
   value: JobAnswer | undefined;
@@ -153,17 +179,26 @@ interface BlockProps {
   children?: React.ReactNode;
 }
 
-function QuestionBlock({ question, depth, value, error, onChange, children }: BlockProps) {
-  const labelId = `q-${question.id}-label`;
-  const hintId = question.hint ? `q-${question.id}-hint` : undefined;
-  const errorId = error ? `q-${question.id}-error` : undefined;
+function QuestionBlock({
+  idPrefix,
+  question,
+  depth,
+  value,
+  error,
+  onChange,
+  children,
+}: BlockProps) {
+  const base = `q-${idPrefix}${question.id}`;
+  const labelId = `${base}-label`;
+  const hintId = question.hint ? `${base}-hint` : undefined;
+  const errorId = error ? `${base}-error` : undefined;
   const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
   const nested = depth > 0;
 
   return (
     <div className="pt-4">
       <div
-        id={`q-${question.id}`}
+        id={base}
         tabIndex={-1}
         className={`scroll-mt-40 outline-none ${
           nested ? 'border-l-2 border-accent/25 pl-4 sm:pl-5' : ''

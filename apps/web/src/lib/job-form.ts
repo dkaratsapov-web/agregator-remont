@@ -5,31 +5,49 @@ import {
   JOB_LIMITS,
   SERVICE_AREA_ERROR,
   validateJobDetails,
+  validateJobItems,
   type JobDetails,
+  type JobItem,
   type JobDraftInput,
   type JobInput,
 } from '@agregator/shared';
 
 export type JobFormValues = Record<
-  'title' | 'description' | 'category' | 'city' | 'budgetMin' | 'budgetMax' | 'details',
+  | 'title'
+  | 'description'
+  | 'category'
+  | 'city'
+  | 'budgetMin'
+  | 'budgetMax'
+  | 'details'
+  | 'extraItems',
   string
 >;
 
-export type JobFormField = 'title' | 'category' | 'city' | 'budget' | 'description' | 'details';
+export type JobFormField =
+  'title' | 'category' | 'city' | 'budget' | 'description' | 'details' | 'items';
 
 export interface JobFormIssue {
   field: JobFormField;
   message: string;
-  /** Для field = 'details': вопрос анкеты, к которому относится ошибка. */
+  /** Для field = 'details' и 'items': вопрос анкеты, к которому относится ошибка. */
   questionId?: string | null;
+  /** Для field = 'items': номер позиции в заказе (с 2), null — ошибка списка целиком. */
+  position?: number | null;
 }
 
 export type ParsedJobForm =
-  | { ok: true; input: JobInput & { details: JobDetails }; values: JobFormValues }
+  | {
+      ok: true;
+      input: JobInput & { details: JobDetails; extraItems: JobItem[] };
+      values: JobFormValues;
+    }
   | { ok: false; error: string; issues: JobFormIssue[]; values: JobFormValues };
 
 /** Ответы анкеты приходят в скрытом поле JSON-строкой; с запасом на экранирование. */
 const DETAILS_FIELD_MAX = JOB_DETAILS_LIMITS.MAX_BYTES * 2;
+/** Позиции других категорий: до 4 анкет. */
+const ITEMS_FIELD_MAX = DETAILS_FIELD_MAX * 4 + 1000;
 
 const text = (form: FormData, key: string, max: number): string => {
   const value = form.get(key);
@@ -66,7 +84,9 @@ const length = (value: string) => [...value.trim()].length;
  */
 export function checkJobForm(
   values: JobFormValues,
-): { ok: true; input: JobInput & { details: JobDetails } } | { ok: false; issues: JobFormIssue[] } {
+):
+  | { ok: true; input: JobInput & { details: JobDetails; extraItems: JobItem[] } }
+  | { ok: false; issues: JobFormIssue[] } {
   const issues: JobFormIssue[] = [];
   const title = values.title.trim();
   if (length(title) < JOB_LIMITS.TITLE_MIN || length(title) > JOB_LIMITS.TITLE_MAX) {
@@ -128,6 +148,22 @@ export function checkJobForm(
     }
   }
 
+  let extraItems: JobItem[] = [];
+  if (isJobCategory(category)) {
+    const result = validateJobItems(category, parseItemsField(values.extraItems));
+    if (result.ok) extraItems = result.items;
+    else {
+      for (const error of result.errors) {
+        issues.push({
+          field: 'items',
+          message: error.message,
+          questionId: error.questionId,
+          position: error.position,
+        });
+      }
+    }
+  }
+
   if (issues.length > 0 || !isJobCategory(category) || !city) return { ok: false, issues };
   return {
     ok: true,
@@ -139,6 +175,7 @@ export function checkJobForm(
       budgetMin: budgetMin as number | null,
       budgetMax: budgetMax as number | null,
       details,
+      extraItems,
     },
   };
 }
@@ -153,7 +190,18 @@ export function readJobForm(form: FormData): JobFormValues {
     budgetMin: text(form, 'budgetMin', 20),
     budgetMax: text(form, 'budgetMax', 20),
     details: text(form, 'details', DETAILS_FIELD_MAX + 1),
+    extraItems: text(form, 'extraItems', ITEMS_FIELD_MAX + 1),
   };
+}
+
+/** JSON позиций из скрытого поля; пусто — позиций нет. Битый JSON отклонит проверка. */
+export function parseItemsField(raw: string): unknown {
+  if (raw.trim() === '') return [];
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return raw;
+  }
 }
 
 /**
@@ -162,12 +210,12 @@ export function readJobForm(form: FormData): JobFormValues {
  */
 export function parseJobForm(form: FormData): ParsedJobForm {
   const values = readJobForm(form);
-  if (values.details.length > DETAILS_FIELD_MAX) {
+  if (values.details.length > DETAILS_FIELD_MAX || values.extraItems.length > ITEMS_FIELD_MAX) {
     return {
       ok: false,
       error: 'Слишком длинные ответы на вопросы.',
       issues: [{ field: 'details', message: 'Слишком длинные ответы на вопросы.' }],
-      values: { ...values, details: '' },
+      values: { ...values, details: '', extraItems: '' },
     };
   }
   const checked = checkJobForm(values);
@@ -206,6 +254,8 @@ export function parseDraftForm(form: FormData): JobDraftInput {
   };
   const details =
     values.details.length > DETAILS_FIELD_MAX ? {} : parseDetailsField(values.details);
+  const items =
+    values.extraItems.length > ITEMS_FIELD_MAX ? [] : parseItemsField(values.extraItems);
   return {
     title: cleanLine(values.title, JOB_LIMITS.TITLE_MAX),
     description: cleanText(values.description, JOB_LIMITS.DESCRIPTION_MAX),
@@ -217,5 +267,7 @@ export function parseDraftForm(form: FormData): JobDraftInput {
       details !== null && typeof details === 'object' && !Array.isArray(details)
         ? (details as JobDetails)
         : {},
+    // Позиции API проверит мягко: неверные отбросит.
+    extraItems: Array.isArray(items) ? (items as JobItem[]).slice(0, 4) : [],
   };
 }
