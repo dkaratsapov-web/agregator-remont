@@ -21,6 +21,11 @@ const nextConfig: NextConfig = {
     return [
       { source: '/:path*', headers: securityHeaders },
       {
+        // Кадры пролёта на главной: папка версионируется (flight-v1, flight-v2…), файлы не меняются.
+        source: '/landing/:path*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
+      {
         source: '/sw.js',
         headers: [
           { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
