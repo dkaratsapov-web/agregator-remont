@@ -6,7 +6,8 @@ import { useEffect, useId, useRef, useState } from 'react';
 /**
  * Поиск по каталогу заказов в шапке. Обычная GET-форма на /jobs?q=…: работает и без JavaScript.
  * На широком экране поле стоит в шапке, на узком — кнопка-лупа открывает поле под шапкой.
- * «/» с клавиатуры ставит курсор в поле (если фокус не в другом поле ввода).
+ * «/» с клавиатуры ставит курсор в поле (если фокус не в другом поле ввода); значка-подсказки
+ * нет: без объяснения он непонятен.
  */
 export function HeaderSearch() {
   const [open, setOpen] = useState(false);
@@ -48,7 +49,7 @@ export function HeaderSearch() {
         aria-label="Поиск заказов"
         className="hidden min-w-0 flex-1 justify-center lg:flex"
       >
-        <SearchField inputRef={inlineRef} hint />
+        <SearchField inputRef={inlineRef} />
       </form>
 
       <button
@@ -75,13 +76,7 @@ export function HeaderSearch() {
   );
 }
 
-function SearchField({
-  inputRef,
-  hint = false,
-}: {
-  inputRef: React.RefObject<HTMLInputElement | null>;
-  hint?: boolean;
-}) {
+function SearchField({ inputRef }: { inputRef: React.RefObject<HTMLInputElement | null> }) {
   return (
     <label
       data-focus-ring="within"
@@ -101,14 +96,6 @@ function SearchField({
         enterKeyHint="search"
         className="min-w-0 flex-1 bg-transparent text-[0.95rem] text-ink placeholder:text-ink-soft/70 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
       />
-      {hint ? (
-        <kbd
-          aria-hidden="true"
-          className="mr-1 hidden rounded-md border border-line bg-canvas px-1.5 py-0.5 font-sans text-xs text-ink-soft group-focus-within:hidden xl:inline"
-        >
-          /
-        </kbd>
-      ) : null}
       <button
         type="submit"
         className="inline-flex h-8 shrink-0 items-center rounded-full bg-ink px-3.5 text-sm font-semibold text-canvas transition-[background-color,transform] duration-150 hover:bg-ink/85 active:scale-[0.97]"
