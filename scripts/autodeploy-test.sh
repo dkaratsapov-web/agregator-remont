@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # Тест deploy/autodeploy/deploy.sh без сервера: bash scripts/autodeploy-test.sh
-# Локальный git-репозиторий вместо GitHub, заглушки docker и curl в PATH. Проверяет: нет нового
-# коммита — ничего не делает; CI идёт — ждёт; CI красный — не разворачивает и не повторяет;
-# CI зелёный — fast-forward и пересборка; изменён Caddyfile — рестарт caddy; конфликт — стоп.
+# Локальный git-репозиторий вместо GitHub, заглушки docker и curl в PATH. Заглушка curl отдаёт
+# ответы GitHub Actions API (список run и страницы задач) из файлов и коды ответов сайта через
+# Caddy из переменных. Проверяет строгий CI gate (обязательные задачи, skipped/neutral/cancelled,
+# отсутствующая задача, несколько страниц, 429, чужой SHA), раздельные сборку и переключение,
+# сбой рестарта Caddy, проверку здоровья (502/000 главной, 200 вместо 401, нездоровый контейнер)
+# и повтор после исправления.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -27,91 +30,235 @@ git add -A && git commit -qm one && git push -q origin main 2> /dev/null
 git clone -q "$WORK/origin.git" "$WORK/server"
 printf "DOMAIN=example.test\n" > "$WORK/server/deploy/.env"
 
-# Заглушки: docker пишет вызовы в журнал; curl отдаёт статус CI из файла и 200 для главной.
-mkdir -p "$WORK/bin"
+mkdir -p "$WORK/bin" "$WORK/api"
+# docker: журнал вызовов; сбои по переменным; ps — состояние контейнеров из PS_STATES.
 cat > "$WORK/bin/docker" << 'STUB'
 #!/usr/bin/env bash
 echo "docker $*" >> "$STUB_LOG"
-[ "${DOCKER_FAIL:-0}" = 1 ] && [ "$1" = compose ] && [[ " $* " == *" up "* ]] && exit 1
+if [ "$1" = compose ]; then
+  case " $* " in
+    *" build "*) [ "${BUILD_FAIL:-0}" = 1 ] && exit 1 ;;
+    *" up "*) [ "${UP_FAIL:-0}" = 1 ] && exit 1 ;;
+    *" restart caddy "*) [ "${RESTART_FAIL:-0}" = 1 ] && exit 1 ;;
+    *" ps "*) printf '%b\n' "${PS_STATES:-db running healthy\napi running healthy\nweb running healthy\ncaddy running}" ;;
+  esac
+fi
 exit 0
 STUB
+# curl: GitHub API из файлов в $API_DIR; сайт — коды из переменных, главная со ссылками на статику.
 cat > "$WORK/bin/curl" << 'STUB'
 #!/usr/bin/env bash
-for arg in "$@"; do
-  case "$arg" in
-    *check-runs*) cat "$CHECKS_FILE"; exit 0 ;;
+url='' out=''
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o) out=$2; shift ;;
+    http*) url=$1 ;;
   esac
+  shift
 done
-printf 200
+echo "curl $url" >> "$CURL_LOG"
+case "$url" in
+  *api.github.invalid*)
+    [ "${API_FAIL:-0}" = 1 ] && { echo 'curl: (22) The requested URL returned error: 429' >&2; exit 22; }
+    case "$url" in
+      *actions/runs\?*) cat "$API_DIR/runs.json" ;;
+      */jobs\?*page=2*) cat "$API_DIR/jobs2.json" ;;
+      */jobs\?*) cat "$API_DIR/jobs1.json" ;;
+    esac
+    exit 0 ;;
+esac
+case "$url" in
+  */jobs) code=${PRIVATE_CODE:-401} ;;
+  */_next/static/*|*/landing/*) code=${ASSET_CODE:-200} ;;
+  *) code=${HOME_CODE:-200}
+     [ -n "$out" ] && [ "$out" != /dev/null ] &&
+       printf '<script src="/_next/static/chunks/app.js"></script><img src="/landing/flight-v2/desktop/000.avif">' > "$out" ;;
+esac
+printf '%s' "$code"
 STUB
 chmod +x "$WORK/bin/docker" "$WORK/bin/curl"
 
 export PATH="$WORK/bin:$PATH"
 export REPO_DIR="$WORK/server" STATE_DIR="$WORK/state" LOCK_FILE="$WORK/lock"
-export STUB_LOG="$WORK/docker.log" CHECKS_FILE="$WORK/checks.json"
-export GITHUB_API=https://api.github.invalid/repos/x/y
+export STUB_LOG="$WORK/docker.log" CURL_LOG="$WORK/curl.log" API_DIR="$WORK/api"
+export GITHUB_API=https://api.github.invalid/repos/x/y HEALTH_ATTEMPTS=2 HEALTH_DELAY=0
 
-run() { : > "$STUB_LOG"; bash "$DEPLOY" > "$WORK/out.log" 2>&1 || echo "exit $?" >> "$WORK/out.log"; }
+run() {
+  : > "$STUB_LOG"
+  : > "$CURL_LOG"
+  bash "$DEPLOY" > "$WORK/out.log" 2>&1 || echo "exit $?" >> "$WORK/out.log"
+}
 head_of() { git -C "$1" rev-parse HEAD; }
+dev_head() { head_of "$WORK/dev"; }
 push_commit() {
   cd "$WORK/dev"
   echo "$1" > "${2:-app.txt}"
   git add -A && git commit -qm "$1" && git push -q origin main 2> /dev/null
 }
-checks() { printf '{"check_runs":[%s]}' "$1" > "$CHECKS_FILE"; }
-run_ok='{"status":"completed","conclusion":"success"}'
+deployed() { cat "$WORK/state/deployed" 2> /dev/null || echo none; }
+failed() { cat "$WORK/state/failed" 2> /dev/null || echo none; }
+docker_calls() { grep -c "$1" "$STUB_LOG" || true; }
+logged() { grep -c "$1" "$WORK/out.log" || true; }
 
-# 1. Нет нового коммита.
-checks "$run_ok"
+# Ответы GitHub: run для SHA и задачи. job NAME STATUS CONCLUSION.
+ci_run() { # sha status conclusion [path]
+  printf '{"workflow_runs":[{"id":7,"run_attempt":1,"head_sha":"%s","path":"%s","status":"%s","conclusion":%s}]}' \
+    "$1" "${4:-.github/workflows/ci.yml}" "$2" "$3" > "$API_DIR/runs.json"
+}
+job() { printf '{"id":%s,"name":"%s","status":"%s","conclusion":%s}' "$((RANDOM + 1))" "$1" "$2" "$3"; }
+jobs_page() { # file total jobs...
+  local file=$1 total=$2
+  shift 2
+  local IFS=,
+  printf '{"total_count":%s,"jobs":[%s]}' "$total" "$*" > "$API_DIR/$file"
+}
+J1='Lint, typecheck, test, build' J2='Docker stack (compose)' J3='Docker stack behind Caddy (proxy)'
+all_green() {
+  ci_run "$(dev_head)" completed '"success"'
+  jobs_page jobs1.json 3 "$(job "$J1" completed '"success"')" "$(job "$J2" completed '"success"')" "$(job "$J3" completed '"success"')"
+}
+
+# 1. Первый запуск: текущий main зелёный — разворачивается и проходит проверку.
+all_green
+run
+check 'green: deployed sha recorded' "$(deployed)" "$(dev_head)"
+check 'green: build then up' "$(grep -o 'build$\|up -d' "$STUB_LOG" | tr '\n' ' ')" 'build up -d '
+check 'green: health checked through Caddy' "$(grep -c 'example.test/jobs' "$CURL_LOG")" 1
+check 'green: static and frame checked' "$(grep -c '_next/static\|/landing/' "$CURL_LOG")" 2
+
+# 2. Нет нового коммита: ничего не делает.
 run
 check 'no new commit: docker not called' "$(wc -l < "$STUB_LOG" | tr -d ' ')" 0
 
-# 2. Новый коммит, CI ещё идёт.
+# 3. Новый коммит, CI ещё идёт.
 push_commit two
-checks '{"status":"in_progress","conclusion":null},'"$run_ok"
+ci_run "$(dev_head)" in_progress null
 run
 check 'CI pending: server stays' "$(head_of "$WORK/server")" "$(git -C "$WORK/server" rev-parse origin/main~1)"
 check 'CI pending: docker not called' "$(wc -l < "$STUB_LOG" | tr -d ' ')" 0
+check 'CI pending: not marked failed' "$(failed)" none
 
-# 3. CI зелёный: обновление и пересборка, Caddy не трогаем.
-checks "$run_ok,$run_ok"
+# 4. GitHub отвечает 429: ждём, не разворачиваем, не помечаем.
+API_FAIL=1 run
+check 'HTTP 429: docker not called' "$(wc -l < "$STUB_LOG" | tr -d ' ')" 0
+check 'HTTP 429: not marked failed' "$(failed)" none
+check 'HTTP 429: waits' "$(logged 'GitHub не ответил')" 1
+
+# 5. Run найден, но для другого SHA или другого workflow — ждём.
+ci_run "$(git -C "$WORK/dev" rev-parse HEAD~1)" completed '"success"'
 run
-check 'CI green: fast-forward to main' "$(head_of "$WORK/server")" "$(head_of "$WORK/dev")"
-check 'CI green: compose up --build' "$(grep -c 'compose .* up -d --build' "$STUB_LOG")" 1
-check 'CI green: caddy not restarted' "$(grep -c 'restart caddy' "$STUB_LOG" || true)" 0
-check 'CI green: deployed sha recorded' "$(cat "$WORK/state/deployed")" "$(head_of "$WORK/dev")"
-
-# 4. Изменён Caddyfile: рестарт caddy.
-push_commit 'new {}' deploy/Caddyfile
+check 'SHA mismatch: waits' "$(logged 'ещё идёт или не найден')" 1
+ci_run "$(dev_head)" completed '"success"' .github/workflows/other.yml
 run
-check 'Caddyfile changed: caddy restarted' "$(grep -c 'restart caddy' "$STUB_LOG")" 1
+check 'other workflow: waits' "$(logged 'ещё идёт или не найден')" 1
+check 'other workflow: docker not called' "$(wc -l < "$STUB_LOG" | tr -d ' ')" 0
 
-# 5. CI красный: не разворачиваем и не пробуем повторно.
+# 6. Run зелёный, но задачи: только skipped / neutral / одной нет — коммит не разворачивается.
+ci_run "$(dev_head)" completed '"success"'
+jobs_page jobs1.json 3 "$(job "$J1" completed '"skipped"')" "$(job "$J2" completed '"skipped"')" "$(job "$J3" completed '"skipped"')"
+run
+check 'only skipped: not deployed' "$(deployed)" "$(git -C "$WORK/dev" rev-parse HEAD~1)"
+check 'only skipped: marked failed' "$(failed)" "$(dev_head)"
+
 push_commit three
-checks '{"status":"completed","conclusion":"failure"},'"$run_ok"
-before=$(head_of "$WORK/server")
+ci_run "$(dev_head)" completed '"success"'
+jobs_page jobs1.json 3 "$(job "$J1" completed '"success"')" "$(job "$J2" completed '"neutral"')" "$(job "$J3" completed '"success"')"
 run
-check 'CI red: server stays' "$(head_of "$WORK/server")" "$before"
-check 'CI red: commit marked failed' "$(cat "$WORK/state/failed")" "$(head_of "$WORK/dev")"
-checks "$run_ok"
-run
-check 'CI red: same commit not retried' "$(head_of "$WORK/server")" "$before"
+check 'neutral job: not deployed' "$(failed)" "$(dev_head)"
+check 'neutral job: docker not called' "$(wc -l < "$STUB_LOG" | tr -d ' ')" 0
 
-# 6. Следующий коммит с зелёным CI разворачивается, но сборка падает: помечаем, не повторяем.
 push_commit four
-DOCKER_FAIL=1 run
-check 'build failure: exit code reported' "$(grep -c '^exit 1' "$WORK/out.log")" 1
-check 'build failure: commit marked failed' "$(cat "$WORK/state/failed")" "$(head_of "$WORK/dev")"
-DOCKER_FAIL=1 run
-check 'build failure: not retried' "$(grep -c 'compose .* up' "$STUB_LOG" || true)" 0
+ci_run "$(dev_head)" completed '"success"'
+jobs_page jobs1.json 2 "$(job "$J1" completed '"success"')" "$(job "$J2" completed '"success"')"
+run
+check 'missing job: marked failed' "$(failed)" "$(dev_head)"
+check 'missing job: reason logged' "$(logged 'нет задачи')" 1
 
-# 7. Локальная правка на сервере мешает fast-forward: стоп без пересборки.
+push_commit five
+ci_run "$(dev_head)" completed '"cancelled"'
+run
+check 'cancelled workflow: marked failed' "$(failed)" "$(dev_head)"
+
+push_commit six
+ci_run "$(dev_head)" completed '"failure"'
+run
+check 'red CI: marked failed' "$(failed)" "$(dev_head)"
+all_green
+run
+check 'red CI: same commit not retried' "$(wc -l < "$STUB_LOG" | tr -d ' ')" 0
+
+# 7. Задачи на двух страницах: обязательная задача только на второй.
+push_commit seven
+ci_run "$(dev_head)" completed '"success"'
+filler=()
+for i in $(seq 1 100); do filler+=("$(job "extra $i" completed '"success"')"); done
+jobs_page jobs1.json 102 "$(job "$J1" completed '"success"')" "${filler[@]:0:99}"
+jobs_page jobs2.json 102 "$(job "$J2" completed '"success"')" "$(job "$J3" completed '"success"')"
+run
+check 'pagination: second page read' "$(grep -c 'page=2' "$CURL_LOG")" 1
+check 'pagination: deployed' "$(deployed)" "$(dev_head)"
+
+# 8. Сборка падает: контейнеры не переключаются, коммит помечен, выход с ошибкой.
+push_commit eight
+all_green
+BUILD_FAIL=1 run
+check 'build failure: exit 1' "$(logged '^exit 1')" 1
+check 'build failure: no up' "$(docker_calls 'up -d')" 0
+check 'build failure: marked failed' "$(failed)" "$(dev_head)"
+check 'build failure: not deployed' "$(deployed)" "$(git -C "$WORK/dev" rev-parse HEAD~1)"
+BUILD_FAIL=1 run
+check 'build failure: not retried' "$(docker_calls build)" 0
+
+# 9. Переключение падает частично.
+push_commit nine
+all_green
+UP_FAIL=1 run
+check 'partial compose failure: exit 1' "$(logged '^exit 1')" 1
+check 'partial compose failure: marked failed' "$(failed)" "$(dev_head)"
+check 'partial compose failure: recovery hint' "$(logged 'Если обновление не прошло')" 1
+
+# 10. Повтор после исправления: снять отметку — тот же коммит разворачивается.
+rm "$WORK/state/failed"
+run
+check 'retry after fix: deployed' "$(deployed)" "$(dev_head)"
+
+# 11. Изменён Caddyfile, рестарт Caddy падает: не «готово», а ошибка.
+push_commit 'new {}' deploy/Caddyfile
+all_green
+RESTART_FAIL=1 run
+check 'caddy restart failure: exit 1' "$(logged '^exit 1')" 1
+check 'caddy restart failure: not deployed' "$(failed)" "$(dev_head)"
+check 'caddy restart failure: no false ready' "$(logged 'готово')" 0
+rm "$WORK/state/failed"
+run
+check 'caddy restart ok: restarted and deployed' "$(docker_calls 'restart caddy') $(deployed)" "1 $(dev_head)"
+
+# 12. Проверка здоровья: главная 502, главная 000, закрытая страница 200, нездоровый web.
+for case_ in 'HOME_CODE=502|главная через Caddy отвечает 502' 'HOME_CODE=000|главная через Caddy отвечает 000' \
+  'PRIVATE_CODE=200|отвечает не 401' 'ASSET_CODE=404|статика /_next/static недоступна' \
+  'PS_STATES=db running healthy\napi running healthy\nweb running unhealthy\ncaddy running|контейнеры не поднялись'; do
+  setting=${case_%%|*} expect=${case_#*|}
+  push_commit "health $setting"
+  all_green
+  : > "$STUB_LOG"
+  : > "$CURL_LOG"
+  env "$setting" bash "$DEPLOY" > "$WORK/out.log" 2>&1 || echo "exit $?" >> "$WORK/out.log"
+  check "health ($expect): exit 1" "$(logged '^exit 1')" 1
+  check "health ($expect): reason logged" "$(logged "$expect")" 1
+  check "health ($expect): not deployed" "$(failed)" "$(dev_head)"
+done
+
+# 13. Локальная правка на сервере мешает fast-forward: стоп без пересборки.
 echo local > "$WORK/server/app.txt"
 git -C "$WORK/server" -c user.email=s@example.ru -c user.name=s commit -qam local
-push_commit five
+push_commit ten
+all_green
 run
-check 'diverged: stopped' "$(grep -c 'fast-forward невозможен' "$WORK/out.log")" 1
-check 'diverged: docker not called' "$(grep -c 'compose' "$STUB_LOG" || true)" 0
+check 'diverged: stopped' "$(logged 'fast-forward невозможен')" 1
+check 'diverged: docker not called' "$(docker_calls compose)" 0
+
+# Секреты не попадают в журнал (в .env на сервере их нет, но проверяем, что .env не печатается).
+check 'no .env in log' "$(grep -c 'DOMAIN=' "$WORK/out.log" || true)" 0
 
 if [ "$failures" -gt 0 ]; then
   echo "$failures autodeploy check(s) failed"
