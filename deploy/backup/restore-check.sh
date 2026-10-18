@@ -24,7 +24,7 @@ die() {
 }
 
 file=${1:-$(find "$dir" -maxdepth 1 -name 'agregator-*.dump' -printf '%T@ %p\n' 2> /dev/null | sort -n | tail -n 1 | cut -d' ' -f2-)}
-[ -n "$file" ] && [ -f "$file" ] || die "нет копии в $dir"
+if [ -z "$file" ] || [ ! -f "$file" ]; then die "нет копии в $dir"; fi
 log "копия: $file"
 
 started=$(date +%s)
@@ -50,7 +50,9 @@ seconds=$(($(date +%s) - started))
 
 log "миграций в копии: $applied, в репозитории: $expected; users: $users; jobs: $jobs; восстановление: ${seconds} с"
 # Копия может быть сделана до последнего обновления: миграций в ней не больше, чем в репозитории.
-[ "$applied" -gt 0 ] && [ "$applied" -le "$expected" ] || die "миграций в копии $applied, в репозитории $expected"
+if [ "$applied" -le 0 ] || [ "$applied" -gt "$expected" ]; then
+  die "миграций в копии $applied, в репозитории $expected"
+fi
 heartbeat=$(env_value RESTORE_HEARTBEAT_URL)
 if [ -n "$heartbeat" ]; then
   printf 'url = "%s"\n' "$heartbeat" | curl -fsS --max-time 10 -K - > /dev/null || log 'heartbeat не отправлен'
