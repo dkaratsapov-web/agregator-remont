@@ -8,6 +8,9 @@ const { check, finish } = createChecker();
 const owner = await registerViaApi('CUSTOMER');
 const drafts = async () =>
   (await (await fetch(`${API}/v1/me/drafts`, { headers: owner.auth })).json()).items;
+const jobsTotal = async () =>
+  (await (await fetch(`${API}/v1/me/jobs?limit=1`, { headers: owner.auth })).json()).total;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const browser = await chromium.launch(
   process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
@@ -21,6 +24,37 @@ await context.addCookies(
   }),
 );
 const page = await context.newPage();
+
+/** Заполняет форму до публикуемого состояния: категория «Другое» и её обязательные вопросы. */
+async function fillValidJob(title) {
+  await page.fill('input[name="title"]', title);
+  await page.click('#field-category');
+  await page.getByRole('option', { name: 'Другое' }).click();
+  await page.fill('#field-city', 'Москва');
+  await page.getByRole('option', { name: 'Москва', exact: true }).click();
+  await page.fill('textarea[name="description"]', 'Повесить полки и карниз, всё на месте.');
+  for (const group of await page.locator('[role="radiogroup"], [role="group"]').all()) {
+    const required = await group.evaluate((el) =>
+      Boolean(el.closest('[id^="q-"]')?.textContent?.includes('обязательно')),
+    );
+    if (required) await group.locator('button, [role="radio"], [role="checkbox"]').first().click();
+  }
+}
+
+/** Задержка ответов Server Actions (сохранение черновика, публикация) на время сценария. */
+async function withSlowActions(ms, run) {
+  const handler = async (route) => {
+    const request = route.request();
+    if (request.method() === 'POST' && request.headers()['next-action']) await sleep(ms);
+    await route.continue();
+  };
+  await page.route('**/account/jobs/new**', handler);
+  try {
+    await run();
+  } finally {
+    await page.unroute('**/account/jobs/new**', handler);
+  }
+}
 
 try {
   // --- автосохранение после паузы
@@ -72,22 +106,74 @@ try {
   await page.fill('input[name="title"]', 'Опубликую из черновика');
   await page.getByRole('button', { name: 'Сохранить черновик' }).click();
   await page.getByText('Черновик сохранён', { exact: false }).waitFor();
-  await page.click('#field-category');
-  await page.getByRole('option', { name: 'Другое' }).click();
-  await page.fill('#field-city', 'Москва');
-  await page.getByRole('option', { name: 'Москва', exact: true }).click();
-  await page.fill('textarea[name="description"]', 'Повесить полки и карниз, всё на месте.');
-  // Обязательные вопросы категории «Другое»: отвечаем первым вариантом в каждом.
-  for (const group of await page.locator('[role="radiogroup"], [role="group"]').all()) {
-    const required = await group.evaluate((el) =>
-      Boolean(el.closest('[id^="q-"]')?.textContent?.includes('обязательно')),
-    );
-    if (required) await group.locator('button, [role="radio"], [role="checkbox"]').first().click();
-  }
+  await fillValidJob('Опубликую из черновика');
+  let before = await jobsTotal();
   await page.getByRole('button', { name: 'Опубликовать заказ' }).click();
   await page.waitForURL(/\/account\/jobs\/[^/?]+\?created=1/, { timeout: 15_000 });
-  check('publishing from a draft creates the job', /created=1/.test(page.url()));
+  check('publishing from a draft creates the job', (await jobsTotal()) === before + 1);
   check('published draft is removed', (await drafts()).length === 0);
+
+  // --- гонка: публикуют, пока создание черновика ещё в пути
+  await page.goto(`${WEB}/account/jobs/new`, { waitUntil: 'networkidle' });
+  await fillValidJob('Гонка: новый черновик');
+  before = await jobsTotal();
+  await withSlowActions(2500, async () => {
+    await page.getByRole('button', { name: 'Сохранить черновик' }).click();
+    await page.getByText('Сохраняем черновик', { exact: false }).waitFor();
+    await page.getByRole('button', { name: 'Опубликовать заказ' }).click();
+    await page.waitForURL(/\/account\/jobs\/[^/?]+\?created=1/, { timeout: 20_000 });
+  });
+  await sleep(1500);
+  check(
+    'race (new draft): exactly one job is published',
+    (await jobsTotal()) === before + 1,
+    `jobs ${before} -> ${await jobsTotal()}`,
+  );
+  check('race (new draft): no draft is left behind', (await drafts()).length === 0);
+
+  // --- гонка: публикуют, пока автосохранение существующего черновика в пути
+  await page.goto(`${WEB}/account/jobs/new`, { waitUntil: 'networkidle' });
+  await fillValidJob('Гонка: правка черновика');
+  await page.getByRole('button', { name: 'Сохранить черновик' }).click();
+  await page.getByText('Черновик сохранён', { exact: false }).waitFor();
+  before = await jobsTotal();
+  await withSlowActions(2500, async () => {
+    await page.fill('textarea[name="description"]', 'Повесить полки, карниз и зеркало в прихожей.');
+    // Автосохранение срабатывает через 4 с после правки и застревает на задержке.
+    await page.getByText('Сохраняем черновик', { exact: false }).waitFor({ timeout: 10_000 });
+    await page.getByRole('button', { name: 'Опубликовать заказ' }).click();
+    await page.waitForURL(/\/account\/jobs\/[^/?]+\?created=1/, { timeout: 20_000 });
+  });
+  await sleep(1500);
+  check(
+    'race (autosave): exactly one job is published',
+    (await jobsTotal()) === before + 1,
+    `jobs ${before} -> ${await jobsTotal()}`,
+  );
+  check('race (autosave): no draft is left behind', (await drafts()).length === 0);
+
+  // --- переход внутри сайта сразу после правки: черновик досохраняется
+  await page.goto(`${WEB}/account/jobs/new`, { waitUntil: 'networkidle' });
+  await page.fill('input[name="title"]', 'Ушёл в каталог сразу');
+  await page.getByRole('link', { name: 'Заказы', exact: true }).click();
+  await page.waitForURL(/\/jobs(\?|$)/);
+  await sleep(2000);
+  check(
+    'leaving within the site saves the last change',
+    (await drafts()).some((d) => d.title === 'Ушёл в каталог сразу'),
+  );
+
+  // --- закрытие вкладки с несохранёнными правками спрашивает подтверждение
+  await page.goto(`${WEB}/account/jobs/new`, { waitUntil: 'networkidle' });
+  await page.fill('input[name="title"]', 'Закрываю вкладку');
+  let asked = false;
+  page.once('dialog', async (dialog) => {
+    asked = dialog.type() === 'beforeunload';
+    await dialog.dismiss();
+  });
+  await page.close({ runBeforeUnload: true });
+  await sleep(500);
+  check('closing with unsaved changes asks to confirm', asked);
 } catch (error) {
   check('drafts scenario finished', false, error instanceof Error ? error.message : String(error));
   await page.screenshot({ path: 'drafts-e2e-failure.png', fullPage: true }).catch(() => undefined);

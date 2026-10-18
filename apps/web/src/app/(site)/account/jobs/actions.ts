@@ -116,12 +116,14 @@ export async function acceptBidAction(
 }
 
 export type DraftSaveResult =
-  { ok: true; draftId: string; savedAt: string } | { ok: false; error: string };
+  | { ok: true; draftId: string; savedAt: string }
+  /** reset: черновика больше нет (опубликован или удалён), форма забывает его id. */
+  | { ok: false; error: string; reset?: boolean };
 
 /**
  * Сохранение черновика из формы нового заказа (кнопка и автосохранение). Вызывается из
  * клиента, поэтому без redirect: при потерянной сессии форма показывает ошибку и не теряет
- * введённое. Если черновик удалён в другой вкладке, создаётся новый.
+ * введённое.
  */
 export async function saveDraftAction(form: FormData): Promise<DraftSaveResult> {
   if (!(await isTrustedOrigin())) return { ok: false, error: FOREIGN_ORIGIN };
@@ -131,15 +133,18 @@ export async function saveDraftAction(form: FormData): Promise<DraftSaveResult> 
   const id = draftIdFrom(form);
   const clientIp = await getClientIp();
   try {
-    let draft;
-    try {
-      draft = await saveDraft(token, id, input, clientIp);
-    } catch (error) {
-      if (!(id && error instanceof ApiError && error.status === 404)) throw error;
-      draft = await saveDraft(token, null, input, clientIp);
-    }
+    const draft = await saveDraft(token, id, input, clientIp);
     return { ok: true, draftId: draft.id, savedAt: draft.updatedAt };
   } catch (error) {
+    // Не создаём черновик заново: он мог быть только что опубликован, и запоздавшее
+    // сохранение не должно его воскресить. Следующее сохранение из формы создаст новый.
+    if (id && error instanceof ApiError && error.status === 404) {
+      return {
+        ok: false,
+        reset: true,
+        error: 'Черновик уже опубликован или удалён. Следующее сохранение создаст новый.',
+      };
+    }
     return {
       ok: false,
       error: apiErrorMessage(error, {
