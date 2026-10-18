@@ -375,25 +375,29 @@ html.is-ready .preloader {
   animation: preloader-out 350ms var(--ease-out-strong) forwards;
 }
 
-.preloader .draw {
-  fill: none;
+/* «Г» из знака: контур прорисовывается, затем заливается цветом текста. */
+.preloader .preloader-g {
+  fill: var(--ink);
+  fill-opacity: 0;
   stroke: var(--ink);
-  stroke-width: 1.4;
-  stroke-linecap: round;
+  /* В единицах viewBox (444 → 76 px): около 1,6 px на экране. Без vector-effect: иначе
+     stroke-dasharray считается в пикселях и pathLength не работает. */
+  stroke-width: 10;
   stroke-linejoin: round;
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: draw 900ms var(--ease-out-strong) forwards;
-  animation-delay: calc(150ms + var(--i, 0) * 260ms);
+  animation:
+    draw 1000ms var(--ease-out-strong) 150ms forwards,
+    g-fill 450ms ease 950ms forwards;
 }
 
-.preloader .preloader-block {
+/* Щит въезжает снизу справа, вдоль своего наклона, и встаёт под «Г». */
+.preloader .preloader-shield {
   fill: var(--accent);
-  stroke: none;
   opacity: 0;
   transform-box: fill-box;
-  transform-origin: 50% 100%;
-  animation: block-in 500ms var(--ease-out-strong) 1150ms forwards;
+  transform-origin: 0% 100%;
+  animation: shield-in 550ms var(--ease-out-strong) 1250ms forwards;
 }
 
 .preloader-bar {
@@ -420,14 +424,20 @@ html.is-ready .preloader {
   }
 }
 
-@keyframes block-in {
+@keyframes g-fill {
+  to {
+    fill-opacity: 1;
+  }
+}
+
+@keyframes shield-in {
   from {
     opacity: 0;
-    transform: translateY(-6px) scale(0.6);
+    transform: translate(18%, 14%) scale(0.85);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translate(0, 0) scale(1);
   }
 }
 
