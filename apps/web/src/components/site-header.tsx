@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/session';
 import { AccountMenu } from './account-menu';
+import { HeaderSearch } from './header-search';
 import { Wordmark } from './landing/wordmark';
 import { NavLink } from './nav-link';
 
@@ -11,34 +12,40 @@ export async function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-10">
         <Link
           href="/"
-          className="flex min-h-11 items-center rounded-lg"
+          className="flex min-h-11 shrink-0 items-center rounded-lg"
           aria-label="Гарантыч, на главную"
         >
           <Wordmark />
         </Link>
-        <nav aria-label="Основная навигация" className="flex items-center gap-1">
-          <NavLink href="/jobs">Заказы</NavLink>
-          <span className="hidden sm:contents">
-            <NavLink href="/#how-it-works">Как это работает</NavLink>
-          </span>
-          {user ? (
-            <AccountMenu
-              user={{
-                name: user.name,
-                role: user.role,
-                publicId: user.publicId,
-                avatarVersion: user.avatarVersion,
-              }}
-            />
-          ) : (
-            <Link
-              href="/login"
-              className="ml-1 inline-flex min-h-11 items-center rounded-full bg-ink px-5 text-sm font-semibold text-canvas transition-[background-color,transform] duration-200 hover:bg-ink/85 active:scale-[0.97]"
-            >
-              Войти
-            </Link>
-          )}
-        </nav>
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-1 lg:gap-4">
+          <HeaderSearch />
+          <nav aria-label="Основная навигация" className="flex shrink-0 items-center gap-1">
+            {/* На самых узких экранах каталог открывается через поиск и меню кабинета. */}
+            <span className="contents max-[400px]:hidden">
+              <NavLink href="/jobs">Заказы</NavLink>
+            </span>
+            <span className="hidden sm:contents">
+              <NavLink href="/#how-it-works">Как это работает</NavLink>
+            </span>
+            {user ? (
+              <AccountMenu
+                user={{
+                  name: user.name,
+                  role: user.role,
+                  publicId: user.publicId,
+                  avatarVersion: user.avatarVersion,
+                }}
+              />
+            ) : (
+              <Link
+                href="/login"
+                className="ml-1 inline-flex min-h-11 items-center rounded-full bg-ink px-5 text-sm font-semibold text-canvas transition-[background-color,transform] duration-200 hover:bg-ink/85 active:scale-[0.97]"
+              >
+                Войти
+              </Link>
+            )}
+          </nav>
+        </div>
       </div>
     </header>
   );
