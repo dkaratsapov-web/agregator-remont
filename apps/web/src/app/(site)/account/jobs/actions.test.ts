@@ -76,6 +76,7 @@ describe('createJobAction', () => {
       budgetMin: 40000,
       budgetMax: null,
       details: { rooms: ['bathroom'], surfaces: ['walls'], tileType: 'ceramic' },
+      extraItems: [],
     });
     expect(state.redirectedTo).toBe('/account/jobs/job1?created=1');
   });

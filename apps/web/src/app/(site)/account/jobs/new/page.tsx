@@ -22,6 +22,7 @@ function draftValues(draft: JobDraftDto): Partial<JobFormValues> {
     budgetMin: draft.budgetMin === null ? '' : formatAmount(draft.budgetMin),
     budgetMax: draft.budgetMax === null ? '' : formatAmount(draft.budgetMax),
     details: JSON.stringify(draft.details),
+    extraItems: JSON.stringify(draft.extraItems),
   };
 }
 

@@ -83,6 +83,7 @@ describe('API (e2e)', () => {
         currency: 'RUB',
         status: 'CLOSED',
         details: {},
+        extraItems: [],
         createdAt: new Date(BASE_TIME).toISOString(),
       });
     });

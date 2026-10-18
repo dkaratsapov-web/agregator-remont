@@ -1,10 +1,12 @@
 import {
+  JOB_CATEGORY_LABELS,
   groupJobDetails,
   jobDetailHighlights,
   summarizeJobDetails,
   type JobCategory,
   type JobDetailItem,
   type JobDetails as JobDetailsData,
+  type JobDto,
 } from '@agregator/shared';
 
 interface Props {
@@ -12,10 +14,20 @@ interface Props {
   details: JobDetailsData;
   /** Уровень заголовка блока. */
   headingLevel?: 2 | 3;
+  /** Заголовок блока; в заказе с несколькими позициями — название категории. */
+  title?: string;
+  /** Уникальная часть id заголовка, если блоков на странице несколько. */
+  idSuffix?: string;
 }
 
 /** Блок «Подробности»: ответы анкеты по разделам. Ничего не выводит, если анкета пуста. */
-export function JobDetails({ category, details, headingLevel = 2 }: Props) {
+export function JobDetails({
+  category,
+  details,
+  headingLevel = 2,
+  title = 'Подробности',
+  idSuffix = '',
+}: Props) {
   const items = summarizeJobDetails(category, details);
   if (items.length === 0) return null;
   const sections = groupJobDetails(items);
@@ -23,25 +35,27 @@ export function JobDetails({ category, details, headingLevel = 2 }: Props) {
   const Sub = `h${headingLevel + 1}` as 'h3' | 'h4';
 
   return (
-    <section aria-labelledby="job-details-title">
+    <section aria-labelledby={`job-details-title${idSuffix}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <Heading id="job-details-title" className="text-lg font-semibold">
-          Подробности
+        <Heading id={`job-details-title${idSuffix}`} className="text-lg font-semibold">
+          {title}
         </Heading>
         <p className="text-sm text-ink-soft tabular-nums">Ответов: {items.length}</p>
       </div>
-      <div className="mt-4 space-y-4">
+      <div className="mt-4 space-y-3">
         {sections.map((section) => {
           const units = toUnits(section.items);
           return (
             <div
               key={section.id}
-              className="rounded-[22px] border border-line/80 bg-surface p-5 shadow-[0_1px_1px_hsl(var(--shadow-color)/0.04)] sm:p-6"
+              className="overflow-hidden rounded-[14px] border border-line bg-surface"
             >
-              <Sub className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-soft">
+              <Sub className="border-b border-line px-5 py-3 text-sm font-semibold text-ink sm:px-6">
                 {section.title}
               </Sub>
-              <dl className={`mt-4 gap-x-10 ${units.length > 1 ? 'md:columns-2' : ''}`}>
+              <dl
+                className={`gap-x-10 px-5 py-4 sm:px-6 sm:py-5 ${units.length > 1 ? 'md:columns-2' : ''}`}
+              >
                 {units.map(({ item, children }) => (
                   <div key={item.id} className="mb-5 break-inside-avoid last:mb-0">
                     <dt className="text-sm text-ink-soft">{item.label}</dt>
@@ -92,7 +106,7 @@ function AnswerValue({ item }: { item: JobDetailItem }) {
         {item.values.map((value) => (
           <li
             key={value}
-            className="rounded-full bg-canvas px-2.5 py-1 text-sm font-medium text-ink"
+            className="rounded-[7px] border border-line bg-canvas px-2.5 py-1 text-sm font-medium text-ink"
           >
             {value}
           </li>
@@ -122,7 +136,7 @@ export function JobHighlights({
       {highlights.map((text) => (
         <li
           key={text}
-          className={`inline-flex items-center rounded-full border border-line/80 bg-canvas font-medium text-ink ${
+          className={`inline-flex items-center rounded-[7px] border border-line bg-canvas font-medium text-ink ${
             size === 'md' ? 'px-3 py-1.5 text-sm' : 'px-2.5 py-1 text-xs'
           }`}
         >
@@ -130,5 +144,43 @@ export function JobHighlights({
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * Подробности всех позиций заказа: у заказа с одной категорией — обычный блок «Подробности»,
+ * с несколькими — по блоку на категорию.
+ */
+export function JobPositionsDetails({
+  job,
+  headingLevel = 2,
+}: {
+  job: Pick<JobDto, 'category' | 'details' | 'extraItems'>;
+  headingLevel?: 2 | 3;
+}) {
+  if (job.extraItems.length === 0) {
+    return <JobDetails category={job.category} details={job.details} headingLevel={headingLevel} />;
+  }
+  const positions = [{ category: job.category, details: job.details }, ...job.extraItems];
+  return (
+    <div className="space-y-8">
+      {positions.map((position, index) => (
+        <JobDetails
+          key={position.category}
+          category={position.category}
+          details={position.details}
+          headingLevel={headingLevel}
+          title={JOB_CATEGORY_LABELS[position.category]}
+          idSuffix={`-${index + 1}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Подписи всех категорий заказа: основная первой. */
+export function jobCategoryLabels(job: Pick<JobDto, 'category' | 'extraItems'>): string[] {
+  return [job.category, ...job.extraItems.map((item) => item.category)].map(
+    (category) => JOB_CATEGORY_LABELS[category],
   );
 }

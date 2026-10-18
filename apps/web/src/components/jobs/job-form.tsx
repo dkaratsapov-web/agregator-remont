@@ -4,7 +4,10 @@ import {
   isJobCategory,
   JOB_CATEGORIES,
   JOB_CATEGORY_LABELS,
+  JOB_ITEM_LIMITS,
   JOB_LIMITS,
+  jobDetailHighlights,
+  jobDetailsProgress,
   SERVICE_AREA_ERROR,
   validateJobDetails,
   type JobCategory,
@@ -17,14 +20,18 @@ import { FormError } from '@/components/auth/form-error';
 import { SubmitButton } from '@/components/auth/submit-button';
 import { CityCombobox } from '@/components/ui/city-combobox';
 import { CITY_GROUPS, CITY_OPTIONS } from '@/lib/city-options';
+import { formatBudget } from '@/lib/format';
 import { Select } from '@/components/ui/select';
 import {
   checkJobForm,
+  parseBudget,
   parseDetailsField,
+  parseItemsField,
   readJobForm,
   type JobFormIssue,
   type JobFormValues,
 } from '@/lib/job-form';
+import { ProgressRuler } from '@/components/ui/progress-ruler';
 import { JobQuestionnaire } from './job-questionnaire';
 
 interface Props {
@@ -79,7 +86,36 @@ const FIELD_IDS: Record<JobFormIssue['field'], string> = {
   budget: 'field-budgetMin',
   description: 'field-description',
   details: 'job-questions',
+  items: 'job-positions',
 };
+
+/** Позиция другой категории в форме; key — для React, пока категория не выбрана. */
+interface ExtraPosition {
+  key: string;
+  category: JobCategory | '';
+  answers: JobDetails;
+}
+
+let positionKeys = 0;
+const nextPositionKey = () => `position-${(positionKeys += 1)}`;
+
+/** Позиции из скрытого поля (сохранённый заказ, черновик, ответ сервера с ошибкой). */
+function initialExtras(raw: string | undefined): ExtraPosition[] {
+  const parsed = parseItemsField(raw ?? '');
+  if (!Array.isArray(parsed)) return [];
+  return parsed.slice(0, JOB_ITEM_LIMITS.MAX_EXTRA).map((item: unknown) => {
+    const record = (typeof item === 'object' && item !== null ? item : {}) as {
+      category?: unknown;
+      details?: unknown;
+    };
+    const category = isJobCategory(record.category) ? record.category : '';
+    return {
+      key: nextPositionKey(),
+      category,
+      answers: category ? fitAnswers(category, record.details ?? {}) : {},
+    };
+  });
+}
 
 /** Ответы, подходящие анкете категории (скрытые и некорректные отбрасываются). */
 const fitAnswers = (category: JobCategory, answers: unknown): JobDetails => {
@@ -112,12 +148,83 @@ export function JobForm({
       ? { [values.category]: fitAnswers(values.category, parseDetailsField(values.details ?? '')) }
       : {},
   );
+  const [extras, setExtras] = useState<ExtraPosition[]>(() => initialExtras(values.extraItems));
+  // Поля, которые штамп заказа показывает по мере ввода (сами поля не управляемые).
+  const [live, setLive] = useState(() => ({
+    title: values.title ?? '',
+    budgetMin: values.budgetMin ?? '',
+    budgetMax: values.budgetMax ?? '',
+  }));
+  const trackLive = (event: React.FormEvent<HTMLFormElement>) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    const name = target.name;
+    if (name === 'title' || name === 'budgetMin' || name === 'budgetMax') {
+      setLive((current) => ({ ...current, [name]: target.value }));
+    }
+  };
   const [issues, setIssues] = useState<JobFormIssue[]>(state.issues ?? []);
   const [lastState, setLastState] = useState(state);
   if (state !== lastState) {
     setLastState(state);
     setIssues(state.issues ?? []);
   }
+
+  // Все позиции уходят в форму, даже без категории: проверка подскажет «выберите категорию».
+  const extraItemsJson = JSON.stringify(
+    extras.map((extra) => ({
+      category: extra.category || null,
+      details: extra.category ? fitAnswers(extra.category, extra.answers) : {},
+    })),
+  );
+  const usedCategories = new Set<JobCategory>(
+    [category, ...extras.map((extra) => extra.category)].filter(isJobCategory),
+  );
+  const positionIssues = (position: number) =>
+    issues.filter((issue) => issue.field === 'items' && issue.position === position);
+  const clearPositionIssues = (position: number, questionIds?: string[]) =>
+    setIssues((current) =>
+      current.filter(
+        (issue) =>
+          issue.field !== 'items' ||
+          issue.position !== position ||
+          (questionIds ? !questionIds.includes(issue.questionId ?? '') : false),
+      ),
+    );
+
+  const addExtra = () =>
+    setExtras((current) =>
+      current.length >= JOB_ITEM_LIMITS.MAX_EXTRA
+        ? current
+        : [...current, { key: nextPositionKey(), category: '', answers: {} }],
+    );
+  const removeExtra = (key: string) => {
+    setExtras((current) => current.filter((extra) => extra.key !== key));
+    // Номера позиций сдвигаются: старые ошибки по позициям больше не на своих местах.
+    setIssues((current) => current.filter((issue) => issue.field !== 'items'));
+  };
+  const chooseExtraCategory = (index: number, next: string) => {
+    if (!isJobCategory(next)) return;
+    setExtras((current) =>
+      current.map((extra, i) =>
+        i !== index || extra.category === next
+          ? extra
+          : // Общие ответы основной позиции (тип объекта, сроки) переносятся в новую анкету.
+            { ...extra, category: next, answers: fitAnswers(next, category ? answers : {}) },
+      ),
+    );
+    clearPositionIssues(index + 2);
+  };
+  const changeExtraAnswers = (index: number, next: JobDetails) => {
+    const before = extras[index]?.answers ?? {};
+    const changed = Object.keys({ ...before, ...next }).filter(
+      (id) => JSON.stringify(before[id]) !== JSON.stringify(next[id]),
+    );
+    setExtras((current) =>
+      current.map((extra, i) => (i === index ? { ...extra, answers: next } : extra)),
+    );
+    if (changed.length > 0) clearPositionIssues(index + 2, changed);
+  };
 
   const answers = category ? (answersByCategory[category] ?? {}) : {};
   const detailsJson = category ? JSON.stringify(fitAnswers(category, answers)) : '{}';
@@ -255,7 +362,7 @@ export function JobForm({
       return;
     }
     scheduleSave();
-  }, [category, city, answersByCategory, scheduleSave]);
+  }, [category, city, answersByCategory, extras, scheduleSave]);
 
   useEffect(() => {
     if (!drafts) return;
@@ -322,7 +429,11 @@ export function JobForm({
     const targetId =
       first.field === 'details' && first.questionId
         ? `q-${first.questionId}`
-        : FIELD_IDS[first.field];
+        : first.field === 'items' && first.position
+          ? first.questionId
+            ? `q-p${first.position}-${first.questionId}`
+            : `job-position-${first.position}`
+          : FIELD_IDS[first.field];
     const target = document.getElementById(targetId);
     if (target) {
       const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -343,9 +454,12 @@ export function JobForm({
       ref={formRef}
       action={formAction}
       onSubmit={onSubmit}
-      onInput={scheduleSave}
+      onInput={(event) => {
+        trackLive(event);
+        scheduleSave();
+      }}
       noValidate
-      className="@container"
+      className="@container/form"
     >
       <FormError message={topError} />
       {drafts ? <input type="hidden" name="draftId" value={draftId ?? ''} /> : null}
@@ -378,7 +492,12 @@ export function JobForm({
                   <Select
                     id="field-category"
                     name="category"
-                    options={CATEGORY_OPTIONS}
+                    // Категории дополнительных позиций основной стать не могут.
+                    options={CATEGORY_OPTIONS.filter(
+                      (option) =>
+                        option.value === category ||
+                        !extras.some((extra) => extra.category === option.value),
+                    )}
                     value={category}
                     onChange={chooseCategory}
                     placeholder="Выберите категорию"
@@ -442,9 +561,15 @@ export function JobForm({
             id="job-questions"
           >
             <input type="hidden" name="details" value={detailsJson} />
+            <input type="hidden" name="extraItems" value={extraItemsJson} />
             {category ? (
               <>
                 {generalDetailsError ? <FormError message={generalDetailsError} /> : null}
+                {extras.length > 0 ? (
+                  <p className="text-xs font-semibold uppercase tracking-[0.08em] text-accent">
+                    Позиция 1 · {JOB_CATEGORY_LABELS[category]}
+                  </p>
+                ) : null}
                 <JobQuestionnaire
                   key={category}
                   category={category}
@@ -452,6 +577,48 @@ export function JobForm({
                   onChange={changeAnswers}
                   errors={questionErrors}
                 />
+                <div id="job-positions" tabIndex={-1} className="space-y-4 pt-2 outline-none">
+                  {issues
+                    .filter((issue) => issue.field === 'items' && !issue.position)
+                    .map((issue) => (
+                      <FormError key={issue.message} message={issue.message} />
+                    ))}
+                  {extras.map((extra, index) => (
+                    <ExtraPositionCard
+                      key={extra.key}
+                      position={index + 2}
+                      extra={extra}
+                      used={usedCategories}
+                      issues={positionIssues(index + 2)}
+                      onCategory={(next) => chooseExtraCategory(index, next)}
+                      onAnswers={(next) => changeExtraAnswers(index, next)}
+                      onRemove={() => removeExtra(extra.key)}
+                    />
+                  ))}
+                  {extras.length < JOB_ITEM_LIMITS.MAX_EXTRA ? (
+                    <button
+                      type="button"
+                      onClick={addExtra}
+                      className="flex w-full items-center gap-3 rounded-[12px] border border-dashed border-ink/25 px-5 py-4 text-left transition-colors duration-150 hover:border-ink/50 hover:bg-canvas"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="grid size-8 shrink-0 place-items-center rounded-[7px] border-[1.5px] border-dashed border-ink/40 text-lg font-semibold text-ink"
+                      >
+                        +
+                      </span>
+                      <span>
+                        <span className="block font-semibold text-ink">
+                          Добавить работы другой категории
+                        </span>
+                        <span className="block text-sm text-ink-soft">
+                          Например, к плитке сантехнику и электрику. Мастер оценит всё вместе, до{' '}
+                          {JOB_ITEM_LIMITS.MAX_EXTRA + 1} категорий в заказе.
+                        </span>
+                      </span>
+                    </button>
+                  ) : null}
+                </div>
               </>
             ) : (
               <div className="flex items-start gap-4 rounded-2xl border border-dashed border-line bg-canvas/60 px-5 py-6">
@@ -479,6 +646,28 @@ export function JobForm({
         </div>
 
         <div className="min-w-0 space-y-4 @5xl:sticky @5xl:top-24">
+          <OrderStamp
+            title={live.title.trim()}
+            categories={[category, ...extras.map((extra) => extra.category)]
+              .filter(isJobCategory)
+              .map((item) => JOB_CATEGORY_LABELS[item])}
+            city={city.trim()}
+            highlights={category ? jobDetailHighlights(category, answers, 3) : []}
+            progress={[
+              ...(category ? [jobDetailsProgress(category, answers)] : []),
+              ...extras.flatMap((extra) =>
+                extra.category ? [jobDetailsProgress(extra.category, extra.answers)] : [],
+              ),
+            ].reduce(
+              (sum, item) => ({
+                answered: sum.answered + item.answered,
+                total: sum.total + item.total,
+              }),
+              { answered: 0, total: 0 },
+            )}
+            budget={stampBudget(live.budgetMin, live.budgetMax)}
+            status={drafts ? draftStatus : null}
+          />
           <FormSection step={3} title="Бюджет и описание">
             <fieldset>
               <legend className="text-sm font-medium text-ink">Бюджет, ₽</legend>
@@ -574,38 +763,44 @@ function FormSection({
       id={id}
       tabIndex={id ? -1 : undefined}
       aria-labelledby={headingId}
-      className="scroll-mt-24 rounded-[22px] border border-line/80 bg-surface p-5 shadow-[0_1px_1px_hsl(var(--shadow-color)/0.04)] outline-none sm:p-6"
+      className="scroll-mt-24 rounded-[14px] border border-line bg-surface outline-none"
     >
-      <div className="flex items-start gap-3">
+      {/* Лист: шапка с номером шага отделена линией, как заголовок листа в документации. */}
+      <div className="flex items-start gap-3.5 border-b border-line px-5 py-4 sm:px-6">
         <span
           aria-hidden="true"
-          className="grid size-7 shrink-0 place-items-center rounded-full bg-ink text-sm font-semibold tabular-nums text-surface"
+          className="grid size-8 shrink-0 place-items-center rounded-[7px] border-[1.5px] border-ink font-display text-[13px] font-semibold tabular-nums text-ink"
         >
           {step}
         </span>
-        <div>
+        <div className="pt-0.5">
           <h2 id={headingId} className="text-lg font-semibold leading-7 tracking-tight text-ink">
             {title}
           </h2>
-          {description ? <p className="mt-1 text-sm text-ink-soft">{description}</p> : null}
+          {description ? (
+            <p className="mt-0.5 max-w-[60ch] text-sm text-ink-soft">{description}</p>
+          ) : null}
         </div>
       </div>
-      <div className="mt-4 space-y-4">{children}</div>
+      <div className="space-y-4 px-5 pb-5 pt-4 sm:px-6 sm:pb-6">{children}</div>
     </section>
   );
 }
 
+/** Текст состояния черновика: в штампе заказа. */
+function draftStatusText(status: DraftStatus): string {
+  return status.kind === 'saving'
+    ? 'Сохраняем черновик…'
+    : status.kind === 'pending'
+      ? 'Есть несохранённые изменения'
+      : status.kind === 'saved'
+        ? `Черновик сохранён в ${timeOf(status.at)}`
+        : status.kind === 'error'
+          ? status.message
+          : 'Черновик сохраняется сам через несколько секунд после правки';
+}
+
 function DraftControls({ status, onSave }: { status: DraftStatus; onSave: () => void }) {
-  const text =
-    status.kind === 'saving'
-      ? 'Сохраняем черновик…'
-      : status.kind === 'pending'
-        ? 'Есть несохранённые изменения: черновик сохранится через несколько секунд.'
-        : status.kind === 'saved'
-          ? `Черновик сохранён в ${timeOf(status.at)}`
-          : status.kind === 'error'
-            ? status.message
-            : 'Не готовы публиковать? Черновик сохраняется сам через несколько секунд после правки, продолжить можно из «Мои заказы».';
   return (
     <div className="flex flex-col gap-2">
       <button
@@ -616,13 +811,189 @@ function DraftControls({ status, onSave }: { status: DraftStatus; onSave: () => 
       >
         Сохранить черновик
       </button>
-      <p
-        role="status"
-        aria-live="polite"
-        className={`text-center text-sm ${status.kind === 'error' ? 'font-medium text-accent' : 'text-ink-soft'}`}
-      >
-        {text}
+      <p className="text-center text-sm text-ink-soft">
+        Продолжить черновик можно из «Мои заказы».
       </p>
     </div>
+  );
+}
+
+const stampBudget = (minRaw: string, maxRaw: string): string => {
+  const min = parseBudget(minRaw);
+  const max = parseBudget(maxRaw);
+  if (min === 'invalid' || max === 'invalid') return 'Проверьте сумму';
+  return formatBudget(min, max, 'RUB');
+};
+
+/**
+ * Штамп заказа — как основная надпись на строительном чертеже: сводка того, что уже
+ * заполнено, обновляется по мере ввода. Толстая внешняя рамка, тонкие внутренние линии.
+ */
+function OrderStamp({
+  title,
+  categories,
+  city,
+  highlights,
+  progress,
+  budget,
+  status,
+}: {
+  title: string;
+  categories: string[];
+  city: string;
+  highlights: string[];
+  progress: { answered: number; total: number };
+  budget: string;
+  status: DraftStatus | null;
+}) {
+  const empty = <span className="font-normal text-ink-soft">не указано</span>;
+  const rows: [string, React.ReactNode][] = [
+    [categories.length > 1 ? 'Категории' : 'Категория', categories.join(', ') || empty],
+    ['Город', city || empty],
+    // То же, что увидят подрядчики на карточке заказа в каталоге.
+    [
+      'На карточке',
+      highlights.join(', ') || <span className="font-normal text-ink-soft">по ответам анкеты</span>,
+    ],
+    ['Бюджет', budget],
+  ];
+  return (
+    <section
+      aria-label="Сводка заказа"
+      className="overflow-hidden rounded-[6px] border-[1.5px] border-ink bg-surface text-sm"
+    >
+      <div className="border-b border-ink/20 px-4 py-3">
+        <p className="text-xs text-ink-soft">Заказ</p>
+        <p className="mt-0.5 font-display text-[17px] font-semibold leading-snug tracking-[-0.01em] text-ink [overflow-wrap:anywhere]">
+          {title || <span className="text-ink-soft/70">Без названия</span>}
+        </p>
+      </div>
+      <dl className="grid grid-cols-[7.25rem_minmax(0,1fr)]">
+        {rows.map(([label, value]) => (
+          <div key={label} className="contents">
+            <dt className="border-b border-r border-ink/15 px-4 py-2.5 text-xs leading-5 text-ink-soft">
+              {label}
+            </dt>
+            <dd className="border-b border-ink/15 px-3 py-2.5 font-medium leading-5 text-ink [overflow-wrap:anywhere]">
+              {value}
+            </dd>
+          </div>
+        ))}
+        <dt className="border-b border-r border-ink/15 px-4 py-2.5 text-xs leading-5 text-ink-soft">
+          Анкета
+        </dt>
+        <dd className="border-b border-ink/15 px-3 py-2.5">
+          <span className="flex items-baseline justify-between gap-2 font-medium leading-5 text-ink">
+            <span className="tabular-nums">
+              {progress.answered} из {progress.total}
+            </span>
+            <span className="text-xs font-normal text-ink-soft">
+              <span aria-hidden="true" className="text-accent">
+                *{' '}
+              </span>
+              обязательные
+            </span>
+          </span>
+          <ProgressRuler answered={progress.answered} total={progress.total} className="mt-2" />
+        </dd>
+      </dl>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto]">
+        <p
+          role="status"
+          aria-live="polite"
+          className={`border-r border-ink/15 px-4 py-2.5 text-xs leading-5 ${
+            status?.kind === 'error' ? 'font-medium text-accent' : 'text-ink-soft'
+          }`}
+        >
+          {status ? draftStatusText(status) : 'Изменения сохранятся после «Сохранить изменения»'}
+        </p>
+        <p className="px-3 py-2.5 font-display text-[11px] font-semibold leading-5 tracking-[-0.01em] text-ink">
+          Гарантыч
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function ExtraPositionCard({
+  position,
+  extra,
+  used,
+  issues,
+  onCategory,
+  onAnswers,
+  onRemove,
+}: {
+  position: number;
+  extra: ExtraPosition;
+  used: Set<JobCategory>;
+  issues: JobFormIssue[];
+  onCategory: (next: string) => void;
+  onAnswers: (next: JobDetails) => void;
+  onRemove: () => void;
+}) {
+  const labelId = `job-position-${position}-label`;
+  const categoryError = issues.find((issue) => !issue.questionId)?.message;
+  const questionErrors: Record<string, string> = {};
+  for (const issue of issues) {
+    if (issue.questionId) questionErrors[issue.questionId] ??= issue.message;
+  }
+  // Категории, уже выбранные в заказе, не предлагаются (кроме своей).
+  const options = CATEGORY_OPTIONS.filter(
+    (option) => option.value === extra.category || !used.has(option.value),
+  );
+  return (
+    <section
+      id={`job-position-${position}`}
+      tabIndex={-1}
+      aria-labelledby={labelId}
+      className="rounded-[12px] border border-line bg-canvas/60 p-4 outline-none sm:p-5"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h3 id={labelId} className="text-xs font-semibold uppercase tracking-[0.08em] text-accent">
+          Позиция {position}
+          {extra.category ? ` · ${JOB_CATEGORY_LABELS[extra.category]}` : ''}
+        </h3>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="inline-flex min-h-9 items-center rounded-full px-3 text-sm font-medium text-ink-soft transition-colors duration-150 hover:bg-ink/5 hover:text-ink"
+        >
+          Убрать
+        </button>
+      </div>
+      <div className="mt-3 max-w-sm">
+        <p id={`${labelId}-category`} className="block text-sm font-medium text-ink">
+          Категория
+        </p>
+        <div className="mt-1.5">
+          <Select
+            id={`job-position-${position}-category`}
+            options={options}
+            value={extra.category}
+            onChange={onCategory}
+            placeholder="Выберите категорию"
+            aria-labelledby={`${labelId}-category`}
+            invalid={Boolean(categoryError)}
+          />
+        </div>
+        {categoryError ? (
+          <p className="mt-1.5 text-sm font-medium text-accent">{categoryError}</p>
+        ) : null}
+      </div>
+      {extra.category ? (
+        <div className="mt-2">
+          <JobQuestionnaire
+            key={extra.category}
+            category={extra.category}
+            answers={extra.answers}
+            onChange={onAnswers}
+            errors={questionErrors}
+            idPrefix={`p${position}-`}
+            stickyProgress={false}
+          />
+        </div>
+      ) : null}
+    </section>
   );
 }

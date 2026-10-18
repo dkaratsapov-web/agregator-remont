@@ -25,7 +25,7 @@ export function DeleteDraftButton() {
         setConfirming(true);
       }}
       disabled={pending}
-      className={`inline-flex min-h-10 items-center rounded-xl border px-4 text-sm font-semibold transition-colors duration-150 disabled:opacity-60 ${
+      className={`inline-flex min-h-10 items-center rounded-[10px] border px-4 text-sm font-semibold transition-colors duration-150 disabled:opacity-60 ${
         confirming
           ? 'border-accent bg-accent text-accent-ink hover:bg-accent-hover'
           : 'border-line bg-surface text-ink-soft hover:border-ink/25 hover:text-ink'

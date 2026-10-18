@@ -1,33 +1,34 @@
-import { JOB_CATEGORY_LABELS, type OwnJobDto } from '@agregator/shared';
-import Link from 'next/link';
+import type { OwnJobDto } from '@agregator/shared';
 import { StatusBadge } from '@/components/status-badge';
+import { Ledger, LedgerLink } from '@/components/ui/sheet';
 import { formatBudget, formatDate } from '@/lib/format';
+import { jobCategoryLabels } from './job-details';
 
+/** Заказы заказчика строками ведомости. Рамку даёт лист, в который список вложен. */
 export function OwnJobList({ jobs }: { jobs: OwnJobDto[] }) {
   return (
-    <ul className="divide-y divide-line rounded-2xl border border-line bg-surface">
+    <Ledger>
       {jobs.map((job) => (
-        <li key={job.id}>
-          <Link
-            href={`/account/jobs/${job.id}`}
-            className="flex flex-col gap-1.5 px-5 py-4 transition-colors duration-150 hover:bg-muted-tint sm:flex-row sm:items-center sm:justify-between sm:gap-6"
-          >
-            <span className="min-w-0">
-              <span className="block break-words font-semibold">{job.title}</span>
-              <span className="mt-0.5 block text-sm text-ink-soft">
-                {JOB_CATEGORY_LABELS[job.category]}, {job.city},{' '}
-                <time dateTime={job.createdAt}>{formatDate(job.createdAt)}</time>
-              </span>
-            </span>
-            <span className="flex shrink-0 items-center gap-3">
-              <span className="text-sm font-semibold tabular-nums">
+        <LedgerLink
+          key={job.id}
+          href={`/account/jobs/${job.id}`}
+          title={job.title}
+          meta={
+            <>
+              {jobCategoryLabels(job).join(', ')} · {job.city} ·{' '}
+              <time dateTime={job.createdAt}>{formatDate(job.createdAt)}</time>
+            </>
+          }
+          aside={
+            <>
+              <span className="text-sm font-semibold tabular-nums text-ink">
                 {formatBudget(job.budgetMin, job.budgetMax, job.currency)}
               </span>
               <StatusBadge status={job.status} />
-            </span>
-          </Link>
-        </li>
+            </>
+          }
+        />
       ))}
-    </ul>
+    </Ledger>
   );
 }

@@ -20,7 +20,7 @@ const dateFormat = new Intl.DateTimeFormat('ru-RU', {
 function DeviceIcon({ device }: { device: string | null }) {
   const phone = device ? /iOS|Android/.test(device) : false;
   return (
-    <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-muted-tint text-ink-soft">
+    <span className="grid size-11 shrink-0 place-items-center rounded-[10px] bg-muted-tint text-ink-soft">
       <svg
         viewBox="0 0 24 24"
         className="size-5"
@@ -55,7 +55,7 @@ function RevokeButton({ id }: { id: string }) {
       <button
         type="submit"
         disabled={pending}
-        className="inline-flex min-h-10 items-center rounded-xl border border-line bg-surface px-3.5 text-sm font-semibold text-ink transition-colors duration-150 hover:border-accent hover:text-accent disabled:opacity-60"
+        className="inline-flex min-h-10 items-center rounded-[10px] border border-line bg-surface px-3.5 text-sm font-semibold text-ink transition-colors duration-150 hover:border-accent hover:text-accent disabled:opacity-60"
       >
         {pending ? 'Завершаем…' : 'Завершить'}
       </button>
@@ -74,7 +74,7 @@ export function SessionsList({ sessions }: { sessions: SessionDto[] }) {
   return (
     <div className="space-y-4">
       <FormStatus error={state.error} done={state.done} />
-      <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
+      <ul className="divide-y divide-line overflow-hidden rounded-[12px] border border-line bg-canvas">
         {sessions.map((s) => (
           <li key={s.id} className="flex flex-wrap items-center gap-4 px-4 py-3.5">
             <DeviceIcon device={s.device} />
@@ -82,7 +82,7 @@ export function SessionsList({ sessions }: { sessions: SessionDto[] }) {
               <p className="flex flex-wrap items-center gap-2 font-semibold">
                 {s.device ?? 'Неизвестное устройство'}
                 {s.current ? (
-                  <span className="rounded-full bg-ok-tint px-2 py-0.5 text-xs font-semibold text-ok">
+                  <span className="rounded-[6px] border border-ok/30 bg-ok-tint px-2 py-0.5 text-xs font-semibold text-ok">
                     Это устройство
                   </span>
                 ) : null}
@@ -103,7 +103,7 @@ export function SessionsList({ sessions }: { sessions: SessionDto[] }) {
           <button
             type="submit"
             disabled={pending}
-            className="inline-flex min-h-11 items-center rounded-xl bg-ink px-4 text-sm font-semibold text-canvas transition-[background-color,transform] duration-150 hover:bg-ink/85 active:scale-[0.97] disabled:opacity-60"
+            className="inline-flex min-h-11 items-center rounded-[10px] bg-ink px-4 text-sm font-semibold text-canvas transition-[background-color,transform] duration-150 hover:bg-ink/85 active:scale-[0.97] disabled:opacity-60"
           >
             {pending ? 'Завершаем…' : 'Выйти на всех других устройствах'}
           </button>

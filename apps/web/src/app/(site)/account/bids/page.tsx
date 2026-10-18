@@ -4,6 +4,13 @@ import { ApiUnavailable } from '@/components/api-unavailable';
 import { MyBidList } from '@/components/bids/my-bid-list';
 import { ContractorsOnly } from '@/components/jobs/contractors-only';
 import { Notice } from '@/components/notice';
+import {
+  EmptyState,
+  PageHeader,
+  primaryLinkClass,
+  secondaryLinkClass,
+} from '@/components/ui/page-header';
+import { Sheet, SheetHeader, SheetPager } from '@/components/ui/sheet';
 import { listMyBids } from '@/lib/api';
 import { requireContractorPage } from '@/lib/customer';
 import { parsePage } from '@/lib/search-params';
@@ -33,62 +40,56 @@ export default async function MyBidsPage({
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 pt-10 sm:px-6 md:pt-14">
-      <p className="text-sm text-ink-soft">
-        <Link href="/account" className="hover:text-ink hover:underline">
-          Кабинет
-        </Link>
-      </p>
-      <h1 className="mt-1 text-3xl font-semibold tracking-tight">Мои отклики</h1>
+    <div className="mx-auto max-w-[1600px] px-4 pb-16 pt-10 sm:px-6 md:pt-14 lg:px-10">
+      <PageHeader
+        back={{ href: '/account', label: 'Кабинет' }}
+        title="Мои отклики"
+        description="Цена и срок, которые вы предложили, и что решил заказчик."
+        action={
+          <Link href="/jobs?open=1" className={primaryLinkClass}>
+            Найти заказ
+          </Link>
+        }
+      />
       {query.withdrawn ? (
         <div className="mt-6">
           <Notice>Отклик отозван.</Notice>
         </div>
       ) : null}
-      <div className="mt-8">
+      <div className="mt-8 max-w-5xl">
         {data === null ? (
           <ApiUnavailable />
-        ) : data.items.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-line bg-surface p-10 text-center">
-            <h2 className="text-lg font-semibold">Вы ещё не откликались</h2>
-            <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
-              Найдите подходящий заказ в каталоге и предложите свою цену.
-            </p>
-            <Link
-              href="/jobs"
-              className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-accent px-5 font-semibold text-accent-ink hover:bg-accent-hover"
-            >
-              Открыть каталог
-            </Link>
-          </div>
         ) : (
-          <MyBidList
-            bids={data.items}
-            returnTo={page > 1 ? `/account/bids?page=${page}` : '/account/bids'}
-          />
+          <Sheet labelledBy="bids-title">
+            <SheetHeader
+              id="bids-title"
+              title={
+                <>
+                  Отклики <span className="tabular-nums text-ink-soft">{data.total}</span>
+                </>
+              }
+            />
+            {data.items.length === 0 ? (
+              <EmptyState
+                title={data.total > 0 ? 'На этой странице пусто' : 'Вы ещё не откликались'}
+                action={
+                  <Link href="/jobs?open=1" className={secondaryLinkClass}>
+                    Открыть каталог
+                  </Link>
+                }
+              >
+                Найдите подходящий заказ в каталоге и предложите свою цену и срок.
+              </EmptyState>
+            ) : (
+              <MyBidList
+                bids={data.items}
+                returnTo={page > 1 ? `/account/bids?page=${page}` : '/account/bids'}
+              />
+            )}
+            <SheetPager href="/account/bids" page={page} totalPages={totalPages} />
+          </Sheet>
         )}
       </div>
-      {data && totalPages > 1 ? (
-        <nav aria-label="Страницы" className="mt-6 flex justify-between text-sm font-medium">
-          {page > 1 ? (
-            <Link href={`/account/bids?page=${page - 1}`} className="text-accent hover:underline">
-              Назад
-            </Link>
-          ) : (
-            <span />
-          )}
-          <span className="tabular-nums text-ink-soft">
-            {page} из {totalPages}
-          </span>
-          {page < totalPages ? (
-            <Link href={`/account/bids?page=${page + 1}`} className="text-accent hover:underline">
-              Вперёд
-            </Link>
-          ) : (
-            <span />
-          )}
-        </nav>
-      ) : null}
     </div>
   );
 }

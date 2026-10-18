@@ -85,7 +85,7 @@ export function AvatarUploader({
         const file = e.dataTransfer.files[0];
         if (file && !busy) void upload(file);
       }}
-      className={`flex flex-col items-start gap-5 rounded-2xl border border-dashed p-5 transition-colors duration-150 sm:flex-row sm:items-center ${
+      className={`flex flex-col items-start gap-5 rounded-[12px] border border-dashed p-5 transition-colors duration-150 sm:flex-row sm:items-center ${
         dragging ? 'border-accent bg-accent-tint' : 'border-line bg-canvas'
       }`}
     >
@@ -122,7 +122,7 @@ export function AvatarUploader({
           />
           <label
             htmlFor="avatar-file"
-            className={`inline-flex min-h-11 cursor-pointer items-center rounded-xl bg-ink px-4 text-sm font-semibold text-canvas transition-[background-color,transform] duration-150 hover:bg-ink/85 active:scale-[0.97] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${busy ? 'pointer-events-none opacity-60' : ''}`}
+            className={`inline-flex min-h-11 cursor-pointer items-center rounded-[10px] bg-ink px-4 text-sm font-semibold text-canvas transition-[background-color,transform] duration-150 hover:bg-ink/85 active:scale-[0.97] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${busy ? 'pointer-events-none opacity-60' : ''}`}
           >
             {avatarVersion ? 'Заменить фото' : 'Загрузить фото'}
           </label>
@@ -131,7 +131,7 @@ export function AvatarUploader({
               type="button"
               onClick={remove}
               disabled={busy}
-              className="inline-flex min-h-11 items-center rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink transition-colors duration-150 hover:border-ink-soft/50 disabled:opacity-60"
+              className="inline-flex min-h-11 items-center rounded-[10px] border border-line bg-surface px-4 text-sm font-semibold text-ink transition-colors duration-150 hover:border-ink-soft/50 disabled:opacity-60"
             >
               Удалить
             </button>

@@ -490,6 +490,14 @@ export interface components {
             };
             /** @description Черновик, из которого опубликован заказ: удаляется в той же транзакции */
             draftId?: string;
+            /** @description Позиции других категорий (до 4); категории не повторяются и не совпадают с основной. Без поля: [] */
+            extraItems?: {
+                category: components["schemas"]["JobCategory"];
+                /** @description Ответы анкеты категории позиции */
+                details: {
+                    [key: string]: string | number | boolean | string[];
+                };
+            }[];
             title: string;
         };
         CreateLeadDto: {
@@ -541,6 +549,7 @@ export interface components {
             details: {
                 [key: string]: string | number | boolean | string[];
             };
+            extraItems: components["schemas"]["JobItemDto"][];
             id: string;
             title: string | null;
             /** Format: date-time */
@@ -564,9 +573,18 @@ export interface components {
             details: {
                 [key: string]: string | number | boolean | string[];
             };
+            /** @description Позиции других категорий (до 4); [] если категория одна */
+            extraItems: components["schemas"]["JobItemDto"][];
             id: string;
             status: components["schemas"]["JobStatus"];
             title: string;
+        };
+        JobItemDto: {
+            category: components["schemas"]["JobCategory"];
+            /** @description Ответы анкеты категории позиции */
+            details: {
+                [key: string]: string | number | boolean | string[];
+            };
         };
         /** @enum {string} */
         JobStatus: "OPEN" | "IN_PROGRESS" | "CLOSED";
@@ -627,6 +645,8 @@ export interface components {
             };
             /** @description Редактировать можно только открытый заказ */
             editable: boolean;
+            /** @description Позиции других категорий (до 4); [] если категория одна */
+            extraItems: components["schemas"]["JobItemDto"][];
             id: string;
             status: components["schemas"]["JobStatus"];
             title: string;
@@ -674,6 +694,8 @@ export interface components {
             details?: {
                 [key: string]: string | number | boolean | string[];
             };
+            /** @description Позиции других категорий; проверяются мягко, неверные отбрасываются */
+            extraItems?: Record<string, never>[];
             title?: string | null;
         };
         /** @enum {string} */
@@ -717,6 +739,14 @@ export interface components {
             details?: {
                 [key: string]: string | number | boolean | string[];
             };
+            /** @description Позиции других категорий целиком (заменяют прежние); без поля: не менять */
+            extraItems?: {
+                category: components["schemas"]["JobCategory"];
+                /** @description Ответы анкеты категории позиции */
+                details: {
+                    [key: string]: string | number | boolean | string[];
+                };
+            }[];
             title?: string;
         };
         UpdateLeadDto: {

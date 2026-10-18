@@ -1,6 +1,8 @@
-import { JOB_CATEGORIES, JOB_LIMITS, type JobCategory } from '@agregator/shared';
+import { JOB_CATEGORIES, JOB_ITEM_LIMITS, JOB_LIMITS, type JobCategory } from '@agregator/shared';
 import { Transform } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsIn,
   IsInt,
   IsObject,
@@ -105,4 +107,17 @@ export class SaveDraftDto {
     ),
   )
   details?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsArray({ message: 'Позиции заказа передаются списком' })
+  @ArrayMaxSize(JOB_ITEM_LIMITS.MAX_EXTRA, {
+    message: `В заказе может быть не больше ${JOB_ITEM_LIMITS.MAX_EXTRA + 1} категорий`,
+  })
+  @ApiPropertyOptional({
+    type: 'array',
+    maxItems: JOB_ITEM_LIMITS.MAX_EXTRA,
+    items: { type: 'object' },
+    description: 'Позиции других категорий; проверяются мягко, неверные отбрасываются',
+  })
+  extraItems?: unknown[];
 }

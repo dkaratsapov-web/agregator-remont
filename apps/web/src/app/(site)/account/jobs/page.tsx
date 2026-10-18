@@ -4,6 +4,14 @@ import { ApiUnavailable } from '@/components/api-unavailable';
 import { CustomersOnly } from '@/components/jobs/customers-only';
 import { DraftList } from '@/components/jobs/draft-list';
 import { OwnJobList } from '@/components/jobs/own-job-list';
+import { Notice } from '@/components/notice';
+import {
+  EmptyState,
+  PageHeader,
+  primaryLinkClass,
+  secondaryLinkClass,
+} from '@/components/ui/page-header';
+import { Sheet, SheetHeader, SheetPager } from '@/components/ui/sheet';
 import { listDrafts, listMyJobs } from '@/lib/api';
 import { requireCustomerPage } from '@/lib/customer';
 import { parsePage } from '@/lib/search-params';
@@ -43,95 +51,85 @@ export default async function MyJobsPage({
         : null;
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
+  const showDrafts = drafts.length > 0 && page === 1;
+
   return (
     <div className="mx-auto max-w-[1600px] px-4 pb-16 pt-10 sm:px-6 md:pt-14 lg:px-10">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm text-ink-soft">
-            <Link href="/account" className="hover:text-ink hover:underline">
-              Кабинет
-            </Link>
-          </p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Мои заказы</h1>
-        </div>
-        <Link
-          href="/account/jobs/new"
-          className="inline-flex min-h-11 items-center rounded-xl bg-accent px-5 font-semibold text-accent-ink transition-colors duration-150 hover:bg-accent-hover"
-        >
-          Новый заказ
-        </Link>
-      </div>
+      <PageHeader
+        back={{ href: '/account', label: 'Кабинет' }}
+        title="Мои заказы"
+        description="Черновики видны только вам. Опубликованные заказы — в каталоге, мастера на них откликаются."
+        action={
+          <Link href="/account/jobs/new" className={primaryLinkClass}>
+            Новый заказ
+          </Link>
+        }
+      />
 
       {notice ? (
-        <p
-          role="status"
-          className="mt-6 rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink"
-        >
-          {notice}
-        </p>
+        <div className="mt-6">
+          <Notice tone={params.draftError === '1' ? 'neutral' : 'ok'}>{notice}</Notice>
+        </div>
       ) : null}
 
-      {drafts.length > 0 && page === 1 ? (
-        <section aria-labelledby="drafts-title" className="mt-8">
-          <h2 id="drafts-title" className="text-lg font-semibold">
-            Черновики <span className="tabular-nums text-ink-soft">{drafts.length}</span>
-          </h2>
-          <p className="mt-1 text-sm text-ink-soft">
-            Видны только вам. Подрядчики увидят заказ после публикации.
-          </p>
-          <div className="mt-4">
+      <div className="mt-8 flex flex-col gap-6">
+        {showDrafts ? (
+          <Sheet labelledBy="drafts-title" className="border-dashed">
+            <SheetHeader
+              id="drafts-title"
+              title={
+                <>
+                  Черновики <span className="tabular-nums text-ink-soft">{drafts.length}</span>
+                </>
+              }
+              description="Подрядчики увидят заказ только после публикации."
+            />
             <DraftList drafts={drafts} />
-          </div>
-        </section>
-      ) : null}
-
-      <div className="mt-8">
-        {drafts.length > 0 && page === 1 && data && data.items.length > 0 ? (
-          <h2 className="mb-4 text-lg font-semibold">Опубликованные</h2>
+          </Sheet>
         ) : null}
+
         {data === null ? (
           <ApiUnavailable />
-        ) : data.items.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-line bg-surface p-10 text-center">
-            <h2 className="text-lg font-semibold">
-              {data.total > 0
-                ? 'На этой странице пусто'
-                : drafts.length > 0
-                  ? 'Опубликованных заказов пока нет'
-                  : 'У вас пока нет заказов'}
-            </h2>
-            <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
-              {drafts.length > 0 && data.total === 0
-                ? 'Продолжите черновик выше или создайте новый заказ: после публикации он появится в каталоге.'
-                : 'Опишите работы, город и бюджет: заказ сразу появится в каталоге.'}
-            </p>
-          </div>
         ) : (
-          <OwnJobList jobs={data.items} />
+          <Sheet labelledBy="published-title">
+            <SheetHeader
+              id="published-title"
+              title={
+                <>
+                  Опубликованные <span className="tabular-nums text-ink-soft">{data.total}</span>
+                </>
+              }
+            />
+            {data.items.length === 0 ? (
+              <EmptyState
+                title={
+                  data.total > 0
+                    ? 'На этой странице пусто'
+                    : showDrafts
+                      ? 'Опубликованных заказов пока нет'
+                      : 'У вас пока нет заказов'
+                }
+                action={
+                  data.total > 0 ? (
+                    <Link href="/account/jobs" className={secondaryLinkClass}>
+                      К первой странице
+                    </Link>
+                  ) : null
+                }
+              >
+                {showDrafts && data.total === 0
+                  ? 'Продолжите черновик выше или создайте новый заказ: после публикации он появится в каталоге.'
+                  : data.total > 0
+                    ? undefined
+                    : 'Опишите работы, город и бюджет: заказ сразу появится в каталоге.'}
+              </EmptyState>
+            ) : (
+              <OwnJobList jobs={data.items} />
+            )}
+            <SheetPager href="/account/jobs" page={page} totalPages={totalPages} />
+          </Sheet>
         )}
       </div>
-
-      {data && totalPages > 1 ? (
-        <nav aria-label="Страницы" className="mt-6 flex justify-between text-sm font-medium">
-          {page > 1 ? (
-            <Link href={`/account/jobs?page=${page - 1}`} className="text-accent hover:underline">
-              Назад
-            </Link>
-          ) : (
-            <span />
-          )}
-          <span className="tabular-nums text-ink-soft">
-            {page} из {totalPages}
-          </span>
-          {page < totalPages ? (
-            <Link href={`/account/jobs?page=${page + 1}`} className="text-accent hover:underline">
-              Вперёд
-            </Link>
-          ) : (
-            <span />
-          )}
-        </nav>
-      ) : null}
     </div>
   );
 }

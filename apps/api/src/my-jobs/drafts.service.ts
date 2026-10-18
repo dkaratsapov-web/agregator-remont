@@ -3,7 +3,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { Prisma } from '@prisma/client';
 import { ENTITY_ID_PATTERN } from '../common/text';
 import { PrismaService } from '../prisma/prisma.service';
-import { draftDetails, toJobDraftDto } from './draft.mapper';
+import { draftDetails, draftItems, toJobDraftDto } from './draft.mapper';
 import { SaveDraftDto } from './dto/draft-input.dto';
 
 const NOT_FOUND = 'Черновик не найден';
@@ -82,5 +82,6 @@ function toData(dto: SaveDraftDto) {
     budgetMin: dto.budgetMin ?? null,
     budgetMax: dto.budgetMax ?? null,
     details: draftDetails(category, dto.details) as Prisma.InputJsonObject,
+    extraItems: draftItems(category, dto.extraItems) as unknown as Prisma.InputJsonArray,
   };
 }

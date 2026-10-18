@@ -1,12 +1,14 @@
 import { USER_ROLE_LABELS, type SessionDto } from '@agregator/shared';
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { AppearanceForm } from '@/components/account/appearance-form';
+import { CopyId } from '@/components/account/copy-id';
 import { AvatarUploader } from '@/components/account/avatar-uploader';
 import { PasswordForm } from '@/components/account/password-form';
 import { ProfileForm } from '@/components/account/profile-form';
 import { SessionsList } from '@/components/account/sessions-list';
+import { PageHeader } from '@/components/ui/page-header';
+import { Sheet, SheetBody, SheetHeader } from '@/components/ui/sheet';
 import { listSessions } from '@/lib/api';
 import { getCurrentUser, getSessionToken } from '@/lib/session';
 
@@ -31,17 +33,12 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section
-      id={id}
-      aria-labelledby={`${id}-title`}
-      className="scroll-mt-24 rounded-[24px] border border-line/80 bg-surface p-5 sm:p-7"
-    >
-      <h2 id={`${id}-title`} className="text-xl font-semibold tracking-tight">
-        {title}
-      </h2>
-      <p className="mt-1 text-sm text-ink-soft">{text}</p>
-      <div className="mt-6">{children}</div>
-    </section>
+    <div id={id} className="scroll-mt-24">
+      <Sheet labelledBy={`${id}-title`}>
+        <SheetHeader id={`${id}-title`} title={title} description={text} />
+        <SheetBody className="sm:py-6">{children}</SheetBody>
+      </Sheet>
+    </div>
   );
 }
 
@@ -57,25 +54,23 @@ export default async function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1600px] px-4 pb-20 pt-10 sm:px-6 lg:px-10 md:pt-14">
-      <p className="text-sm text-ink-soft">
-        <Link href="/account" className="hover:text-ink hover:underline">
-          Кабинет
-        </Link>
-      </p>
-      <h1 className="mt-1 text-3xl font-semibold tracking-tight md:text-[2.6rem]">Настройки</h1>
-      <p className="mt-2 text-ink-soft">
-        {USER_ROLE_LABELS[user.role]} · ID {user.publicId} · {user.email}
-      </p>
+    <div className="mx-auto max-w-[1600px] px-4 pb-20 pt-10 sm:px-6 md:pt-14 lg:px-10">
+      <PageHeader
+        back={{ href: '/account', label: 'Кабинет' }}
+        title="Настройки"
+        description={`${USER_ROLE_LABELS[user.role]} · ${user.email}`}
+      >
+        <CopyId publicId={user.publicId} />
+      </PageHeader>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="mt-8 grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-8">
         <nav aria-label="Разделы настроек" className="min-w-0 lg:sticky lg:top-24 lg:self-start">
-          <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] lg:mx-0 lg:flex-col lg:gap-1 lg:px-0">
+          <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] lg:mx-0 lg:flex-col lg:gap-0 lg:divide-y lg:divide-line lg:overflow-hidden lg:rounded-[14px] lg:border lg:border-line lg:bg-surface lg:px-0">
             {SECTIONS.map((s) => (
               <li key={s.id}>
                 <a
                   href={`#${s.id}`}
-                  className="inline-flex min-h-10 items-center whitespace-nowrap rounded-full border border-line bg-surface px-4 text-sm font-medium text-ink-soft transition-colors duration-150 hover:text-ink lg:flex lg:rounded-xl lg:border-transparent lg:bg-transparent lg:px-3 lg:hover:bg-ink/5"
+                  className="inline-flex min-h-10 items-center whitespace-nowrap rounded-[8px] border border-line bg-surface px-3.5 text-sm font-medium text-ink-soft transition-colors duration-150 hover:text-ink lg:flex lg:min-h-11 lg:rounded-none lg:border-0 lg:px-4 lg:hover:bg-canvas"
                 >
                   {s.title}
                 </a>
@@ -84,7 +79,7 @@ export default async function SettingsPage() {
           </ul>
         </nav>
 
-        <div className="flex min-w-0 flex-col gap-6">
+        <div className="flex min-w-0 max-w-5xl flex-col gap-6">
           <Section
             id="profile"
             title="Профиль"
@@ -116,7 +111,7 @@ export default async function SettingsPage() {
             {sessions ? (
               <SessionsList sessions={sessions} />
             ) : (
-              <p className="rounded-xl border border-dashed border-line p-4 text-sm text-ink-soft">
+              <p className="rounded-[10px] border border-dashed border-line p-4 text-sm text-ink-soft">
                 Не удалось загрузить список устройств. Обновите страницу чуть позже.
               </p>
             )}

@@ -12,12 +12,21 @@ export function CloseJobForm({
 }) {
   const [state, formAction, pending] = useActionState<JobFormState, FormData>(action, {});
   return (
-    <details className="group rounded-2xl border border-line bg-surface p-5">
-      <summary className="cursor-pointer list-none font-semibold text-ink [&::-webkit-details-marker]:hidden">
+    <details className="group overflow-hidden rounded-[14px] border border-line bg-surface">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-5 font-semibold text-ink transition-colors duration-150 hover:bg-canvas sm:px-6 [&::-webkit-details-marker]:hidden">
         Закрыть заказ
-        <span className="ml-2 font-normal text-ink-soft group-open:hidden">(показать)</span>
+        <svg
+          viewBox="0 0 16 16"
+          className="size-4 text-ink-soft transition-transform duration-200 group-open:rotate-180"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          aria-hidden="true"
+        >
+          <path d="m4 6 4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </summary>
-      <form action={formAction} className="mt-4 space-y-3">
+      <form action={formAction} className="space-y-3 border-t border-line px-5 py-4 sm:px-6">
         <FormError message={state.error} />
         <p className="text-sm leading-relaxed text-ink-soft">
           Закрытый заказ нельзя редактировать и открыть снова. Подрядчики увидят, что он закрыт.

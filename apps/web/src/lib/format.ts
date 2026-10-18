@@ -29,3 +29,16 @@ export function formatAmount(value: number): string {
 export function formatDate(iso: string): string {
   return dateFormat.format(new Date(iso));
 }
+
+/** «1 год», «3 года», «12 лет». */
+export function formatYears(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  const word =
+    mod10 === 1 && mod100 !== 11
+      ? 'год'
+      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
+        ? 'года'
+        : 'лет';
+  return `${n} ${word}`;
+}

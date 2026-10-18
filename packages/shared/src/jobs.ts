@@ -56,8 +56,16 @@ export interface JobDto {
   status: JobStatus;
   /** Ответы на вопросы анкеты категории (см. job-questions.ts); {} если анкета не заполнена. */
   details: JobDetails;
+  /** Позиции других категорий (job-items.ts); [] если в заказе одна категория. */
+  extraItems: JobItemDto[];
   /** ISO 8601 */
   createdAt: string;
+}
+
+/** Позиция заказа: категория и ответы её анкеты. */
+export interface JobItemDto {
+  category: JobCategory;
+  details: JobDetails;
 }
 
 export function isJobCategory(value: unknown): value is JobCategory {
@@ -93,6 +101,8 @@ export interface JobInput {
   budgetMax: number | null;
   /** Ответы анкеты. При создании без поля сохраняется {}; при правке отсутствие = не менять. */
   details?: JobDetails;
+  /** Позиции других категорий (до 4). При создании без поля — []; при правке — не менять. */
+  extraItems?: JobItemDto[];
   /** Только при создании: черновик, из которого опубликован заказ; удаляется вместе с ним. */
   draftId?: string;
 }
@@ -123,6 +133,7 @@ export interface JobDraftInput {
   budgetMin?: number | null;
   budgetMax?: number | null;
   details?: JobDetails;
+  extraItems?: JobItemDto[];
 }
 
 export interface JobDraftDto {
@@ -134,6 +145,7 @@ export interface JobDraftDto {
   budgetMin: number | null;
   budgetMax: number | null;
   details: JobDetails;
+  extraItems: JobItemDto[];
   /** ISO 8601 */
   createdAt: string;
   /** ISO 8601 */

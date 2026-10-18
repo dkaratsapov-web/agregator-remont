@@ -25,7 +25,8 @@ export class JobsService {
     const city = query.city ? escapeLike(query.city) : undefined;
     const q = query.q ? escapeLike(query.q) : undefined;
     const where: Prisma.JobWhereInput = {
-      ...(category ? { category } : {}),
+      // Заказ находится по любой своей категории, не только по основной.
+      ...(category ? { categories: { has: category } } : {}),
       ...(status ? { status } : {}),
       ...(city ? { city: { equals: city, mode: 'insensitive' } } : {}),
       ...(q

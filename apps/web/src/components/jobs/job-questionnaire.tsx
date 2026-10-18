@@ -16,6 +16,7 @@ import {
   type TextQuestion,
 } from '@agregator/shared';
 import { useEffect, useId, useRef, useState } from 'react';
+import { ProgressRuler } from '@/components/ui/progress-ruler';
 import { CheckIcon, Select } from '@/components/ui/select';
 
 interface Props {
@@ -24,17 +25,30 @@ interface Props {
   onChange: (answers: JobDetails) => void;
   /** Ошибки по id вопроса. */
   errors?: Record<string, string>;
+  /**
+   * Приставка к id элементов: в заказе с несколькими позициями анкеты разных категорий стоят
+   * на одной странице, и одинаковые вопросы («Тип объекта») не должны совпадать по id.
+   */
+  idPrefix?: string;
+  /** Полоса «Заполнено» прилипает к шапке; в карточке позиции — обычная строка. */
+  stickyProgress?: boolean;
 }
 
 /**
  * Анкета категории: вопросы по разделам, вложенные ветки раскрываются по ответам.
  * Ответы хранит родитель; в форму они уходят скрытым полем (см. JobForm).
  */
-export function JobQuestionnaire({ category, answers, onChange, errors = {} }: Props) {
+export function JobQuestionnaire({
+  category,
+  answers,
+  onChange,
+  errors = {},
+  idPrefix = '',
+  stickyProgress = true,
+}: Props) {
   const questionnaire = JOB_QUESTIONNAIRES[category];
   const visible = visibleJobQuestionIds(category, answers);
   const progress = jobDetailsProgress(category, answers);
-  const percent = progress.total === 0 ? 0 : Math.round((progress.answered / progress.total) * 100);
 
   const setAnswer = (id: string, value: JobAnswer | undefined) => {
     const next = { ...answers };
@@ -48,10 +62,13 @@ export function JobQuestionnaire({ category, answers, onChange, errors = {} }: P
       <Reveal
         key={question.id}
         open={visible.has(question.id)}
-        // Скрытый вопрос верхнего уровня не занимает ячейку в двух колонках.
-        className={depth === 0 && !visible.has(question.id) ? '@3xl:hidden' : ''}
+        // Строки ведомости разделены линией; у скрытой строки линии нет.
+        className={
+          depth === 0 && visible.has(question.id) ? 'border-t border-line/80 first:border-t-0' : ''
+        }
       >
         <QuestionBlock
+          idPrefix={idPrefix}
           question={question}
           depth={depth}
           value={answers[question.id]}
@@ -65,7 +82,14 @@ export function JobQuestionnaire({ category, answers, onChange, errors = {} }: P
 
   return (
     <div>
-      <div className="sticky top-16 z-20 -mx-5 border-b border-line/70 bg-surface/95 px-5 py-3 backdrop-blur-md sm:-mx-6 sm:px-6">
+      {/* На широкой форме заполненность показывает штамп заказа справа. */}
+      <div
+        className={
+          stickyProgress
+            ? 'sticky top-16 z-20 -mx-5 border-b border-line bg-surface/95 px-5 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 @5xl/form:hidden'
+            : 'pt-1'
+        }
+      >
         <div className="flex items-center justify-between gap-4 text-sm">
           <p className="font-medium text-ink" aria-live="polite">
             Заполнено{' '}
@@ -73,36 +97,32 @@ export function JobQuestionnaire({ category, answers, onChange, errors = {} }: P
               {progress.answered} из {progress.total}
             </span>
           </p>
-          <p className="text-ink-soft tabular-nums">{percent}%</p>
+          <p className="text-ink-soft">
+            <span aria-hidden="true" className="text-accent">
+              *{' '}
+            </span>
+            обязательные вопросы
+          </p>
         </div>
-        <div
-          className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted-tint"
-          role="progressbar"
-          aria-label="Заполнение анкеты"
-          aria-valuemin={0}
-          aria-valuemax={progress.total}
-          aria-valuenow={progress.answered}
-        >
-          <div
-            className="h-full rounded-full bg-accent transition-[width] duration-500 ease-[var(--ease-out)] motion-reduce:transition-none"
-            style={{ width: `${percent}%` }}
-          />
-        </div>
+        <ProgressRuler answered={progress.answered} total={progress.total} className="mt-2" />
       </div>
 
-      <div className="mt-2 @container">
+      <div className="@container">
         {questionnaire.sections.map((section) => (
-          <section key={section.id} aria-labelledby={`qs-${section.id}`} className="pt-5">
+          <section
+            key={section.id}
+            aria-labelledby={`qs-${idPrefix}${section.id}`}
+            className="pt-7"
+          >
             <h3
-              id={`qs-${section.id}`}
-              className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-soft"
+              id={`qs-${idPrefix}${section.id}`}
+              className="flex items-center gap-3 text-[15px] font-semibold text-ink"
             >
               {section.title}
+              <span aria-hidden="true" className="h-px flex-1 bg-line" />
             </h3>
-            {/* На широкой форме вопросы раздела в две колонки; ветки раскрываются под своим вопросом. */}
-            <div className="mt-1 grid items-start @3xl:grid-cols-2 @3xl:gap-x-10">
-              {renderQuestions(section.questions, 0)}
-            </div>
+            {/* Ведомость: вопрос слева, ответы справа; строки разделены линиями. */}
+            <div className="mt-1">{renderQuestions(section.questions, 0)}</div>
           </section>
         ))}
       </div>
@@ -145,6 +165,7 @@ function Reveal({
 }
 
 interface BlockProps {
+  idPrefix: string;
   question: JobQuestion;
   depth: number;
   value: JobAnswer | undefined;
@@ -153,55 +174,88 @@ interface BlockProps {
   children?: React.ReactNode;
 }
 
-function QuestionBlock({ question, depth, value, error, onChange, children }: BlockProps) {
-  const labelId = `q-${question.id}-label`;
-  const hintId = question.hint ? `q-${question.id}-hint` : undefined;
-  const errorId = error ? `q-${question.id}-error` : undefined;
+function QuestionBlock({
+  idPrefix,
+  question,
+  depth,
+  value,
+  error,
+  onChange,
+  children,
+}: BlockProps) {
+  const base = `q-${idPrefix}${question.id}`;
+  const labelId = `${base}-label`;
+  const hintId = question.hint ? `${base}-hint` : undefined;
+  const errorId = error ? `${base}-error` : undefined;
   const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
   const nested = depth > 0;
 
-  return (
-    <div className="pt-4">
-      <div
-        id={`q-${question.id}`}
-        tabIndex={-1}
-        className={`scroll-mt-40 outline-none ${
-          nested ? 'border-l-2 border-accent/25 pl-4 sm:pl-5' : ''
-        }`}
+  const label = (
+    <div>
+      <p
+        id={labelId}
+        className={`font-medium leading-snug text-ink ${nested ? 'text-[15px]' : 'text-base'}`}
       >
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <p
-            id={labelId}
-            className={`font-medium text-ink ${nested ? 'text-[15px]' : 'text-base'}`}
-          >
-            {question.label}
-          </p>
-          {question.required ? (
-            <span className="rounded-full bg-accent-tint px-2 py-0.5 text-[11px] font-semibold text-accent">
-              обязательно
+        {question.label}
+        {question.required ? (
+          <>
+            <span aria-hidden="true" className="ml-0.5 text-accent">
+              *
             </span>
-          ) : null}
-        </div>
-        {question.hint ? (
-          <p id={hintId} className="mt-0.5 text-sm text-ink-soft">
-            {question.hint}
-          </p>
+            <span className="sr-only"> (обязательно)</span>
+          </>
         ) : null}
-        <div className="mt-3">
-          <QuestionControl
-            question={question}
-            value={value}
-            onChange={onChange}
-            labelId={labelId}
-            describedBy={describedBy}
-            invalid={Boolean(error)}
-          />
+      </p>
+      {question.hint ? (
+        <p id={hintId} className="mt-1 text-sm leading-snug text-ink-soft">
+          {question.hint}
+        </p>
+      ) : null}
+    </div>
+  );
+  const control = (
+    <>
+      <QuestionControl
+        question={question}
+        value={value}
+        onChange={onChange}
+        labelId={labelId}
+        describedBy={describedBy}
+        invalid={Boolean(error)}
+      />
+      {error ? (
+        <p id={errorId} className="mt-2 text-sm font-medium text-accent">
+          {error}
+        </p>
+      ) : null}
+    </>
+  );
+
+  // Вложенный вопрос — под ответом родителя, с линией ветки; верхний — строка ведомости.
+  if (nested) {
+    return (
+      <div className="pt-4">
+        <div
+          id={base}
+          tabIndex={-1}
+          className="scroll-mt-40 border-l-2 border-accent/30 pl-4 outline-none sm:pl-5"
+        >
+          {label}
+          <div className="mt-2.5">{control}</div>
+          {children}
         </div>
-        {error ? (
-          <p id={errorId} className="mt-2 text-sm font-medium text-accent">
-            {error}
-          </p>
-        ) : null}
+      </div>
+    );
+  }
+  return (
+    <div
+      id={base}
+      tabIndex={-1}
+      className="grid scroll-mt-40 gap-x-8 gap-y-3 py-5 outline-none @2xl:grid-cols-[minmax(9rem,13rem)_minmax(0,1fr)]"
+    >
+      <div className="@2xl:pt-2.5">{label}</div>
+      <div className="min-w-0">
+        {control}
         {children}
       </div>
     </div>
@@ -242,11 +296,11 @@ function QuestionControl(props: ControlProps<JobQuestion>) {
   }
 }
 
+// Варианты ответа — «образцы»: плитки с небольшим скруглением; выбранная заливается тёмным.
 const chipBase =
-  'inline-flex min-h-11 select-none items-center gap-2 rounded-full border px-4 py-2 text-left text-[15px] leading-snug transition-[background-color,border-color,color,transform,box-shadow] duration-150 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-2 focus-visible:outline-offset-2';
-const chipOff = 'border-line bg-surface text-ink hover:border-ink-soft/40 hover:bg-canvas';
-const chipOn =
-  'border-accent bg-accent-tint font-medium text-ink shadow-[inset_0_0_0_1px_var(--accent)]';
+  'inline-flex min-h-11 select-none items-center gap-2.5 rounded-[10px] border px-3.5 py-2 text-left text-[15px] leading-snug transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-2 focus-visible:outline-offset-2';
+const chipOff = 'border-line bg-surface text-ink hover:border-ink/35';
+const chipOn = 'border-ink bg-ink font-medium text-canvas';
 
 /** Один вариант из нескольких: radiogroup с переходом стрелками; повторный клик снимает выбор. */
 function ChoiceChips({
@@ -311,11 +365,11 @@ function ChoiceChips({
           >
             <span
               aria-hidden="true"
-              className={`grid size-4 shrink-0 place-items-center rounded-full border transition-colors duration-150 ${
-                on ? 'border-accent bg-accent' : 'border-ink-soft/40 bg-surface'
+              className={`grid size-3.5 shrink-0 place-items-center rounded-full border transition-colors duration-150 ${
+                on ? 'border-accent bg-accent' : 'border-ink/30'
               }`}
             >
-              <span className={`size-1.5 rounded-full bg-surface ${on ? '' : 'opacity-0'}`} />
+              <span className={`size-1 rounded-full bg-canvas ${on ? '' : 'opacity-0'}`} />
             </span>
             {option.label}
           </button>
@@ -382,8 +436,8 @@ function MultiChips({
           >
             <span
               aria-hidden="true"
-              className={`grid size-4 shrink-0 place-items-center rounded-[5px] border transition-colors duration-150 ${
-                on ? 'border-accent bg-accent text-accent-ink' : 'border-ink-soft/40 bg-surface'
+              className={`grid size-3.5 shrink-0 place-items-center rounded-[4px] border transition-colors duration-150 ${
+                on ? 'border-accent bg-accent text-accent-ink' : 'border-ink/30'
               }`}
             >
               {on ? <CheckIcon className="size-3 text-accent-ink" /> : null}

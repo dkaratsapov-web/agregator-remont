@@ -1,5 +1,6 @@
 import {
   findServiceCity,
+  JOB_ITEM_LIMITS,
   JOB_CATEGORIES,
   JOB_LIMITS,
   SERVICE_AREA_ERROR,
@@ -8,6 +9,8 @@ import {
 } from '@agregator/shared';
 import { Transform } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsDefined,
   IsIn,
   IsInt,
@@ -41,6 +44,22 @@ const CITY_PROPERTY = {
   maxLength: JOB_LIMITS.CITY_MAX,
   description:
     'Город или посёлок из списка SERVICE_CITIES (@agregator/shared): Москва и Московская область, Санкт-Петербург и Ленинградская область',
+};
+
+/** Позиции других категорий: { category, details }; проверяются validateJobItems в сервисе. */
+const EXTRA_ITEMS_PROPERTY = {
+  type: 'array' as const,
+  maxItems: JOB_ITEM_LIMITS.MAX_EXTRA,
+  items: {
+    type: 'object' as const,
+    required: ['category', 'details'],
+    properties: {
+      category: { $ref: '#/components/schemas/JobCategory' },
+      details: jobDetailsProperty('Ответы анкеты категории позиции'),
+    },
+  },
+  description:
+    'Позиции других категорий (до 4); категории не повторяются и не совпадают с основной. Без поля: []',
 };
 
 const apply =
@@ -119,6 +138,14 @@ export class CreateJobDto {
     description: 'Черновик, из которого опубликован заказ: удаляется в той же транзакции',
   })
   draftId?: string;
+
+  @IsOptional()
+  @IsArray({ message: 'Позиции заказа передаются списком' })
+  @ArrayMaxSize(JOB_ITEM_LIMITS.MAX_EXTRA, {
+    message: `В заказе может быть не больше ${JOB_ITEM_LIMITS.MAX_EXTRA + 1} категорий`,
+  })
+  @ApiPropertyOptional(EXTRA_ITEMS_PROPERTY)
+  extraItems?: unknown[];
 }
 
 /** Правка: любые поля из CreateJobDto; владелец, статус и даты через API не меняются. */
@@ -188,4 +215,15 @@ export class UpdateJobDto {
     ),
   )
   details?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsArray({ message: 'Позиции заказа передаются списком' })
+  @ArrayMaxSize(JOB_ITEM_LIMITS.MAX_EXTRA, {
+    message: `В заказе может быть не больше ${JOB_ITEM_LIMITS.MAX_EXTRA + 1} категорий`,
+  })
+  @ApiPropertyOptional({
+    ...EXTRA_ITEMS_PROPERTY,
+    description: 'Позиции других категорий целиком (заменяют прежние); без поля: не менять',
+  })
+  extraItems?: unknown[];
 }

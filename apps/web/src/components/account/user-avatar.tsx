@@ -11,10 +11,13 @@ export function UserAvatar({
   name,
   avatarVersion,
   className = 'size-9 text-sm',
+  shape = 'rounded-full',
 }: {
   name: string;
   avatarVersion: string | null;
   className?: string;
+  /** Скругление: круг в шапке, квадрат со скруглением в штампе аккаунта. */
+  shape?: string;
 }) {
   const initial = name.trim().charAt(0).toUpperCase() || '?';
   const [failedVersion, setFailedVersion] = useState<string | null>(null);
@@ -34,14 +37,14 @@ export function UserAvatar({
         src={`/account/avatar?v=${encodeURIComponent(avatarVersion)}`}
         alt=""
         onError={() => setFailedVersion(avatarVersion)}
-        className={`shrink-0 rounded-full bg-muted-tint object-cover ${className}`}
+        className={`shrink-0 ${shape} bg-muted-tint object-cover ${className}`}
       />
     );
   }
   return (
     <span
       aria-hidden="true"
-      className={`grid shrink-0 place-items-center rounded-full bg-ink font-semibold text-canvas ${className}`}
+      className={`grid shrink-0 place-items-center ${shape} bg-ink font-semibold text-canvas ${className}`}
     >
       {initial}
     </span>

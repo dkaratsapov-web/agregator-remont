@@ -70,12 +70,18 @@ export const sessionFrom = (setCookie) => /(__Host-ar_session|ar_session)=([^;]*
 export const sessionCookie = (token) => `__Host-ar_session=${token}; ar_session=${token}`;
 
 let counter = 0;
+// Своя подсеть на каждый процесс: скрипты в CI идут подряд, и общий адрес исчерпал бы лимит
+// регистраций (AUTH_RATE_LIMIT_PER_MIN) у следующего скрипта.
+const subnet = `10.${(process.pid >> 8) % 256}.${process.pid % 256}`;
 /** Регистрация через API; уникальный X-Forwarded-For, чтобы не упираться в лимит на вход. */
 export async function registerViaApi(role) {
   counter += 1;
   const res = await fetch(`${API}/v1/auth/register`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': `192.0.2.${counter}` },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Forwarded-For': `${subnet}.${counter % 250}`,
+    },
     body: JSON.stringify({
       email: `it-${role.toLowerCase()}-${Date.now()}-${counter}@example.ru`,
       password: 'integration-password-123',

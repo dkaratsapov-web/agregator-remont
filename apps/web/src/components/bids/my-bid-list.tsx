@@ -7,26 +7,26 @@ import { ConfirmActionForm } from './confirm-action-form';
 
 export function MyBidList({ bids, returnTo }: { bids: MyBidDto[]; returnTo: string }) {
   return (
-    <ul className="space-y-3">
+    <ul className="divide-y divide-line">
       {bids.map((bid) => (
-        <li key={bid.id} className="rounded-2xl border border-line bg-surface p-5">
+        <li key={bid.id} className="px-5 py-4 sm:px-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <Link
               href={`/jobs/${bid.job.id}`}
-              className="min-w-0 break-words font-semibold hover:underline"
+              className="min-w-0 font-semibold text-ink [overflow-wrap:anywhere] hover:underline hover:decoration-accent hover:underline-offset-4"
             >
               {bid.job.title}
             </Link>
             <BidStatusBadge status={bid.status} />
           </div>
           <p className="mt-1 text-sm text-ink-soft">
-            {bid.job.city}, заказ: {JOB_STATUS_LABELS[bid.job.status].toLowerCase()}. Отклик от{' '}
+            {bid.job.city} · заказ {JOB_STATUS_LABELS[bid.job.status].toLowerCase()} · отклик от{' '}
             <time dateTime={bid.createdAt}>{formatDate(bid.createdAt)}</time>
           </p>
-          <p className="mt-2 font-semibold tabular-nums">
+          <p className="mt-2 font-display text-lg font-semibold tabular-nums tracking-[-0.02em]">
             {formatAmount(bid.price)}&nbsp;₽
             {bid.durationDays !== null ? (
-              <span className="ml-2 text-sm font-normal text-ink-soft">
+              <span className="ml-2 font-sans text-sm font-normal tracking-normal text-ink-soft">
                 за {bid.durationDays} дн.
               </span>
             ) : null}

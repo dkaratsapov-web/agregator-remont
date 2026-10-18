@@ -24,7 +24,7 @@ export function ConfirmActionForm({
   const [state, formAction, pending] = useActionState<State, FormData>(action, {});
   return (
     <details className="group">
-      <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-ink hover:border-ink-soft/50 [&::-webkit-details-marker]:hidden">
+      <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-[10px] border border-line bg-surface px-4 text-sm font-semibold text-ink transition-colors duration-150 hover:border-ink/30 [&::-webkit-details-marker]:hidden">
         {summary}
       </summary>
       <form action={formAction} className="mt-3 space-y-3">
