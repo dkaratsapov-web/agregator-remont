@@ -61,7 +61,10 @@ export default async function LandingPage() {
               name: user.name,
               role: user.role,
               publicId: user.publicId,
-              avatarVersion: user.avatarVersion,
+              // Фото отдаётся из закрытой части (/account/avatar): если браузер ещё не знает пароль
+              // тестировщика, запрос картинки при загрузке главной вызвал бы окно ввода пароля.
+              // На главной вместо фото — первая буква имени; фото показывает приложение.
+              avatarVersion: null,
             }
           : null
       }
