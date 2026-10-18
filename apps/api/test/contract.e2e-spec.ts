@@ -458,6 +458,16 @@ describe('API contract (e2e)', () => {
       await check('put', ONE, put(customer.auth), 200);
       await check('put', ONE, put(customer.auth, { title: 'я'.repeat(200) }), 400);
       await check('put', ONE, put(customer.auth, {}, 'missing'), 404);
+      // Черновик изменён в другой вкладке: устаревшая версия → 409.
+      await check(
+        'put',
+        ONE,
+        put(customer.auth, {
+          title: 'Старая вкладка',
+          expectedUpdatedAt: '2020-01-01T00:00:00.000Z',
+        }),
+        409,
+      );
       await check('put', ONE, put(), 401);
       await check('put', ONE, put(contractor.auth), 403);
 

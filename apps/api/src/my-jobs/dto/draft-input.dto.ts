@@ -5,6 +5,7 @@ import {
   IsArray,
   IsIn,
   IsInt,
+  IsISO8601,
   IsObject,
   IsOptional,
   IsString,
@@ -120,4 +121,13 @@ export class SaveDraftDto {
     description: 'Позиции других категорий; проверяются мягко, неверные отбрасываются',
   })
   extraItems?: unknown[];
+
+  @IsOptional()
+  @IsISO8601({ strict: true }, { message: 'Неверная версия черновика' })
+  @ApiPropertyOptional({
+    format: 'date-time',
+    description:
+      'Только при замене (PUT): updatedAt черновика, с которым работает форма. Изменён в другой вкладке — 409',
+  })
+  expectedUpdatedAt?: string;
 }

@@ -47,11 +47,26 @@ export class DraftsService {
 
   /** Полная замена содержимого: черновик сохраняется формой целиком. */
   async replace(ownerId: string, id: string, dto: SaveDraftDto): Promise<JobDraftDto> {
+    const where = { id: ENTITY_ID_PATTERN.test(id) ? id : '', ownerId };
+    if (dto.expectedUpdatedAt === undefined) {
+      const { count } = await this.prisma.jobDraft.updateMany({ where, data: toData(dto) });
+      if (count === 0) throw new NotFoundException(NOT_FOUND);
+      return this.get(ownerId, id);
+    }
+    // Форма знает версию черновика: замена — только если его не изменили в другой вкладке
+    // (условие в самом UPDATE, без гонки между проверкой и записью; MVP-6).
     const { count } = await this.prisma.jobDraft.updateMany({
-      where: { id: ENTITY_ID_PATTERN.test(id) ? id : '', ownerId },
+      where: { ...where, updatedAt: new Date(dto.expectedUpdatedAt) },
       data: toData(dto),
     });
-    if (count === 0) throw new NotFoundException(NOT_FOUND);
+    if (count === 0) {
+      if ((await this.prisma.jobDraft.count({ where })) === 0) {
+        throw new NotFoundException(NOT_FOUND);
+      }
+      throw new ConflictException(
+        'Черновик изменён в другой вкладке. Обновите страницу, чтобы не потерять изменения.',
+      );
+    }
     return this.get(ownerId, id);
   }
 

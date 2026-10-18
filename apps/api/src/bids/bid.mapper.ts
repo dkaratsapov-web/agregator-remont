@@ -11,6 +11,7 @@ export function toBidDto(bid: Bid): BidDto {
     durationDays: bid.durationDays,
     comment: bid.comment,
     createdAt: bid.createdAt.toISOString(),
+    jobChangedAt: bid.jobChangedAt?.toISOString() ?? null,
   };
 }
 

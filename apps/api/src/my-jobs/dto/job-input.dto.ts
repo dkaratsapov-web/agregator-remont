@@ -14,9 +14,11 @@ import {
   IsDefined,
   IsIn,
   IsInt,
+  IsISO8601,
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
   Length,
   Matches,
   Max,
@@ -140,6 +142,15 @@ export class CreateJobDto {
   draftId?: string;
 
   @IsOptional()
+  @IsUUID('all', { message: 'Неверный ключ формы' })
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Ключ формы публикации: повтор запроса с тем же ключом (двойной клик, обрыв связи) вернёт уже созданный заказ',
+  })
+  requestId?: string;
+
+  @IsOptional()
   @IsArray({ message: 'Позиции заказа передаются списком' })
   @ArrayMaxSize(JOB_ITEM_LIMITS.MAX_EXTRA, {
     message: `В заказе может быть не больше ${JOB_ITEM_LIMITS.MAX_EXTRA + 1} категорий`,
@@ -226,4 +237,13 @@ export class UpdateJobDto {
     description: 'Позиции других категорий целиком (заменяют прежние); без поля: не менять',
   })
   extraItems?: unknown[];
+
+  @IsOptional()
+  @IsISO8601({ strict: true }, { message: 'Неверная версия заказа' })
+  @ApiPropertyOptional({
+    format: 'date-time',
+    description:
+      'updatedAt заказа, с которым открыта форма. Если заказ с тех пор изменён (другая вкладка) — 409, правка не применяется',
+  })
+  expectedUpdatedAt?: string;
 }

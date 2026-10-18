@@ -60,6 +60,8 @@ export interface BidDto {
   comment: string;
   /** ISO 8601 */
   createdAt: string;
+  /** ISO 8601: когда заказчик изменил заказ после этого отклика; null — не менял. */
+  jobChangedAt: string | null;
 }
 
 /** Отклик в кабинете подрядчика: с краткой информацией о заказе. */

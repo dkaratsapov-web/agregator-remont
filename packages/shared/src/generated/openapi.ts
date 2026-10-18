@@ -610,6 +610,11 @@ export interface components {
                     [key: string]: string | number | boolean | string[];
                 };
             }[];
+            /**
+             * Format: uuid
+             * @description Ключ формы публикации: повтор запроса с тем же ключом (двойной клик, обрыв связи) вернёт уже созданный заказ
+             */
+            requestId?: string;
             title: string;
         };
         CreateLeadDto: {
@@ -644,6 +649,11 @@ export interface components {
             createdAt: string;
             durationDays: number | null;
             id: string;
+            /**
+             * Format: date-time
+             * @description Когда заказчик изменил заказ после этого отклика; null — не менял
+             */
+            jobChangedAt: string | null;
             jobId: string;
             /** @description Целые рубли */
             price: number;
@@ -737,6 +747,11 @@ export interface components {
             durationDays: number | null;
             id: string;
             job: components["schemas"]["MyBidJob"];
+            /**
+             * Format: date-time
+             * @description Когда заказчик изменил заказ после этого отклика; null — не менял
+             */
+            jobChangedAt: string | null;
             jobId: string;
             /** @description Целые рубли */
             price: number;
@@ -856,6 +871,11 @@ export interface components {
             details?: {
                 [key: string]: string | number | boolean | string[];
             };
+            /**
+             * Format: date-time
+             * @description Только при замене (PUT): updatedAt черновика, с которым работает форма. Изменён в другой вкладке — 409
+             */
+            expectedUpdatedAt?: string;
             /** @description Позиции других категорий; проверяются мягко, неверные отбрасываются */
             extraItems?: Record<string, never>[];
             title?: string | null;
@@ -901,6 +921,11 @@ export interface components {
             details?: {
                 [key: string]: string | number | boolean | string[];
             };
+            /**
+             * Format: date-time
+             * @description updatedAt заказа, с которым открыта форма. Если заказ с тех пор изменён (другая вкладка) — 409, правка не применяется
+             */
+            expectedUpdatedAt?: string;
             /** @description Позиции других категорий целиком (заменяют прежние); без поля: не менять */
             extraItems?: {
                 category: components["schemas"]["JobCategory"];
@@ -2298,6 +2323,15 @@ export interface operations {
             };
             /** @description Ресурса нет или он принадлежит другому пользователю */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Конфликт с текущим состоянием ресурса */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

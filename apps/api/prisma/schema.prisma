@@ -91,7 +91,11 @@ model Job {
   bids        Bid[]
   createdAt   DateTime      @default(now()) @map("created_at")
   updatedAt   DateTime      @updatedAt @map("updated_at")
+  /// Ключ формы публикации (UUID): повтор того же запроса (двойной клик, обрыв связи) вернёт
+  /// уже созданный заказ, а не создаст второй. Уникален в пределах владельца.
+  requestId   String?       @map("request_id") @db.Uuid
 
+  @@unique([ownerId, requestId])
   @@index([createdAt(sort: Desc), id(sort: Desc)])
   @@index([category, createdAt(sort: Desc)])
   @@index([ownerId, createdAt(sort: Desc)])
@@ -243,6 +247,9 @@ model Bid {
   status       BidStatus @default(PENDING)
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
+  /// Когда заказчик изменил заказ после этого отклика (описание, бюджет, анкету…): подрядчик
+  /// видит пометку «заказ изменён после вашего отклика». null — не менялся.
+  jobChangedAt DateTime? @map("job_changed_at")
 
   @@unique([jobId, contractorId])
   @@index([contractorId, createdAt(sort: Desc)])

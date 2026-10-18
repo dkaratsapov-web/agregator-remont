@@ -199,6 +199,13 @@ class BidFields {
   @int({ nullable: true }) durationDays!: number | null;
   @ApiProperty() comment!: string;
   @dateTime() createdAt!: string;
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'Когда заказчик изменил заказ после этого отклика; null — не менял',
+  })
+  jobChangedAt!: string | null;
 }
 
 @ApiSchema({ name: 'MyBidJob' })

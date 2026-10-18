@@ -30,6 +30,10 @@ const JOB_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 export const DRAFT_ALREADY_PUBLISHED =
   'Заказ из этого черновика уже опубликован. Проверьте «Мои заказы»; если его там нет, опубликуйте ещё раз.';
 
+/** Правка устаревшей формы (заказ изменён в другой вкладке): ответ 409 без изменений. */
+export const JOB_CHANGED_ELSEWHERE =
+  'Заказ изменён в другой вкладке или окне. Обновите страницу, чтобы увидеть изменения, и внесите правку ещё раз.';
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const EDITABLE_FIELDS = [
   'title',
@@ -81,6 +85,15 @@ export class MyJobsService {
       // Блокировка строки пользователя сериализует создание заказов одним пользователем:
       // параллельные запросы считают квоту по очереди и не могут превысить её.
       await tx.$queryRaw`SELECT id FROM users WHERE id = ${ownerId} FOR UPDATE`;
+      // Повтор того же запроса (двойной клик, повтор после обрыва связи) с тем же ключом формы:
+      // возвращается уже созданный заказ, второй не создаётся. Под блокировкой пользователя
+      // параллельные повторы идут по очереди и находят первый (AUDIT_FINDINGS MVP-1).
+      if (dto.requestId) {
+        const existing = await tx.job.findUnique({
+          where: { ownerId_requestId: { ownerId, requestId: dto.requestId } },
+        });
+        if (existing) return existing;
+      }
       const createdToday = await tx.job.count({
         where: { ownerId, createdAt: { gt: new Date(Date.now() - DAY_MS) } },
       });
@@ -112,6 +125,7 @@ export class MyJobsService {
           details,
           extraItems: extraItems as unknown as Prisma.InputJsonArray,
           ownerId,
+          requestId: dto.requestId ?? null,
         },
       });
       await writeAudit(tx, {
@@ -135,6 +149,14 @@ export class MyJobsService {
       const current = await this.lockOwned(tx, ownerId, id);
       if (current.status !== 'OPEN') {
         throw new ConflictException('Редактировать можно только открытый заказ');
+      }
+      // Форма открыта на старой версии (заказ изменён в другой вкладке или окне): правка не
+      // применяется, иначе она молча затёрла бы чужие изменения (MVP-2).
+      if (
+        dto.expectedUpdatedAt !== undefined &&
+        new Date(dto.expectedUpdatedAt).getTime() !== current.updatedAt.getTime()
+      ) {
+        throw new ConflictException(JOB_CHANGED_ELSEWHERE);
       }
 
       const data: Prisma.JobUpdateInput = {};
@@ -192,6 +214,12 @@ export class MyJobsService {
           entityType: 'job',
           entityId: id,
           changes,
+        });
+        // Заказ изменён после откликов: подрядчики видят пометку на своих ожидающих откликах,
+        // заказчик — что отклик дан до изменения (решение владельца по MVP-3).
+        await tx.bid.updateMany({
+          where: { jobId: id, status: 'PENDING' },
+          data: { jobChangedAt: updated.updatedAt },
         });
       }
       return updated;
