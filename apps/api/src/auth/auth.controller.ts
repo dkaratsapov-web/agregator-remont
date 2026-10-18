@@ -1,5 +1,5 @@
 import type { AuthSessionDto } from '@agregator/shared';
-import { Body, Controller, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Headers, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import type { AuthContext } from './auth.types';
 import { CurrentAuth } from './current-auth.decorator';
@@ -11,6 +11,12 @@ import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from
 import { ApiErrors, ApiSession } from '../openapi/decorators';
 import { AuthSessionSchema } from '../openapi/schemas';
 
+/**
+ * User-Agent браузера, который передаёт web (сам web обращается к API со своим). Используется
+ * только для подписи устройства в списке входов, на безопасность не влияет.
+ */
+const CLIENT_UA_HEADER = 'x-client-user-agent';
+
 @ApiTags('auth')
 @ApiErrors(429)
 @Controller('v1/auth')
@@ -21,8 +27,11 @@ export class AuthController {
   @AuthRateLimited()
   @ApiCreatedResponse({ type: AuthSessionSchema })
   @ApiErrors(400, 409)
-  register(@Body() dto: RegisterDto): Promise<AuthSessionDto> {
-    return this.auth.register(dto);
+  register(
+    @Body() dto: RegisterDto,
+    @Headers(CLIENT_UA_HEADER) userAgent?: string,
+  ): Promise<AuthSessionDto> {
+    return this.auth.register(dto, userAgent);
   }
 
   @Post('login')
@@ -30,8 +39,11 @@ export class AuthController {
   @AuthRateLimited()
   @ApiOkResponse({ type: AuthSessionSchema })
   @ApiErrors(400, 401)
-  login(@Body() dto: LoginDto): Promise<AuthSessionDto> {
-    return this.auth.login(dto);
+  login(
+    @Body() dto: LoginDto,
+    @Headers(CLIENT_UA_HEADER) userAgent?: string,
+  ): Promise<AuthSessionDto> {
+    return this.auth.login(dto, userAgent);
   }
 
   @Post('logout')

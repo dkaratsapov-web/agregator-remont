@@ -64,18 +64,24 @@ const HERO_POINTS = [
 ];
 
 function HeroCopy() {
-  // Неразрывный пробел перед тире: тире не уходит в начало строки.
-  const words = ['Гарантыч\u00a0—', 'честный', 'ремонт', 'без', 'лишнего', 'риска!'];
+  const words = ['честный', 'ремонт', 'без', 'лишнего', 'риска!'];
   return (
     <div>
       <h1
         id="hero-title"
         className="font-display text-[2rem] font-semibold leading-[1.06] tracking-[-0.035em] text-ink sm:text-[2.75rem] lg:text-[3rem] xl:text-[3.2rem]"
       >
+        {/* Неразрывный пробел перед тире: тире не уходит в начало строки. */}
+        <span className="word-mask word-mask--brand">
+          <span style={{ '--i': 0 } as React.CSSProperties}>
+            <span className="brand-mark">Гарантыч</span>
+            {'\u00a0—'}
+          </span>
+        </span>{' '}
         {words.map((word, i) => (
           <span key={word}>
             <span className="word-mask">
-              <span style={{ '--i': i } as React.CSSProperties}>{word}</span>
+              <span style={{ '--i': i + 1 } as React.CSSProperties}>{word}</span>
             </span>{' '}
           </span>
         ))}
@@ -341,7 +347,7 @@ function ScrollyStory() {
       {/* Якорь «Как это работает» указывает на первый шаг внутри трека. */}
       <span id="how-it-works" aria-hidden="true" className="absolute left-0 top-[19%]" />
       <div className="sticky top-0 h-svh overflow-hidden">
-        <div className="mx-auto grid h-full max-w-7xl grid-rows-[minmax(0,1fr)_auto] gap-2 px-4 pb-10 pt-16 sm:px-6 lg:grid-cols-12 lg:grid-rows-1 lg:items-center lg:gap-8 lg:px-8 lg:pb-0 lg:pt-16">
+        <div className="mx-auto grid h-full max-w-[1600px] grid-rows-[minmax(0,1fr)_auto] gap-2 px-4 pb-10 pt-16 sm:px-6 lg:grid-cols-12 lg:grid-rows-1 lg:items-center lg:gap-8 lg:px-10 lg:pb-0 lg:pt-16">
           <div className="relative order-2 grid lg:order-1 lg:col-span-6">
             <motion.div
               className="relative z-10 [grid-area:1/1]"
@@ -373,7 +379,7 @@ function ScrollyStory() {
         </div>
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0">
-          <div className="mx-auto flex max-w-7xl items-end justify-between gap-6 px-4 pb-5 sm:px-6 lg:px-8 lg:pb-7">
+          <div className="mx-auto flex max-w-[1600px] items-end justify-between gap-6 px-4 pb-5 sm:px-6 lg:px-10 lg:pb-7">
             <div className="flex w-full max-w-xs gap-1.5 lg:max-w-sm" aria-hidden="true">
               {STEPS.map((step, i) => (
                 <RailSegment key={step.title} index={i} progress={progress} />
@@ -398,7 +404,10 @@ function StaticStory() {
   const done = useMotionValue(1);
   const zero = useMotionValue(0);
   return (
-    <section aria-labelledby="hero-title" className="mx-auto max-w-7xl px-4 pt-24 sm:px-6 lg:px-8">
+    <section
+      aria-labelledby="hero-title"
+      className="mx-auto max-w-[1600px] px-4 pt-24 sm:px-6 lg:px-10"
+    >
       <div className="grid items-center gap-8 lg:grid-cols-12">
         <div className="lg:col-span-6">
           <HeroCopy />

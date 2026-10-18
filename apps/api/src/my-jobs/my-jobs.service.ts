@@ -1,4 +1,11 @@
-import { JOB_LIMITS, type OwnJobDto, type Paginated } from '@agregator/shared';
+import {
+  JOB_LIMITS,
+  validateJobDetails,
+  type JobCategory,
+  type JobDetails,
+  type OwnJobDto,
+  type Paginated,
+} from '@agregator/shared';
 import {
   BadRequestException,
   ConflictException,
@@ -8,11 +15,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Job, Prisma } from '@prisma/client';
-import { diffFields, writeAudit } from '../audit/audit';
+import { diffFields, writeAudit, type FieldChanges } from '../audit/audit';
 import { BidsService } from '../bids/bids.service';
 import { PaginationQuery } from '../jobs/dto/list-jobs.query';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateJobDto, UpdateJobDto } from './dto/job-input.dto';
+import { readJobDetails } from '../jobs/job.mapper';
 import { toOwnJobDto } from './own-job.mapper';
 
 const JOB_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
@@ -59,6 +67,8 @@ export class MyJobsService {
 
   async create(ownerId: string, dto: CreateJobDto): Promise<OwnJobDto> {
     assertBudgetRange(dto.budgetMin, dto.budgetMax);
+    // Анкета обязательна: обязательные вопросы категории должны быть отвечены.
+    const details = checkDetails(dto.category, dto.details);
 
     const job = await this.prisma.$transaction(async (tx) => {
       // Блокировка строки пользователя сериализует создание заказов одним пользователем:
@@ -83,6 +93,7 @@ export class MyJobsService {
           city: dto.city,
           budgetMin: dto.budgetMin,
           budgetMax: dto.budgetMax,
+          details,
           ownerId,
         },
       });
@@ -91,7 +102,10 @@ export class MyJobsService {
         action: 'JOB_CREATED',
         entityType: 'job',
         entityId: created.id,
-        changes: diffFields(null, created, [...EDITABLE_FIELDS, 'status']),
+        changes: {
+          ...diffFields(null, created, [...EDITABLE_FIELDS, 'status']),
+          ...diffDetails({}, details),
+        },
       });
       return created;
     });
@@ -112,6 +126,18 @@ export class MyJobsService {
       if (dto.city !== undefined) data.city = dto.city;
       if (dto.budgetMin !== undefined) data.budgetMin = dto.budgetMin;
       if (dto.budgetMax !== undefined) data.budgetMax = dto.budgetMax;
+      const category = dto.category ?? current.category;
+      const before = readJobDetails(current);
+      let details: JobDetails | undefined;
+      if (dto.details !== undefined) {
+        details = checkDetails(category, dto.details);
+      } else if (category !== current.category) {
+        // У новой категории своя анкета с обязательными вопросами: без ответов не меняем.
+        throw new BadRequestException('При смене категории заполните анкету новой категории');
+      }
+      // Правка без details оставляет ответы как есть. У заказов, созданных до анкеты (legacy),
+      // ответов нет: владелец видит это на странице заказа и дополняет анкету через форму.
+      if (details !== undefined) data.details = details;
       if (Object.keys(data).length === 0) {
         throw new BadRequestException('Нет полей для изменения');
       }
@@ -124,7 +150,10 @@ export class MyJobsService {
       // поэтому «было» в журнале — это действительно предыдущее состояние.
       const updated = await tx.job.update({ where: { id }, data });
 
-      const changes = diffFields(current, updated, EDITABLE_FIELDS);
+      const changes = {
+        ...diffFields(current, updated, EDITABLE_FIELDS),
+        ...(details !== undefined ? diffDetails(before, details) : {}),
+      };
       if (Object.keys(changes).length > 0) {
         await writeAudit(tx, {
           actorId: ownerId,
@@ -181,4 +210,17 @@ function assertBudgetRange(min: number | null | undefined, max: number | null | 
   if (min != null && max != null && min > max) {
     throw new BadRequestException('Минимальный бюджет не может быть больше максимального');
   }
+}
+
+function checkDetails(category: JobCategory, input: unknown): JobDetails {
+  const result = validateJobDetails(category, input);
+  if (!result.ok) throw new BadRequestException(`Анкета заказа: ${result.message}`);
+  return result.details;
+}
+
+/** Ответы анкеты в журнале: одно поле details, если ответы изменились. */
+function diffDetails(before: JobDetails, after: JobDetails): FieldChanges {
+  return JSON.stringify(before) === JSON.stringify(after)
+    ? {}
+    : { details: { from: before, to: after } };
 }

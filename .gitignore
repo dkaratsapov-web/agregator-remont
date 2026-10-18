@@ -30,3 +30,6 @@ api.log
 web.log
 api.pid
 deploy/.env
+
+# временные копии репозитория для параллельной работы агентов Claude Code
+.claude/worktrees/

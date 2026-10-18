@@ -1,9 +1,12 @@
+import { PRIVACY_OPERATOR } from '@agregator/shared';
 import { Features } from '@/components/landing/features';
+import { LeadForm } from '@/components/landing/lead-form';
 import { LandingHeader } from '@/components/landing/landing-header';
 import { Manifesto } from '@/components/landing/manifesto';
 import { Preloader } from '@/components/landing/preloader';
+import { ScrollReset } from '@/components/landing/scroll-reset';
 import { Reveal } from '@/components/landing/reveal';
-import { PrimaryCta, Story } from '@/components/landing/story';
+import { Story } from '@/components/landing/story';
 import { ViewerProvider } from '@/components/landing/viewer';
 import { Wordmark } from '@/components/landing/wordmark';
 import { getCurrentUser } from '@/lib/session';
@@ -51,7 +54,10 @@ export default async function LandingPage() {
   // Запрос к API только при cookie сессии: гость получает страницу без обращения к API.
   const user = await getCurrentUser();
   return (
-    <ViewerProvider viewer={user ? { name: user.name, role: user.role } : null}>
+    <ViewerProvider
+      viewer={user ? { name: user.name, role: user.role, avatarVersion: user.avatarVersion } : null}
+    >
+      <ScrollReset />
       <Preloader />
       <span id="top" aria-hidden="true" className="absolute top-0" />
       <LandingHeader />
@@ -101,32 +107,35 @@ export default async function LandingPage() {
         </section>
 
         {/* О сервисе */}
-        <section id="about" className="mx-auto max-w-7xl px-4 py-28 sm:px-6 lg:px-8 lg:py-40">
+        <section id="about" className="mx-auto max-w-[1600px] px-4 py-28 sm:px-6 lg:px-10 lg:py-40">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">О сервисе</p>
           <div className="mt-6 max-w-5xl">
             <Manifesto text="Мы делаем Гарантыч, чтобы цена и срок ремонта были известны до начала работ, а деньги переходили мастеру только после того, как вы приняли этап." />
           </div>
         </section>
 
-        {/* Призыв */}
-        <section className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+        {/* Заявка на закрытое тестирование */}
+        <section id="apply" className="mx-auto max-w-[1600px] px-4 pb-24 sm:px-6 lg:px-10">
           <Reveal>
-            <div className="iso-grid landing-shadow-lg relative overflow-hidden rounded-[28px] border border-line/70 bg-surface px-6 py-16 sm:px-12 sm:py-20 lg:px-16">
+            <div className="iso-grid landing-shadow-lg relative grid gap-10 overflow-hidden rounded-[28px] border border-line/70 bg-surface px-6 py-12 sm:px-12 sm:py-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-16 lg:px-16">
               <div
                 aria-hidden="true"
                 className="pointer-events-none absolute -right-24 -top-24 size-80 rounded-full bg-[radial-gradient(closest-side,rgb(194_65_12/0.14),transparent)]"
               />
-              <div className="relative max-w-2xl">
-                <h2 className="font-display text-3xl font-semibold leading-[1.08] tracking-[-0.035em] sm:text-5xl">
-                  Сервис в закрытом тестировании
-                </h2>
-                <p className="mt-5 max-w-xl text-lg leading-relaxed text-ink-soft">
-                  Если вы получили доступ, войдите в кабинет: разместите заказ или откликнитесь на
-                  заказы в каталоге.
+              <div className="relative">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">
+                  Закрытое тестирование
                 </p>
-                <div className="mt-9">
-                  <PrimaryCta />
-                </div>
+                <h2 className="font-display mt-4 text-3xl font-semibold leading-[1.08] tracking-[-0.035em] sm:text-5xl">
+                  Оставить заявку на участие в закрытом тестировании
+                </h2>
+                <p className="mt-5 max-w-md text-lg leading-relaxed text-ink-soft">
+                  Оставьте имя и телефон: свяжемся, когда откроем доступ для новых заказчиков и
+                  мастеров.
+                </p>
+              </div>
+              <div className="relative self-center">
+                <LeadForm open={PRIVACY_OPERATOR !== null} />
               </div>
             </div>
           </Reveal>
@@ -134,9 +143,17 @@ export default async function LandingPage() {
       </main>
 
       <footer className="border-t border-line">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-10 pb-[max(2.5rem,env(safe-area-inset-bottom))] text-sm text-ink-soft sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-4 py-10 pb-[max(2.5rem,env(safe-area-inset-bottom))] text-sm text-ink-soft sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-10">
           <Wordmark />
-          <p>Площадка заказов на ремонт и строительство. Закрытое тестирование, 2026.</p>
+          <p className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-6">
+            <span>Площадка заказов на ремонт и строительство. Закрытое тестирование, 2026.</span>
+            <a
+              href="/privacy"
+              className="underline decoration-line underline-offset-4 hover:text-ink hover:decoration-accent"
+            >
+              Политика конфиденциальности
+            </a>
+          </p>
         </div>
       </footer>
     </ViewerProvider>

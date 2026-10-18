@@ -54,6 +54,25 @@
         ],
         "type": "string"
       },
+      "ChangePasswordDto": {
+        "additionalProperties": false,
+        "properties": {
+          "currentPassword": {
+            "maxLength": 128,
+            "type": "string"
+          },
+          "newPassword": {
+            "maxLength": 128,
+            "minLength": 10,
+            "type": "string"
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "type": "object"
+      },
       "ContractorProfileDto": {
         "additionalProperties": false,
         "properties": {
@@ -145,6 +164,7 @@
             ]
           },
           "city": {
+            "description": "Город или посёлок из списка SERVICE_CITIES (@agregator/shared): Москва и Московская область, Санкт-Петербург и Ленинградская область",
             "maxLength": 100,
             "minLength": 2,
             "type": "string"
@@ -153,6 +173,29 @@
             "maxLength": 5000,
             "minLength": 20,
             "type": "string"
+          },
+          "details": {
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
+            "description": "Ответы анкеты категории { id вопроса: значение }. Обязательные вопросы категории должны быть отвечены",
+            "type": "object"
           },
           "title": {
             "maxLength": 160,
@@ -164,7 +207,40 @@
           "title",
           "description",
           "category",
-          "city"
+          "city",
+          "details"
+        ],
+        "type": "object"
+      },
+      "CreateLeadDto": {
+        "additionalProperties": false,
+        "properties": {
+          "consent": {
+            "description": "Согласие на обработку персональных данных",
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 2,
+            "type": "string"
+          },
+          "phone": {
+            "example": "+7 900 123-45-67",
+            "maxLength": 25,
+            "type": "string"
+          },
+          "website": {
+            "description": "Ловушка для ботов: людям не показывается, должна быть пустой",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "phone",
+          "consent"
         ],
         "type": "object"
       },
@@ -317,6 +393,29 @@
           "description": {
             "type": "string"
           },
+          "details": {
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
+            "description": "Ответы анкеты категории { id вопроса: значение }; {} если анкета не заполнена",
+            "type": "object"
+          },
           "id": {
             "type": "string"
           },
@@ -341,6 +440,7 @@
           "budgetMax",
           "currency",
           "status",
+          "details",
           "createdAt"
         ],
         "type": "object"
@@ -352,6 +452,55 @@
           "CLOSED"
         ],
         "type": "string"
+      },
+      "LeadDto": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "example": "+79001234567",
+            "pattern": "^\\+7[3489][0-9]{9}$",
+            "type": "string"
+          },
+          "processedAt": {
+            "description": "null — заявка ещё не обработана",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "phone",
+          "createdAt",
+          "processedAt"
+        ],
+        "type": "object"
+      },
+      "LeadReceived": {
+        "additionalProperties": false,
+        "properties": {
+          "received": {
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "received"
+        ],
+        "type": "object"
       },
       "LoginDto": {
         "additionalProperties": false,
@@ -485,6 +634,29 @@
           "description": {
             "type": "string"
           },
+          "details": {
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
+            "description": "Ответы анкеты категории { id вопроса: значение }; {} если анкета не заполнена",
+            "type": "object"
+          },
           "editable": {
             "description": "Редактировать можно только открытый заказ",
             "type": "boolean"
@@ -517,6 +689,7 @@
           "budgetMax",
           "currency",
           "status",
+          "details",
           "createdAt",
           "updatedAt",
           "editable"
@@ -529,6 +702,33 @@
           "items": {
             "items": {
               "$ref": "#/components/schemas/JobDto"
+            },
+            "type": "array"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total"
+        ],
+        "type": "object"
+      },
+      "PaginatedLeadDto": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LeadDto"
             },
             "type": "array"
           },
@@ -645,6 +845,108 @@
         ],
         "type": "string"
       },
+      "SessionDto": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "current": {
+            "description": "Сессия, с которой сделан запрос",
+            "type": "boolean"
+          },
+          "device": {
+            "description": "Например «Chrome, Windows»",
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "lastSeenAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "device",
+          "createdAt",
+          "lastSeenAt",
+          "current"
+        ],
+        "type": "object"
+      },
+      "SessionsRevoked": {
+        "additionalProperties": false,
+        "properties": {
+          "revoked": {
+            "description": "Сколько сессий завершено",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revoked"
+        ],
+        "type": "object"
+      },
+      "UiMotion": {
+        "enum": [
+          "system",
+          "reduced"
+        ],
+        "type": "string"
+      },
+      "UiPreferences": {
+        "additionalProperties": false,
+        "properties": {
+          "motion": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UiMotion"
+              }
+            ]
+          },
+          "scale": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UiScale"
+              }
+            ]
+          },
+          "theme": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UiTheme"
+              }
+            ]
+          }
+        },
+        "required": [
+          "theme",
+          "scale",
+          "motion"
+        ],
+        "type": "object"
+      },
+      "UiScale": {
+        "enum": [
+          "compact",
+          "normal",
+          "large"
+        ],
+        "type": "string"
+      },
+      "UiTheme": {
+        "enum": [
+          "light",
+          "dark",
+          "system"
+        ],
+        "type": "string"
+      },
       "UpdateJobDto": {
         "additionalProperties": false,
         "properties": {
@@ -670,6 +972,7 @@
             ]
           },
           "city": {
+            "description": "Город или посёлок из списка SERVICE_CITIES (@agregator/shared): Москва и Московская область, Санкт-Петербург и Ленинградская область",
             "maxLength": 100,
             "minLength": 2,
             "type": "string"
@@ -679,9 +982,93 @@
             "minLength": 20,
             "type": "string"
           },
+          "details": {
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
+            "description": "Ответы анкеты целиком (заменяют прежние); без поля: не менять. При смене категории обязательно",
+            "type": "object"
+          },
           "title": {
             "maxLength": 160,
             "minLength": 5,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateLeadDto": {
+        "additionalProperties": false,
+        "properties": {
+          "processed": {
+            "description": "true — заявка обработана, false — вернуть в новые",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "processed"
+        ],
+        "type": "object"
+      },
+      "UpdatePreferencesDto": {
+        "additionalProperties": false,
+        "properties": {
+          "motion": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UiMotion"
+              }
+            ]
+          },
+          "scale": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UiScale"
+              }
+            ]
+          },
+          "theme": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UiTheme"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "UpdateProfileDto": {
+        "additionalProperties": false,
+        "properties": {
+          "city": {
+            "maxLength": 80,
+            "nullable": true,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 2,
+            "type": "string"
+          },
+          "phone": {
+            "example": "+7 900 123-45-67",
+            "nullable": true,
             "type": "string"
           }
         },
@@ -726,6 +1113,16 @@
       "UserDto": {
         "additionalProperties": false,
         "properties": {
+          "avatarVersion": {
+            "description": "Версия фото для адреса картинки; null — фото нет",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "city": {
+            "nullable": true,
+            "type": "string"
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -738,6 +1135,14 @@
           },
           "name": {
             "type": "string"
+          },
+          "phone": {
+            "nullable": true,
+            "pattern": "^\\+7[3489][0-9]{9}$",
+            "type": "string"
+          },
+          "preferences": {
+            "$ref": "#/components/schemas/UiPreferences"
           },
           "role": {
             "allOf": [
@@ -752,6 +1157,10 @@
           "email",
           "name",
           "role",
+          "phone",
+          "city",
+          "avatarVersion",
+          "preferences",
           "createdAt"
         ],
         "type": "object"
@@ -803,10 +1212,216 @@
         ]
       }
     },
+    "/v1/admin/leads": {
+      "get": {
+        "operationId": "AdminLeads_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 10000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 12,
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "new — необработанные, processed — обработанные",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": [
+                "new",
+                "processed"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedLeadDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/leads/{id}": {
+      "patch": {
+        "operationId": "AdminLeads_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLeadDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeadDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/v1/auth/login": {
       "post": {
         "operationId": "Auth_login",
-        "parameters": [],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-client-user-agent",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -906,7 +1521,16 @@
     "/v1/auth/register": {
       "post": {
         "operationId": "Auth_register",
-        "parameters": [],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-client-user-agent",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1221,6 +1845,67 @@
         ]
       }
     },
+    "/v1/leads": {
+      "post": {
+        "operationId": "Leads_create",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLeadDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeadReceived"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Функция временно выключена"
+          }
+        },
+        "tags": [
+          "leads"
+        ]
+      }
+    },
     "/v1/me": {
       "get": {
         "operationId": "Me_me",
@@ -1245,6 +1930,255 @@
               }
             },
             "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
+        ]
+      },
+      "patch": {
+        "operationId": "Me_updateProfile",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/avatar": {
+      "delete": {
+        "operationId": "Me_deleteAvatar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
+        ]
+      },
+      "get": {
+        "operationId": "Me_avatar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "image/webp": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Фото профиля (WebP 512×512)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
+        ]
+      },
+      "put": {
+        "operationId": "Me_setAvatar",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Файл слишком большой"
           },
           "429": {
             "content": {
@@ -2047,6 +2981,131 @@
         ]
       }
     },
+    "/v1/me/password": {
+      "post": {
+        "operationId": "Me_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Пароль изменён, остальные сеансы завершены"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/preferences": {
+      "patch": {
+        "operationId": "Me_updatePreferences",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePreferencesDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
+        ]
+      }
+    },
     "/v1/me/profile": {
       "get": {
         "operationId": "Profile_get",
@@ -2174,6 +3233,169 @@
         ],
         "tags": [
           "profile"
+        ]
+      }
+    },
+    "/v1/me/sessions": {
+      "get": {
+        "operationId": "Me_sessions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SessionDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/sessions/revoke-others": {
+      "post": {
+        "operationId": "Me_revokeOthers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionsRevoked"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/sessions/{id}": {
+      "delete": {
+        "operationId": "Me_revokeSession",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Сеанс завершён"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
         ]
       }
     }

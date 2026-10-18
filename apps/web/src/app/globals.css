@@ -1,8 +1,9 @@
 @import 'tailwindcss';
 
 /*
- * Токены «Гарантыча»: фарфоровая холодная шкала + один акцент (терракота). Только светлая тема:
- * так решил владелец для всего сайта, главная и приложение выглядят одинаково.
+ * Токены «Гарантыча»: фарфоровая холодная шкала + один акцент (терракота). По умолчанию светлая
+ * тема на всём сайте; в кабинете пользователь может выбрать тёмную или «как в системе»
+ * (data-ui-theme ниже). Главная всегда светлая (landing.css).
  */
 :root {
   --canvas: #f4f5f7;
@@ -20,6 +21,65 @@
   --muted-tint: #eceef1;
   --shadow-color: 218 30% 30%;
   color-scheme: light;
+}
+
+/* --- Оформление кабинета (настройки пользователя, (site)/layout.tsx) --- */
+
+/* Тёмная палитра: та же логика ролей, контраст текста не ниже 4.5:1 на canvas и surface. */
+html:has([data-ui-theme='dark']) {
+  --canvas: #0b0f17;
+  --surface: #121826;
+  --surface-sunken: #0e131e;
+  --ink: #e8ecf2;
+  --ink-soft: #a3adbd;
+  --line: #262f3f;
+  --accent: #ea6a32;
+  --accent-hover: #f2844f;
+  --accent-ink: #ffffff;
+  --accent-tint: #2b1a12;
+  --ok: #4ade80;
+  --ok-tint: #10261a;
+  --muted-tint: #1a2131;
+  --shadow-color: 222 60% 2%;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:has([data-ui-theme='system']) {
+    --canvas: #0b0f17;
+    --surface: #121826;
+    --surface-sunken: #0e131e;
+    --ink: #e8ecf2;
+    --ink-soft: #a3adbd;
+    --line: #262f3f;
+    --accent: #ea6a32;
+    --accent-hover: #f2844f;
+    --accent-ink: #ffffff;
+    --accent-tint: #2b1a12;
+    --ok: #4ade80;
+    --ok-tint: #10261a;
+    --muted-tint: #1a2131;
+    --shadow-color: 222 60% 2%;
+    color-scheme: dark;
+  }
+}
+
+/* Масштаб: размеры в rem, поэтому меняется весь интерфейс, а не только текст. */
+html:has([data-ui-scale='compact']) {
+  font-size: 93.75%;
+}
+html:has([data-ui-scale='large']) {
+  font-size: 112.5%;
+}
+
+/* «Меньше анимаций» в настройках действует как системный prefers-reduced-motion. */
+[data-ui-motion='reduced'] *,
+[data-ui-motion='reduced'] *::before,
+[data-ui-motion='reduced'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }
 
 @theme inline {

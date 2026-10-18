@@ -1,3 +1,5 @@
+import type { JobDetails } from './job-questions';
+
 /**
  * Контракт публичного API заказов. Значения enum'ов должны совпадать
  * с enum'ами в apps/api/prisma/schema.prisma (проверяется тестом в API).
@@ -52,6 +54,8 @@ export interface JobDto {
   budgetMax: number | null;
   currency: Currency;
   status: JobStatus;
+  /** Ответы на вопросы анкеты категории (см. job-questions.ts); {} если анкета не заполнена. */
+  details: JobDetails;
   /** ISO 8601 */
   createdAt: string;
 }
@@ -87,6 +91,8 @@ export interface JobInput {
   city: string;
   budgetMin: number | null;
   budgetMax: number | null;
+  /** Ответы анкеты. При создании без поля сохраняется {}; при правке отсутствие = не менять. */
+  details?: JobDetails;
 }
 
 /** Заказ в кабинете владельца. */

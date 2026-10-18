@@ -13,6 +13,7 @@ import { HealthController } from './health/health.controller';
 import { JobsModule } from './jobs/jobs.module';
 import { BidsModule } from './bids/bids.module';
 import { ContractorsModule } from './contractors/contractors.module';
+import { LeadsModule } from './leads/leads.module';
 import { MyJobsModule } from './my-jobs/my-jobs.module';
 import { PrismaModule } from './prisma/prisma.module';
 
@@ -46,6 +47,7 @@ import { PrismaModule } from './prisma/prisma.module';
     MyJobsModule,
     BidsModule,
     ContractorsModule,
+    LeadsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

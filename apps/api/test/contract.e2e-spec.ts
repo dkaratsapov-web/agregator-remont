@@ -1,10 +1,11 @@
 import { BID_LIMITS, JOB_LIMITS } from '@agregator/shared';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaClient } from '@prisma/client';
+import sharp from 'sharp';
 import request from 'supertest';
 import { expectContract, uncoveredResponses } from './contract';
 import { createTestApp } from './create-app';
-import { signUp } from './helpers';
+import { signUp, signUpAdmin, requiredAnswers } from './helpers';
 
 /**
  * Контракт: каждый ответ, объявленный в apps/api/openapi.json, получен от настоящего API
@@ -17,7 +18,8 @@ const job = {
   title: 'Замена проводки в однокомнатной квартире',
   description: 'Нужно заменить проводку и щиток, квартира 35 м², стены бетон.',
   category: 'ELECTRICAL',
-  city: 'Самара',
+  details: requiredAnswers('ELECTRICAL'),
+  city: 'Химки',
   budgetMin: 40_000,
   budgetMax: null,
 };
@@ -32,6 +34,7 @@ const profile = {
 const LIMIT_ENV = ['RATE_LIMIT_PER_MIN', 'AUTH_RATE_LIMIT_PER_MIN', 'WRITE_RATE_LIMIT_PER_MIN'];
 
 async function cleanDb(): Promise<void> {
+  await prisma.lead.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.bid.deleteMany();
   await prisma.job.deleteMany({ where: { ownerId: { not: null } } });
@@ -41,10 +44,11 @@ async function cleanDb(): Promise<void> {
 async function withApp(
   limits: Record<string, string>,
   run: (app: NestExpressApplication) => Promise<void>,
+  options: { leadsEnabled?: boolean } = {},
 ): Promise<void> {
   for (const name of LIMIT_ENV) delete process.env[name];
   Object.assign(process.env, limits);
-  const app = await createTestApp();
+  const app = await createTestApp(false, options);
   try {
     await run(app);
   } finally {
@@ -134,6 +138,24 @@ describe('API contract (e2e)', () => {
           201,
         );
         const jobId: string = created.body.id;
+        const detailed = await check(
+          'post',
+          MY_JOBS,
+          http()
+            .post(MY_JOBS)
+            .set(customer.auth)
+            .send({
+              ...job,
+              details: { task: 'full', area: 35, oldWiring: 'aluminum', smartHome: true },
+            }),
+          201,
+        );
+        expect(detailed.body.details).toEqual({
+          task: 'full',
+          area: 35,
+          oldWiring: 'aluminum',
+          smartHome: true,
+        });
         await check('post', MY_JOBS, http().post(MY_JOBS).set(customer.auth).send({}), 400);
         await check('post', MY_JOBS, http().post(MY_JOBS).send(job), 401);
         await check('post', MY_JOBS, http().post(MY_JOBS).set(contractor.auth).send(job), 403);
@@ -149,11 +171,11 @@ describe('API contract (e2e)', () => {
           const req = http().patch(`${MY_JOBS}/${id}`).send(body);
           return auth ? req.set(auth as Record<string, string>) : req;
         };
-        await check('patch', MY_JOB, patch(customer.auth, { city: 'Тольятти' }), 200);
+        await check('patch', MY_JOB, patch(customer.auth, { city: 'Мытищи' }), 200);
         await check('patch', MY_JOB, patch(customer.auth, {}), 400);
-        await check('patch', MY_JOB, patch(other.auth, { city: 'Тольятти' }), 404);
-        await check('patch', MY_JOB, patch(null, { city: 'Тольятти' }), 401);
-        await check('patch', MY_JOB, patch(contractor.auth, { city: 'Тольятти' }), 403);
+        await check('patch', MY_JOB, patch(other.auth, { city: 'Мытищи' }), 404);
+        await check('patch', MY_JOB, patch(null, { city: 'Мытищи' }), 401);
+        await check('patch', MY_JOB, patch(contractor.auth, { city: 'Мытищи' }), 403);
 
         // --- public catalog
         await check('get', '/v1/jobs', http().get('/v1/jobs'), 200);
@@ -241,13 +263,208 @@ describe('API contract (e2e)', () => {
         await check('post', CLOSE, http().post(closeUrl).set(contractor.auth), 403);
         await check('post', CLOSE, http().post(closeUrl).set(customer.auth), 200);
         await check('post', CLOSE, http().post(closeUrl).set(customer.auth), 409);
+        await check('patch', MY_JOB, patch(customer.auth, { city: 'Мытищи' }, second.body.id), 409);
+      },
+    );
+  });
+
+  it('account endpoints match openapi.json', async () => {
+    const high = {
+      RATE_LIMIT_PER_MIN: '1000',
+      AUTH_RATE_LIMIT_PER_MIN: '1000',
+      WRITE_RATE_LIMIT_PER_MIN: '1000',
+    };
+    await withApp(high, async (app) => {
+      const http = () => request(app.getHttpServer());
+      const check = async (
+        method: 'get' | 'post' | 'put' | 'patch' | 'delete',
+        template: string,
+        req: request.Test,
+        status: number,
+      ) => {
+        const res = await req;
+        expect(res.status).toBe(status);
+        expectContract(res, method, template);
+        return res;
+      };
+      const email = `contract-acc-${Date.now()}@example.ru`;
+      const password = 'correct-horse-battery';
+      const reg = await http()
+        .post('/v1/auth/register')
+        .send({ email, password, name: 'Контракт', role: 'CUSTOMER' })
+        .expect(201);
+      const auth = { Authorization: `Bearer ${reg.body.token}` };
+      const other = await http().post('/v1/auth/login').send({ email, password }).expect(200);
+
+      await check('patch', '/v1/me', http().patch('/v1/me').set(auth).send({ city: 'Тверь' }), 200);
+      await check('patch', '/v1/me', http().patch('/v1/me').set(auth).send({ phone: '1' }), 400);
+      await check('patch', '/v1/me', http().patch('/v1/me').send({}), 401);
+
+      const PREF = '/v1/me/preferences';
+      await check('patch', PREF, http().patch(PREF).set(auth).send({ theme: 'dark' }), 200);
+      await check('patch', PREF, http().patch(PREF).set(auth).send({ theme: 'x' }), 400);
+      await check('patch', PREF, http().patch(PREF).send({}), 401);
+
+      const SESS = '/v1/me/sessions';
+      const list = await check('get', SESS, http().get(SESS).set(auth), 200);
+      await check('get', SESS, http().get(SESS), 401);
+      const ONE = '/v1/me/sessions/{id}';
+      const current = list.body.find((s: { current: boolean }) => s.current).id;
+      const otherId = list.body.find((s: { current: boolean }) => !s.current).id;
+      await check('delete', ONE, http().delete(`${SESS}/${current}`).set(auth), 400);
+      await check('delete', ONE, http().delete(`${SESS}/missing`).set(auth), 404);
+      await check('delete', ONE, http().delete(`${SESS}/${otherId}`), 401);
+      await check('delete', ONE, http().delete(`${SESS}/${otherId}`).set(auth), 204);
+      void other;
+      const REV = '/v1/me/sessions/revoke-others';
+      await check('post', REV, http().post(REV).set(auth), 200);
+      await check('post', REV, http().post(REV), 401);
+
+      const AV = '/v1/me/avatar';
+      await check('get', AV, http().get(AV).set(auth), 404);
+      await check('get', AV, http().get(AV), 401);
+      const png = await sharp({
+        create: { width: 64, height: 64, channels: 3, background: '#0d1320' },
+      })
+        .png()
+        .toBuffer();
+      await check(
+        'put',
+        AV,
+        http()
+          .put(AV)
+          .set(auth)
+          .attach('file', png, { filename: 'a.png', contentType: 'image/png' }),
+        200,
+      );
+      await check(
+        'put',
+        AV,
+        http()
+          .put(AV)
+          .set(auth)
+          .attach('file', Buffer.from('nope'), { filename: 'a.png', contentType: 'image/png' }),
+        400,
+      );
+      await check(
+        'put',
+        AV,
+        http()
+          .put(AV)
+          .set(auth)
+          .attach('file', Buffer.alloc(5 * 1024 * 1024 + 1, 1), {
+            filename: 'a.jpg',
+            contentType: 'image/jpeg',
+          }),
+        413,
+      );
+      await check('put', AV, http().put(AV), 401);
+      await check(
+        'get',
+        AV,
+        http()
+          .get(AV)
+          .set(auth)
+          .buffer(true)
+          .parse((r, cb) => {
+            const chunks: Buffer[] = [];
+            r.on('data', (c: Buffer) => chunks.push(c));
+            r.on('end', () => cb(null, Buffer.concat(chunks)));
+          }),
+        200,
+      );
+      await check('delete', AV, http().delete(AV).set(auth), 200);
+      await check('delete', AV, http().delete(AV), 401);
+
+      const PW = '/v1/me/password';
+      await check(
+        'post',
+        PW,
+        http().post(PW).set(auth).send({ currentPassword: 'x', newPassword: 'short' }),
+        400,
+      );
+      await check('post', PW, http().post(PW).send({}), 401);
+      await check(
+        'post',
+        PW,
+        http()
+          .post(PW)
+          .set(auth)
+          .send({ currentPassword: password, newPassword: 'new-password-2026' }),
+        204,
+      );
+    });
+  });
+
+  it('lead endpoints match openapi.json', async () => {
+    const high = {
+      RATE_LIMIT_PER_MIN: '1000',
+      AUTH_RATE_LIMIT_PER_MIN: '1000',
+      WRITE_RATE_LIMIT_PER_MIN: '1000',
+    };
+    const lead = { name: 'Ирина', phone: '8 (912) 345-67-89', consent: true };
+
+    // Пока нет реквизитов оператора, приём выключен.
+    await withApp(high, async (app) => {
+      const res = await request(app.getHttpServer()).post('/v1/leads').send(lead);
+      expect(res.status).toBe(503);
+      expectContract(res, 'post', '/v1/leads');
+    });
+
+    await withApp(
+      high,
+      async (app) => {
+        const http = () => request(app.getHttpServer());
+        const check = async (
+          method: 'get' | 'post' | 'patch',
+          template: string,
+          req: request.Test,
+          status: number,
+        ) => {
+          const res = await req;
+          expect(res.status).toBe(status);
+          expectContract(res, method, template);
+          return res;
+        };
+
+        await check('post', '/v1/leads', http().post('/v1/leads').send(lead), 201);
+        await check(
+          'post',
+          '/v1/leads',
+          http()
+            .post('/v1/leads')
+            .send({ ...lead, phone: '12345' }),
+          400,
+        );
+
+        const adminAuth = (await signUpAdmin(app, prisma)).auth;
+        const customer = await signUp(app, 'CUSTOMER');
+
+        const LIST = '/v1/admin/leads';
+        const listed = await check('get', LIST, http().get(LIST).set(adminAuth), 200);
+        await check('get', LIST, http().get(`${LIST}?status=bad`).set(adminAuth), 400);
+        await check('get', LIST, http().get(LIST), 401);
+        await check('get', LIST, http().get(LIST).set(customer.auth), 403);
+
+        const ONE = '/v1/admin/leads/{id}';
+        const url = `${LIST}/${listed.body.items[0].id}`;
+        await check('patch', ONE, http().patch(url).set(adminAuth).send({ processed: true }), 200);
+        await check('patch', ONE, http().patch(url).set(adminAuth).send({ processed: 'yes' }), 400);
         await check(
           'patch',
-          MY_JOB,
-          patch(customer.auth, { city: 'Тольятти' }, second.body.id),
-          409,
+          ONE,
+          http().patch(`${LIST}/missing`).set(adminAuth).send({ processed: true }),
+          404,
+        );
+        await check('patch', ONE, http().patch(url).send({ processed: true }), 401);
+        await check(
+          'patch',
+          ONE,
+          http().patch(url).set(customer.auth).send({ processed: true }),
+          403,
         );
       },
+      { leadsEnabled: true },
     );
   });
 

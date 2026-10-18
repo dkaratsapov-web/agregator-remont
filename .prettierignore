@@ -6,3 +6,4 @@ pnpm-lock.yaml
 docs/
 apps/api/openapi.json
 packages/shared/src/generated/
+.claude/

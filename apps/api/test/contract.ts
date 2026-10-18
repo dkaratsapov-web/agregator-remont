@@ -48,12 +48,20 @@ export function expectContract(res: Response, method: Method, path: string): voi
   if (!operation) throw new Error(`${method.toUpperCase()} ${path} is not in openapi.json`);
   const id = key(method, path, res.status);
   const response = operation.responses[String(res.status)] as
-    { content?: { 'application/json'?: { schema: unknown } } } | undefined;
+    { content?: Record<string, { schema: unknown }> } | undefined;
   if (!response) {
     throw new Error(`${id}: status is not declared in openapi.json; body: ${res.text}`);
   }
   const schema = response.content?.['application/json']?.schema;
-  if (schema === undefined) {
+  const binaryTypes = Object.keys(response.content ?? {}).filter((t) => t !== 'application/json');
+  if (schema === undefined && binaryTypes.length > 0) {
+    // Двоичный ответ (фото): совпадает Content-Type, тело не пустое.
+    const type = String(res.headers['content-type'] ?? '').split(';')[0];
+    if (!binaryTypes.includes(type)) throw new Error(`${id}: unexpected Content-Type ${type}`);
+    if (!Buffer.isBuffer(res.body) || res.body.length === 0) {
+      throw new Error(`${id}: expected a non-empty binary body`);
+    }
+  } else if (schema === undefined) {
     if (res.text !== '') throw new Error(`${id}: expected an empty body, got ${res.text}`);
   } else {
     let validate = validators.get(id);

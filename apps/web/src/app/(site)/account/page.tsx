@@ -3,7 +3,6 @@ import {
   BID_STATUS_LABELS,
   JOB_STATUSES,
   JOB_STATUS_LABELS,
-  USER_ROLE_LABELS,
   type ContractorProfileDto,
   type MyBidDto,
   type OwnJobDto,
@@ -12,11 +11,12 @@ import {
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { ProfileCard } from '@/components/account/profile-card';
 import { LogoutForm } from '@/components/auth/logout-form';
 import { BidStatusBadge } from '@/components/bids/bid-status-badge';
 import { StatusBadge } from '@/components/status-badge';
 import { getMyProfile, listMyBids, listMyJobs } from '@/lib/api';
-import { formatAmount, formatBudget, formatDate } from '@/lib/format';
+import { formatAmount, formatBudget } from '@/lib/format';
 import { getCurrentUser, getSessionToken } from '@/lib/session';
 
 export const metadata: Metadata = { title: 'Личный кабинет', robots: { index: false } };
@@ -73,13 +73,13 @@ function ActionCard({
       href={href}
       className={`group flex flex-col justify-between gap-6 rounded-[22px] p-5 transition-[transform,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 ${
         primary
-          ? 'bg-[#0d1320] text-[#eef1f6] shadow-[0_24px_48px_-28px_rgb(13_19_32/0.7)]'
+          ? 'bg-ink text-canvas shadow-[0_24px_48px_-28px_hsl(var(--shadow-color)/0.7)]'
           : 'border border-line/80 bg-surface hover:shadow-[0_18px_40px_-22px_hsl(var(--shadow-color)/0.35)]'
       }`}
     >
       <div>
         <p className="text-base font-semibold">{title}</p>
-        <p className={`mt-1 text-sm ${primary ? 'text-white/60' : 'text-ink-soft'}`}>{text}</p>
+        <p className={`mt-1 text-sm ${primary ? 'text-canvas/65' : 'text-ink-soft'}`}>{text}</p>
       </div>
       <span
         aria-hidden="true"
@@ -209,7 +209,7 @@ async function ContractorSummary({ token }: { token: string }) {
             <p className="font-semibold">Профиль заполнен на {completeness.percent}%</p>
             <Link
               href="/account/profile"
-              className="inline-flex min-h-10 items-center rounded-full bg-ink px-4 text-sm font-semibold text-canvas hover:bg-[#1c2536]"
+              className="inline-flex min-h-10 items-center rounded-full bg-ink px-4 text-sm font-semibold text-canvas hover:bg-ink/85"
             >
               Заполнить
             </Link>
@@ -288,27 +288,37 @@ export default async function AccountPage() {
   if (!user || !token) redirect('/login?next=/account');
 
   const isContractor = user.role === 'CONTRACTOR';
+  const isAdmin = user.role === 'ADMIN';
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pt-10 sm:px-6 md:pt-14">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">
-            Личный кабинет · {USER_ROLE_LABELS[user.role]}
-          </p>
-          <h1 className="mt-3 break-words text-3xl font-semibold tracking-tight md:text-[2.6rem]">
-            Здравствуйте, {user.name}
-          </h1>
-        </div>
-      </header>
+    <div className="mx-auto max-w-[1600px] px-4 pt-10 sm:px-6 lg:px-10 md:pt-14">
+      <ProfileCard user={user} />
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0">
-          {isContractor ? <ContractorSummary token={token} /> : <CustomerSummary token={token} />}
+          {isAdmin ? (
+            <p className="rounded-[20px] border border-line/80 bg-surface p-5 text-ink-soft">
+              Аккаунт администратора: заявки на закрытое тестирование и каталог заказов.
+            </p>
+          ) : isContractor ? (
+            <ContractorSummary token={token} />
+          ) : (
+            <CustomerSummary token={token} />
+          )}
         </div>
 
         <aside className="flex flex-col gap-3">
-          {isContractor ? (
+          {isAdmin ? (
+            <>
+              <ActionCard
+                primary
+                href="/admin/leads"
+                title="Заявки"
+                text="Заявки на закрытое тестирование"
+              />
+              <ActionCard href="/jobs" title="Каталог" text="Все опубликованные заказы" />
+            </>
+          ) : isContractor ? (
             <>
               <ActionCard
                 primary
@@ -337,17 +347,9 @@ export default async function AccountPage() {
           )}
 
           <div className="mt-3 rounded-[22px] border border-line/80 bg-surface p-5">
-            <dl className="space-y-3 text-sm">
-              <div>
-                <dt className="text-ink-soft">Email</dt>
-                <dd className="mt-0.5 break-all font-medium">{user.email}</dd>
-              </div>
-              <div>
-                <dt className="text-ink-soft">На площадке с</dt>
-                <dd className="mt-0.5 font-medium">
-                  <time dateTime={user.createdAt}>{formatDate(user.createdAt)}</time>
-                </dd>
-              </div>
+            <dl className="text-sm">
+              <dt className="text-ink-soft">ID аккаунта</dt>
+              <dd className="mt-0.5 break-all font-mono text-xs">{user.id}</dd>
             </dl>
             <div className="mt-4 border-t border-line pt-4">
               <LogoutForm />

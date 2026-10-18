@@ -52,6 +52,10 @@ describe('Auth (e2e)', () => {
         email: 'ivan@example.ru',
         name: 'Иван Петров',
         role: 'CUSTOMER',
+        phone: null,
+        city: null,
+        avatarVersion: null,
+        preferences: { theme: 'light', scale: 'normal', motion: 'system' },
         createdAt: expect.any(String),
       });
       expect(res.body.token).toMatch(/^[A-Za-z0-9_-]{43}$/);

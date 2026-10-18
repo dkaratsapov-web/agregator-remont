@@ -1,8 +1,17 @@
-import { JOB_CATEGORIES, JOB_LIMITS, type JobCategory } from '@agregator/shared';
+import {
+  findServiceCity,
+  JOB_CATEGORIES,
+  JOB_LIMITS,
+  SERVICE_AREA_ERROR,
+  SERVICE_CITY_NAMES,
+  type JobCategory,
+} from '@agregator/shared';
 import { Transform } from 'class-transformer';
 import {
+  IsDefined,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   Length,
@@ -14,6 +23,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import { MULTI_LINE, SINGLE_LINE, trim, trimText } from '../../common/text';
+import { jobDetailsProperty } from '../../openapi/job-details';
 
 const budget = () => [
   ValidateIf((_: unknown, value: unknown) => value !== null),
@@ -21,6 +31,17 @@ const budget = () => [
   Min(0, { message: 'Бюджет не может быть отрицательным' }),
   Max(JOB_LIMITS.BUDGET_MAX, { message: 'Слишком большой бюджет' }),
 ];
+
+/** Город из зоны обслуживания; регистр и ё/е не важны, сохраняется название из списка. */
+const serviceCity = ({ value }: { value: unknown }) =>
+  typeof value === 'string' ? (findServiceCity(value)?.name ?? value.trim()) : value;
+
+const CITY_PROPERTY = {
+  minLength: JOB_LIMITS.CITY_MIN,
+  maxLength: JOB_LIMITS.CITY_MAX,
+  description:
+    'Город или посёлок из списка SERVICE_CITIES (@agregator/shared): Москва и Московская область, Санкт-Петербург и Ленинградская область',
+};
 
 const apply =
   (...decorators: PropertyDecorator[]): PropertyDecorator =>
@@ -55,13 +76,10 @@ export class CreateJobDto {
   @ApiProperty({ enum: JOB_CATEGORIES, enumName: 'JobCategory' })
   category!: JobCategory;
 
-  @Transform(trim)
-  @IsString()
-  @Length(JOB_LIMITS.CITY_MIN, JOB_LIMITS.CITY_MAX, {
-    message: `Город: от ${JOB_LIMITS.CITY_MIN} до ${JOB_LIMITS.CITY_MAX} символов`,
-  })
-  @Matches(SINGLE_LINE, { message: 'Город содержит недопустимые символы' })
-  @ApiProperty({ minLength: JOB_LIMITS.CITY_MIN, maxLength: JOB_LIMITS.CITY_MAX })
+  @Transform(serviceCity)
+  @IsString({ message: SERVICE_AREA_ERROR })
+  @IsIn(SERVICE_CITY_NAMES, { message: SERVICE_AREA_ERROR })
+  @ApiProperty(CITY_PROPERTY)
   city!: string;
 
   @apply(IsOptional(), ...budget())
@@ -83,6 +101,16 @@ export class CreateJobDto {
     description: 'Целые рубли; null или отсутствие — «по договорённости»',
   })
   budgetMax: number | null = null;
+
+  /** Обязательна; ответы проверяются в сервисе по анкете категории (validateJobDetails). */
+  @IsDefined({ message: 'Заполните анкету заказа' })
+  @IsObject({ message: 'Ответы на вопросы передаются объектом' })
+  @ApiProperty(
+    jobDetailsProperty(
+      'Ответы анкеты категории { id вопроса: значение }. Обязательные вопросы категории должны быть отвечены',
+    ),
+  )
+  details!: Record<string, unknown>;
 }
 
 /** Правка: любые поля из CreateJobDto; владелец, статус и даты через API не меняются. */
@@ -116,13 +144,10 @@ export class UpdateJobDto {
   category?: JobCategory;
 
   @IsOptional()
-  @Transform(trim)
-  @IsString()
-  @Length(JOB_LIMITS.CITY_MIN, JOB_LIMITS.CITY_MAX, {
-    message: `Город: от ${JOB_LIMITS.CITY_MIN} до ${JOB_LIMITS.CITY_MAX} символов`,
-  })
-  @Matches(SINGLE_LINE, { message: 'Город содержит недопустимые символы' })
-  @ApiPropertyOptional({ minLength: JOB_LIMITS.CITY_MIN, maxLength: JOB_LIMITS.CITY_MAX })
+  @Transform(serviceCity)
+  @IsString({ message: SERVICE_AREA_ERROR })
+  @IsIn(SERVICE_CITY_NAMES, { message: SERVICE_AREA_ERROR })
+  @ApiPropertyOptional(CITY_PROPERTY)
   city?: string;
 
   @apply(...budget())
@@ -146,4 +171,13 @@ export class UpdateJobDto {
     description: 'Целые рубли; null — «по договорённости»; отсутствие — не менять',
   })
   budgetMax?: number | null;
+
+  @IsOptional()
+  @IsObject({ message: 'Ответы на вопросы передаются объектом' })
+  @ApiPropertyOptional(
+    jobDetailsProperty(
+      'Ответы анкеты целиком (заменяют прежние); без поля: не менять. При смене категории обязательно',
+    ),
+  )
+  details?: Record<string, unknown>;
 }

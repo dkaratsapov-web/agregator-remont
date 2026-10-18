@@ -58,3 +58,8 @@ export async function getClientIp(): Promise<string | undefined> {
   const hops = parseTrustProxyHops(process.env.WEB_TRUST_PROXY_HOPS);
   return clientIpFromForwardedFor((await headers()).get('x-forwarded-for'), hops);
 }
+
+/** User-Agent браузера для подписи устройства в списке входов (не для безопасности). */
+export async function getUserAgent(): Promise<string | undefined> {
+  return (await headers()).get('user-agent') ?? undefined;
+}

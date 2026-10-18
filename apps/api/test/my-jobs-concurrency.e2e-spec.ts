@@ -2,7 +2,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { createTestApp } from './create-app';
-import { signUp } from './helpers';
+import { signUp, requiredAnswers } from './helpers';
 
 const prisma = new PrismaClient();
 
@@ -10,6 +10,7 @@ const baseJob = {
   title: 'Исходное название заказа',
   description: 'Описание заказа для проверки параллельных изменений.',
   category: 'OTHER',
+  details: requiredAnswers('OTHER'),
   city: 'Москва',
 };
 

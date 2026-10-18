@@ -6,6 +6,7 @@ import { cache } from 'react';
 import { StatusBadge } from '@/components/status-badge';
 import type { MyBidDto, UserDto } from '@agregator/shared';
 import { RespondPanel } from '@/components/bids/respond-panel';
+import { JobDetails, JobHighlights } from '@/components/jobs/job-details';
 import { getJob, getMyJob, listMyBids } from '@/lib/api';
 import { getCurrentUser, getSessionToken } from '@/lib/session';
 import { formatBudget, formatDate } from '@/lib/format';
@@ -70,7 +71,7 @@ export default async function JobPage({
         : null;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pt-8 sm:px-6 md:pt-12">
+    <div className="mx-auto max-w-[1600px] px-4 pt-8 sm:px-6 lg:px-10 md:pt-12">
       <nav aria-label="Навигационная цепочка" className="text-sm text-ink-soft">
         <ol className="flex flex-wrap items-center gap-1.5">
           <li>
@@ -113,6 +114,12 @@ export default async function JobPage({
           <h1 className="mt-4 text-3xl font-semibold leading-tight tracking-tight md:text-4xl">
             {job.title}
           </h1>
+          <div className="mt-4">
+            <JobHighlights category={job.category} details={job.details} size="md" />
+          </div>
+          <div className="mt-8">
+            <JobDetails category={job.category} details={job.details} />
+          </div>
           <h2 className="mt-8 text-lg font-semibold">Описание работ</h2>
           <p className="mt-3 max-w-[65ch] whitespace-pre-line leading-relaxed text-ink-soft">
             {job.description}

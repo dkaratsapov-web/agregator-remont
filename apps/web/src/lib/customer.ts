@@ -17,3 +17,4 @@ export async function requireRolePage(role: UserRole, next: string): Promise<Rol
 
 export const requireCustomerPage = (next: string) => requireRolePage('CUSTOMER', next);
 export const requireContractorPage = (next: string) => requireRolePage('CONTRACTOR', next);
+export const requireAdminPage = (next: string) => requireRolePage('ADMIN', next);

@@ -1,10 +1,11 @@
-import { JOB_CATEGORY_LABELS } from '@agregator/shared';
+import { JOB_CATEGORY_LABELS, validateJobDetails } from '@agregator/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ApiUnavailable } from '@/components/api-unavailable';
 import { CloseJobForm } from '@/components/jobs/close-job-form';
 import { CustomersOnly } from '@/components/jobs/customers-only';
+import { JobDetails, JobHighlights } from '@/components/jobs/job-details';
 import { JobForm } from '@/components/jobs/job-form';
 import { Notice } from '@/components/notice';
 import { StatusBadge } from '@/components/status-badge';
@@ -56,7 +57,7 @@ export default async function MyJobPage({
           : null;
 
   return (
-    <div className="mx-auto max-w-2xl px-4 pt-10 sm:px-6 md:pt-14">
+    <div className="mx-auto max-w-3xl px-4 pt-10 sm:px-6 md:pt-14">
       <p className="text-sm text-ink-soft">
         <Link href="/account/jobs" className="hover:text-ink hover:underline">
           Мои заказы
@@ -74,11 +75,29 @@ export default async function MyJobPage({
         </Link>
       </p>
 
+      <div className="mt-4">
+        <JobHighlights category={job.category} details={job.details} size="md" />
+      </div>
+
       {notice ? (
         <div className="mt-6">
           <Notice>{notice}</Notice>
         </div>
       ) : null}
+
+      {job.editable && !validateJobDetails(job.category, job.details).ok ? (
+        // Заказ создан до анкеты (или анкета стала строже): владелец дополняет её в форме ниже.
+        <p className="mt-6 rounded-xl border border-accent/40 bg-accent-tint px-4 py-3 text-sm text-ink">
+          Анкета заказа заполнена не полностью, подрядчики видят меньше деталей.{' '}
+          <a href="#edit-title" className="font-semibold text-accent hover:underline">
+            Ответить на вопросы
+          </a>
+        </p>
+      ) : null}
+
+      <div className="mt-10 empty:hidden">
+        <JobDetails category={job.category} details={job.details} />
+      </div>
 
       <section aria-labelledby="bids-title" className="mt-10">
         <h2 id="bids-title" className="text-lg font-semibold">
@@ -99,7 +118,9 @@ export default async function MyJobPage({
 
       {job.editable ? (
         <>
-          <h2 className="mt-10 text-lg font-semibold">Редактирование</h2>
+          <h2 id="edit-title" className="mt-10 scroll-mt-24 text-lg font-semibold">
+            Редактирование
+          </h2>
           <div className="mt-4">
             <JobForm
               action={updateJobAction.bind(null, job.id)}
@@ -110,6 +131,7 @@ export default async function MyJobPage({
                 city: job.city,
                 budgetMin: job.budgetMin === null ? '' : formatAmount(job.budgetMin),
                 budgetMax: job.budgetMax === null ? '' : formatAmount(job.budgetMax),
+                details: JSON.stringify(job.details),
               }}
               submitLabel="Сохранить изменения"
               pendingLabel="Сохраняем…"
