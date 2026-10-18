@@ -154,3 +154,117 @@ button {
     scroll-behavior: smooth;
   }
 }
+
+/* --- Фон приложения: чертёжная сетка (кроме главной, у неё свой фон) ---
+ * Сетка — маска из SVG-плитки 120×120: тонкие линии через 20px, основные через 120px и метка
+ * «+» в узле, как на строительном чертеже. Цвет — из --ink, поэтому работает и в тёмной теме.
+ * Слой больше экрана и медленно сдвигается на одну плитку по диагонали: анимируется только
+ * transform, отрисовка на видеокарте. Сверху — неподвижная виньетка, к краям сетка тает. */
+.site-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.site-backdrop__grid {
+  position: absolute;
+  inset: -120px;
+  background-color: color-mix(in srgb, var(--ink) 9%, transparent);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cg fill='none' stroke='%23000'%3E%3Cpath d='M20 0V120M40 0V120M60 0V120M80 0V120M100 0V120M0 20H120M0 40H120M0 60H120M0 80H120M0 100H120' stroke-opacity='.38'/%3E%3Cpath d='M.5 0V120M0 .5H120'/%3E%3Cpath d='M60 52V68M52 60H68' stroke-width='1.5' stroke-opacity='.7'/%3E%3C/g%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cg fill='none' stroke='%23000'%3E%3Cpath d='M20 0V120M40 0V120M60 0V120M80 0V120M100 0V120M0 20H120M0 40H120M0 60H120M0 80H120M0 100H120' stroke-opacity='.38'/%3E%3Cpath d='M.5 0V120M0 .5H120'/%3E%3Cpath d='M60 52V68M52 60H68' stroke-width='1.5' stroke-opacity='.7'/%3E%3C/g%3E%3C/svg%3E");
+  -webkit-mask-size: 120px 120px;
+  mask-size: 120px 120px;
+  animation: site-grid-drift 90s linear infinite;
+  will-change: transform;
+}
+/* Мягкий терракотовый «свет лампы», медленно гуляет по экрану. */
+.site-backdrop__glow {
+  position: absolute;
+  left: 55%;
+  top: -20vmax;
+  width: 70vmax;
+  height: 70vmax;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--accent) 9%, transparent),
+    transparent
+  );
+  animation: site-glow-wander 48s ease-in-out infinite;
+  will-change: transform;
+}
+.site-backdrop__fade {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(130% 95% at 50% 0%, transparent 30%, var(--canvas) 92%);
+}
+@keyframes site-grid-drift {
+  to {
+    transform: translate3d(120px, 120px, 0);
+  }
+}
+@keyframes site-glow-wander {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  33% {
+    transform: translate3d(-38vw, 18vh, 0);
+  }
+  66% {
+    transform: translate3d(-12vw, 42vh, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-backdrop__grid,
+  .site-backdrop__glow {
+    animation: none;
+  }
+}
+[data-ui-motion='reduced'] .site-backdrop__grid,
+[data-ui-motion='reduced'] .site-backdrop__glow {
+  animation: none !important;
+}
+
+/* --- Нижняя кромка шапки: шкала рулетки ---
+ * Мелкие деления через 8px, крупные через 80px. Терракотовая полоса показывает, сколько
+ * страницы прокручено (CSS scroll-driven animation; где не поддерживается — полосы нет). */
+.header-ruler {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 7px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--line), var(--line)) bottom / 100% 1px no-repeat,
+    repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px 80px) bottom / 100% 7px
+      no-repeat,
+    repeating-linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--line) 85%, transparent) 0 1px,
+        transparent 1px 8px
+      )
+      bottom / 100% 4px no-repeat;
+}
+.header-ruler::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+@supports (animation-timeline: scroll()) {
+  .header-ruler::after {
+    animation: header-ruler-progress linear both;
+    animation-timeline: scroll(root block);
+  }
+}
+@keyframes header-ruler-progress {
+  to {
+    transform: scaleX(1);
+  }
+}

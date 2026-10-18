@@ -9,7 +9,9 @@ import { useEffect, useId, useRef, useState } from 'react';
  * «/» с клавиатуры ставит курсор в поле (если фокус не в другом поле ввода); значка-подсказки
  * нет: без объяснения он непонятен.
  */
-export function HeaderSearch() {
+export function HeaderSearch({ app = false }: { app?: boolean }) {
+  // app — шапка приложения (прямоугольные формы, как в кабинете); без него — вид главной.
+  const radius = app ? 'rounded-[12px]' : 'rounded-full';
   const [open, setOpen] = useState(false);
   const inlineRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLInputElement>(null);
@@ -49,7 +51,7 @@ export function HeaderSearch() {
         aria-label="Поиск заказов"
         className="hidden min-w-0 flex-1 justify-center lg:flex"
       >
-        <SearchField inputRef={inlineRef} />
+        <SearchField inputRef={inlineRef} app={app} />
       </form>
 
       <button
@@ -58,7 +60,7 @@ export function HeaderSearch() {
         aria-expanded={open}
         aria-controls={panelId}
         aria-label={open ? 'Закрыть поиск' : 'Поиск заказов'}
-        className="grid size-11 shrink-0 place-items-center rounded-full text-ink-soft transition-colors duration-150 hover:bg-ink/5 hover:text-ink lg:hidden"
+        className={`grid size-11 shrink-0 place-items-center ${radius} text-ink-soft transition-colors duration-150 hover:bg-ink/5 hover:text-ink lg:hidden`}
       >
         {open ? <CloseIcon /> : <SearchIcon />}
       </button>
@@ -69,18 +71,24 @@ export function HeaderSearch() {
         className="absolute inset-x-0 top-full border-b border-line/80 bg-canvas/95 px-4 py-3 supports-[backdrop-filter]:bg-canvas/85 supports-[backdrop-filter]:backdrop-blur-xl sm:px-6 lg:hidden"
       >
         <form action="/jobs" method="get" role="search" aria-label="Поиск заказов">
-          <SearchField inputRef={panelRef} />
+          <SearchField inputRef={panelRef} app={app} />
         </form>
       </div>
     </>
   );
 }
 
-function SearchField({ inputRef }: { inputRef: React.RefObject<HTMLInputElement | null> }) {
+function SearchField({
+  inputRef,
+  app,
+}: {
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  app: boolean;
+}) {
   return (
     <label
       data-focus-ring="within"
-      className="group flex h-11 w-full max-w-md items-center gap-2.5 rounded-full border border-line bg-surface/80 pl-4 pr-1.5 transition-[border-color,box-shadow] duration-150 focus-within:border-ink/30 focus-within:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_14%,transparent)] hover:border-ink/20"
+      className={`group flex h-11 w-full max-w-md items-center gap-2.5 ${app ? 'rounded-[12px]' : 'rounded-full'} border border-line bg-surface/80 pl-4 pr-1.5 transition-[border-color,box-shadow] duration-150 focus-within:border-ink/30 focus-within:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_14%,transparent)] hover:border-ink/20`}
     >
       <SearchIcon />
       <span className="sr-only">Найти заказ</span>
@@ -98,7 +106,7 @@ function SearchField({ inputRef }: { inputRef: React.RefObject<HTMLInputElement 
       />
       <button
         type="submit"
-        className="inline-flex h-8 shrink-0 items-center rounded-full bg-ink px-3.5 text-sm font-semibold text-canvas transition-[background-color,transform] duration-150 hover:bg-ink/85 active:scale-[0.97]"
+        className={`inline-flex h-8 shrink-0 items-center ${app ? 'rounded-[8px]' : 'rounded-full'} bg-ink px-3.5 text-sm font-semibold text-canvas transition-[background-color,transform] duration-150 hover:bg-ink/85 active:scale-[0.97]`}
       >
         Найти
       </button>

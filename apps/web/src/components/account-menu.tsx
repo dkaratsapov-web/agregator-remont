@@ -102,7 +102,8 @@ function LogoutItem() {
  * Иконки разделов и меню кабинета. Меню открывается наведением мыши, нажатием (телефон)
  * и с клавиатуры; закрывается уходом курсора, Escape и нажатием вне меню.
  */
-export function AccountMenu({ user }: { user: MenuUser }) {
+/** app — шапка приложения (прямоугольные формы, как в кабинете); без него — вид главной. */
+export function AccountMenu({ user, app = false }: { user: MenuUser; app?: boolean }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -142,14 +143,22 @@ export function AccountMenu({ user }: { user: MenuUser }) {
 
   return (
     <div className="flex items-center gap-1">
-      <div className="hidden items-center sm:flex">
+      <div
+        className={
+          app
+            ? 'mr-1 hidden items-center divide-x divide-line overflow-hidden rounded-[12px] border border-line bg-surface/70 sm:flex'
+            : 'hidden items-center sm:flex'
+        }
+      >
         {QUICK.map((item) => (
           <a
             key={item.href}
             href={item.href}
             aria-label={item.label}
             title={item.label}
-            className="grid size-11 place-items-center rounded-full text-ink-soft transition-colors duration-150 hover:bg-ink/5 hover:text-ink"
+            className={`grid place-items-center text-ink-soft transition-colors duration-150 hover:bg-ink/5 hover:text-ink ${
+              app ? 'h-[2.6rem] w-11' : 'size-11 rounded-full'
+            }`}
           >
             <Icon name={item.icon} />
           </a>
@@ -169,9 +178,17 @@ export function AccountMenu({ user }: { user: MenuUser }) {
           aria-controls={panelId}
           aria-label={`Меню кабинета: ${user.name}`}
           onClick={() => setOpen((value) => !value)}
-          className="inline-flex min-h-11 max-w-[55vw] items-center gap-2 rounded-full border border-line bg-surface/80 py-1 pl-1 pr-2.5 sm:gap-2.5 sm:pr-3.5 text-sm font-semibold text-ink transition-[background-color,border-color] duration-200 hover:border-ink/25 hover:bg-surface aria-expanded:border-ink/25 aria-expanded:bg-surface sm:max-w-xs"
+          className={`inline-flex min-h-11 max-w-[55vw] items-center gap-2 border border-line bg-surface/80 py-1 pl-1 pr-2.5 sm:gap-2.5 sm:pr-3.5 text-sm font-semibold text-ink transition-[background-color,border-color] duration-200 hover:bg-surface aria-expanded:bg-surface sm:max-w-xs ${
+            app
+              ? 'rounded-[12px] hover:border-ink/30 aria-expanded:border-ink'
+              : 'rounded-full hover:border-ink/25 aria-expanded:border-ink/25'
+          }`}
         >
-          <UserAvatar name={user.name} avatarVersion={user.avatarVersion} />
+          <UserAvatar
+            name={user.name}
+            avatarVersion={user.avatarVersion}
+            shape={app ? 'rounded-[8px]' : 'rounded-full'}
+          />
           <span className="min-w-0 truncate max-sm:sr-only">{user.name}</span>
           <svg
             viewBox="0 0 16 16"
