@@ -277,4 +277,34 @@ export class ErrorSchema {
   @ApiProperty({ oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] })
   message!: string | string[];
   @ApiProperty({ required: false }) error?: string;
+  @ApiProperty({
+    required: false,
+    description: 'Код ошибки для программы (вход через банк: OAUTH_*)',
+  })
+  code?: string;
+}
+
+@ApiSchema({ name: 'OAuthNeedRoleError' })
+export class OAuthNeedRoleSchema extends ErrorSchema {
+  @ApiProperty({ description: 'Незавершённый вход: вернуть в /v1/auth/oauth/complete с ролью' })
+  pending!: string;
+  @ApiProperty({ type: String, nullable: true, description: 'Имя из профиля банка' })
+  name!: string | null;
+}
+
+@ApiSchema({ name: 'OAuthProviderDto' })
+export class OAuthProviderSchema {
+  @ApiProperty({ enum: ['sber', 'tbank'] }) id!: string;
+  @ApiProperty() title!: string;
+}
+
+@ApiSchema({ name: 'OAuthAuthorizeUrlDto' })
+export class OAuthAuthorizeUrlSchema {
+  @ApiProperty({ description: 'Адрес страницы входа банка' }) url!: string;
+}
+
+@ApiSchema({ name: 'LinkedBankDto' })
+export class LinkedBankSchema {
+  @ApiProperty({ enum: ['sber', 'tbank'] }) provider!: string;
+  @dateTime() linkedAt!: string;
 }

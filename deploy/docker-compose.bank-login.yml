@@ -1,0 +1,27 @@
+# Вход через банк (Сбер ID, Т-Банк ID). Подключается автообновлением, когда в deploy/.env есть
+# BANK_LOGIN=true (deploy/autodeploy/deploy.sh); вручную — третьим файлом:
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml \
+#     -f deploy/docker-compose.bank-login.yml up -d
+#
+# API без этого файла в интернет не ходит (сеть backend внутренняя). Для обмена кода на данные
+# человека ему нужен выход к серверам банка: сеть bank-egress. Секреты банка и сертификат Сбера
+# есть только у API; web их не видит. Как получить ключи — deploy/README.md, «Вход через банк».
+services:
+  api:
+    environment:
+      OAUTH_REDIRECT_ORIGIN: ${PUBLIC_ORIGIN:?PUBLIC_ORIGIN is required for bank login}
+      SBER_ID_CLIENT_ID: ${SBER_ID_CLIENT_ID:-}
+      SBER_ID_CLIENT_SECRET: ${SBER_ID_CLIENT_SECRET:-}
+      # Сертификат клиента Сбер ID (.p12) и корневой сертификат УЦ Минцифры (PEM) лежат в
+      # deploy/secrets на сервере (папка не коммитится) и видны API только для чтения.
+      SBER_ID_CERT_PATH: ${SBER_ID_CERT_PATH:-}
+      SBER_ID_CERT_PASSWORD: ${SBER_ID_CERT_PASSWORD:-}
+      SBER_ID_CA_PATH: ${SBER_ID_CA_PATH:-}
+      TBANK_ID_CLIENT_ID: ${TBANK_ID_CLIENT_ID:-}
+      TBANK_ID_CLIENT_SECRET: ${TBANK_ID_CLIENT_SECRET:-}
+    volumes:
+      - ./secrets:/run/secrets/bank:ro
+    networks: [backend, bank-egress]
+
+networks:
+  bank-egress: {}

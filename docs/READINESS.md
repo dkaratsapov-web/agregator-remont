@@ -18,6 +18,7 @@
 | Каталог заказов: поиск, город, статус (без контактов заказчика) | Реализовано | `apps/api/src/jobs`, `apps/web/src/app/(site)/jobs` | `contract.e2e-spec.ts`, `access-matrix.e2e-spec.ts` |
 | Профиль подрядчика, отклики с ценой и сроком, отзыв, выбор исполнителя | Реализовано | `apps/api/src/contractors`, `apps/api/src/bids` | `bids.e2e-spec.ts`, `bids-concurrency.e2e-spec.ts`, `scripts/bids-integration.mjs` |
 | Главная: пролёт по комнате, шаги, reduced motion, офлайн-страница | Реализовано | `apps/web/src/components/landing` | `scripts/landing-e2e.mjs`, `flight.test.ts` |
+| Вход и регистрация через Сбер ID и Т-Банк ID, привязка банка в настройках | Частично: код готов и проверен против поддельного банка; включается ключами банка (deploy/README.md), на настоящем банке не проверено | `apps/api/src/oauth`, `apps/web/src/app/auth` | `oauth.e2e-spec.ts`, `bank-login.test.ts` |
 | Закрытый тест: вход тестировщиков `/gate` | Реализовано | `apps/web/src/lib/gate.ts`, `deploy/Caddyfile` | `gate.test.ts`, CI `proxy`, `landing-e2e` |
 | Автообновление сервера со строгим CI gate и проверкой здоровья | Реализовано | `deploy/autodeploy` | `scripts/autodeploy-test.sh` |
 | Заявки на тестирование с главной | Частично: приём выключен до реквизитов оператора (152-ФЗ) | `apps/api/src/leads`, `packages/shared/src/leads.ts` | `leads.e2e-spec.ts` |

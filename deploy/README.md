@@ -209,6 +209,48 @@ docker compose -f deploy/docker-compose.yml exec -T db \
 docker compose -f deploy/docker-compose.yml exec -T db sh -c 'dropdb -U "$POSTGRES_USER" restore_check'
 ```
 
+### Вход через банк (Сбер ID, Т-Банк ID)
+
+Кнопки «Войти по Сбер ID» и «Войти с Т-Банком» на страницах входа и регистрации появляются, только
+когда на сервере заданы ключи банка. Без ключей их нет, остальное работает как раньше.
+
+**Сбер ID** (бесплатно, модерация около суток, нужна организация или ИП):
+
+1. Зарегистрировать компанию на [developers.sber.ru](https://developers.sber.ru/portal/products/sber-id),
+   подписать оферту через ЭДО.
+2. Указать адрес возврата **в punycode**: `https://xn--80aah6bno9a5a.xn--p1ai/auth/sber/callback`
+   (это `https://гарантыч.рф/auth/sber/callback`), без параметров. Данные: `openid name email mobile`.
+3. Получить client_id, client_secret и сертификат клиента `.p12` с паролем (действует 12 месяцев:
+   поставить напоминание о замене). Скачать корневой сертификат УЦ Минцифры (PEM): им подписан
+   oauth.sber.ru.
+4. На сервере положить файлы в `deploy/secrets` (папка не коммитится) и закрыть доступ:
+   ```bash
+   sudo install -d -m 700 /opt/agregator/deploy/secrets
+   sudo install -m 600 sber-id.p12 russian_trusted_root_ca.pem /opt/agregator/deploy/secrets/
+   ```
+5. В `deploy/.env` (образец — `.env.example`, раздел «Вход через банк»): `BANK_LOGIN=true`,
+   `SBER_ID_CLIENT_ID`, `SBER_ID_CLIENT_SECRET`, `SBER_ID_CERT_PATH`, `SBER_ID_CERT_PASSWORD`,
+   `SBER_ID_CA_PATH`. `PUBLIC_ORIGIN` должен совпадать с доменом сайта.
+
+**Т-Банк ID**: письмо на tid@tbank.ru (компания, сайт, число входов в месяц). По открытым данным
+банк подключает от 30 000 входов в месяц, по договору и с расчётным счётом в Т-Бизнесе. Адрес
+возврата: `https://xn--80aah6bno9a5a.xn--p1ai/auth/tbank/callback`. Ключи — в `TBANK_ID_CLIENT_ID`
+и `TBANK_ID_CLIENT_SECRET`, сертификат не нужен.
+
+После правки `deploy/.env` применить: `sudo systemctl start agregator-deploy` подхватит только
+новый коммит, поэтому вручную:
+
+```bash
+cd /opt/agregator
+docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml \
+  -f deploy/docker-compose.bank-login.yml up -d api
+curl -s --resolve "$DOMAIN:443:127.0.0.1" https://$DOMAIN/login | grep -c 'Сбер ID'
+```
+
+С `BANK_LOGIN=true` API получает выход в интернет (сеть `bank-egress`) и видит `deploy/secrets`
+только для чтения; без него API в интернет не ходит. Ошибка в настройке (нет сертификата, пустой
+секрет, http вместо https) не даёт API запуститься: смотреть `docker compose ... logs api`.
+
 ## Перед появлением реальных пользовательских данных
 
 Сейчас стенд для закрытого теста. До реальных пользователей обязательно:

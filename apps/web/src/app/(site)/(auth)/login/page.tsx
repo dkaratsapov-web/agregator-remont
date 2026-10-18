@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { LoginForm } from '@/components/auth/login-form';
+import { getBankProviders } from '@/lib/api';
+import { bankErrorMessage, isBankId } from '@/lib/bank-login';
 import { safeRedirectPath } from '@/lib/redirect';
 import { getCurrentUser } from '@/lib/session';
 
@@ -12,9 +14,16 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [{ next }, user] = await Promise.all([searchParams, getCurrentUser()]);
-  const target = safeRedirectPath(Array.isArray(next) ? next[0] : next);
+  const [query, user, banks] = await Promise.all([
+    searchParams,
+    getCurrentUser(),
+    getBankProviders(),
+  ]);
+  const one = (key: string) => (Array.isArray(query[key]) ? query[key][0] : query[key]);
+  const target = safeRedirectPath(one('next'));
   if (user) redirect(target);
+  const bank = one('bank');
+  const bankError = bankErrorMessage(one('bank_error'), isBankId(bank) ? bank : undefined);
 
   return (
     <>
@@ -25,8 +34,8 @@ export default async function LoginPage({
           Зарегистрируйтесь
         </Link>
       </p>
-      <div className="mt-6">
-        <LoginForm next={target} />
+      <div className="mt-6 [@media(max-height:46rem)]:mt-4">
+        <LoginForm next={target} banks={banks.map((b) => b.id)} error={bankError} />
       </div>
     </>
   );

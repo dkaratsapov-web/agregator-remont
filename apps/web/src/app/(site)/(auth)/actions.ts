@@ -2,7 +2,22 @@
 
 import { AUTH_LIMITS, SELF_SERVICE_ROLES } from '@agregator/shared';
 import { redirect } from 'next/navigation';
-import { ApiError, loginUser, logoutSession, registerUser } from '@/lib/api';
+import {
+  ApiError,
+  bankComplete,
+  BankLoginError,
+  loginUser,
+  logoutSession,
+  registerUser,
+} from '@/lib/api';
+import {
+  bankErrorCode,
+  bankErrorMessage,
+  clearBankPending,
+  describePending,
+  isSelfServiceRole,
+  readBankPending,
+} from '@/lib/bank-login';
 import { safeRedirectPath } from '@/lib/redirect';
 import { FOREIGN_ORIGIN, isTrustedOrigin } from '@/lib/action-guard';
 import {
@@ -83,6 +98,38 @@ export async function loginAction(_prev: AuthFormState, form: FormData): Promise
     return { error: messageFor(error), values };
   }
   redirect(next);
+}
+
+/** Завершение входа через банк: аккаунта не было, человек выбрал роль (lib/bank-login.ts). */
+export async function completeBankAction(
+  _prev: AuthFormState,
+  form: FormData,
+): Promise<AuthFormState> {
+  const values = { role: field(form, 'role', 20) };
+  if (!(await isTrustedOrigin())) return { error: FOREIGN_ORIGIN, values };
+  if (!isSelfServiceRole(values.role)) {
+    return { error: 'Выберите, кто вы: заказчик или подрядчик.', values };
+  }
+  const pending = await readBankPending();
+  if (!pending) return { error: bankErrorMessage('expired'), values };
+
+  try {
+    const session = await bankComplete(
+      { pending, role: values.role },
+      await getClientIp(),
+      await getUserAgent(),
+    );
+    await setSessionCookie(session.token, session.expiresAt);
+    await clearBankPending();
+  } catch (error) {
+    if (error instanceof BankLoginError) {
+      if (error.code === 'OAUTH_PENDING_EXPIRED') await clearBankPending();
+      const bank = describePending(pending)?.bank;
+      return { error: bankErrorMessage(bankErrorCode(error.code, error.status), bank), values };
+    }
+    return { error: messageFor(error), values };
+  }
+  redirect('/account');
 }
 
 /**

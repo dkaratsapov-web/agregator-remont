@@ -298,6 +298,10 @@
       "ErrorResponse": {
         "additionalProperties": false,
         "properties": {
+          "code": {
+            "description": "Код ошибки для программы (вход через банк: OAUTH_*)",
+            "type": "string"
+          },
           "error": {
             "type": "string"
           },
@@ -697,6 +701,27 @@
         ],
         "type": "object"
       },
+      "LinkedBankDto": {
+        "additionalProperties": false,
+        "properties": {
+          "linkedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "sber",
+              "tbank"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "linkedAt"
+        ],
+        "type": "object"
+      },
       "LoginDto": {
         "additionalProperties": false,
         "properties": {
@@ -789,6 +814,179 @@
           "title",
           "city",
           "status"
+        ],
+        "type": "object"
+      },
+      "OAuthAuthorizeDto": {
+        "additionalProperties": false,
+        "properties": {
+          "codeChallenge": {
+            "description": "PKCE S256",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "type": "string"
+          },
+          "nonce": {
+            "pattern": "^[A-Za-z0-9_-]{16,64}$",
+            "type": "string"
+          },
+          "state": {
+            "pattern": "^[A-Za-z0-9_-]{16,96}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "nonce",
+          "codeChallenge"
+        ],
+        "type": "object"
+      },
+      "OAuthAuthorizeUrlDto": {
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "description": "Адрес страницы входа банка",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
+      "OAuthCodeDto": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "codeVerifier": {
+            "pattern": "^[A-Za-z0-9._~-]{43,128}$",
+            "type": "string"
+          },
+          "nonce": {
+            "pattern": "^[A-Za-z0-9_-]{16,64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "codeVerifier",
+          "nonce"
+        ],
+        "type": "object"
+      },
+      "OAuthCompleteDto": {
+        "additionalProperties": false,
+        "properties": {
+          "pending": {
+            "description": "Незавершённый вход из ответа OAUTH_NEED_ROLE",
+            "type": "string"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SelfServiceRole"
+              }
+            ]
+          }
+        },
+        "required": [
+          "pending",
+          "role"
+        ],
+        "type": "object"
+      },
+      "OAuthNeedRoleError": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "description": "Код ошибки для программы (вход через банк: OAUTH_*)",
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "name": {
+            "description": "Имя из профиля банка",
+            "nullable": true,
+            "type": "string"
+          },
+          "pending": {
+            "description": "Незавершённый вход: вернуть в /v1/auth/oauth/complete с ролью",
+            "type": "string"
+          },
+          "statusCode": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "pending",
+          "name"
+        ],
+        "type": "object"
+      },
+      "OAuthProviderDto": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "enum": [
+              "sber",
+              "tbank"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "type": "object"
+      },
+      "OAuthSignInDto": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "codeVerifier": {
+            "pattern": "^[A-Za-z0-9._~-]{43,128}$",
+            "type": "string"
+          },
+          "nonce": {
+            "pattern": "^[A-Za-z0-9_-]{16,64}$",
+            "type": "string"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SelfServiceRole"
+              }
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "codeVerifier",
+          "nonce"
         ],
         "type": "object"
       },
@@ -1835,6 +2033,298 @@
             "session": []
           }
         ],
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/oauth/complete": {
+      "post": {
+        "operationId": "OAuth_complete",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-client-user-agent",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthCompleteDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSessionDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Конфликт с текущим состоянием ресурса"
+          },
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Срок действия истёк"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/oauth/providers": {
+      "get": {
+        "operationId": "OAuth_providers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OAuthProviderDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Банки, вход через которые настроен"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/oauth/{provider}/authorize": {
+      "post": {
+        "operationId": "OAuth_authorize",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthAuthorizeDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthAuthorizeUrlDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/v1/auth/oauth/{provider}/callback": {
+      "post": {
+        "operationId": "OAuth_callback",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-client-user-agent",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthSignInDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSessionDto"
+                }
+              }
+            },
+            "description": "Вход выполнен (или аккаунт создан)"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthNeedRoleError"
+                }
+              }
+            },
+            "description": "OAUTH_NEED_ROLE: аккаунта нет, нужна роль; OAUTH_EMAIL_TAKEN: email уже занят"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Недостаточно данных для операции"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Внешний сервис (банк) ответил ошибкой или недоступен"
+          }
+        },
         "tags": [
           "auth"
         ]
@@ -3674,6 +4164,153 @@
         ],
         "tags": [
           "bids"
+        ]
+      }
+    },
+    "/v1/me/oauth": {
+      "get": {
+        "operationId": "MeOAuth_linked",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LinkedBankDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "account"
+        ]
+      }
+    },
+    "/v1/me/oauth/{provider}/link": {
+      "post": {
+        "operationId": "MeOAuth_link",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthCodeDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Банк привязан (или уже был привязан к этому аккаунту)"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Конфликт с текущим состоянием ресурса"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Внешний сервис (банк) ответил ошибкой или недоступен"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "account"
         ]
       }
     },

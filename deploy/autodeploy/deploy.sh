@@ -43,6 +43,10 @@ fi
 
 cd "$REPO_DIR"
 compose=(docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml)
+# Вход через банк (Сбер ID, Т-Банк ID): API получает выход к банку и сертификат (deploy/README.md).
+if grep -Eq '^BANK_LOGIN=true[[:space:]]*$' deploy/.env 2> /dev/null; then
+  compose+=(-f deploy/docker-compose.bank-login.yml)
+fi
 
 git fetch --quiet origin "$BRANCH"
 target=$(git rev-parse "origin/$BRANCH")
