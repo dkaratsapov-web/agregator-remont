@@ -3,7 +3,7 @@
 import { motion, useScroll, useSpring, useTransform, type MotionValue } from 'motion/react';
 import { useRef } from 'react';
 import { FLIGHT_BASE } from '@/lib/flight';
-import { FlightCanvas } from './flight-canvas';
+import { type FlightPlayer, FlightVideo } from './flight-video';
 import { StatusPill } from './status-pill';
 import { useFlightSnap } from './use-flight-snap';
 import { usePrefersReducedMotion } from './use-prefers-reduced-motion';
@@ -11,7 +11,7 @@ import { useViewer } from './viewer';
 
 /**
  * Герой + «Как это работает»: блок закреплён на экране, пока идёт прокрутка трека, а во весь
- * экран идёт пролёт камеры по комнате от «до ремонта» к готовой гостиной (кадр — по прокрутке,
+ * экран идёт пролёт камеры по комнате от «до ремонта» к готовой гостиной (видео, flight-video.tsx,
  * lib/flight.ts). При reduced motion трек не закрепляется: фото готовой комнаты и список шагов.
  */
 
@@ -85,7 +85,7 @@ function HeroCopy() {
         ))}
       </h1>
       <ul
-        className="fade-up mt-6 max-w-[32rem] space-y-2.5 text-base leading-snug text-ink-soft sm:text-lg"
+        className="fade-up mt-6 max-w-[32rem] space-y-2.5 text-base leading-snug text-ink/80 sm:text-lg"
         style={{ '--d': '2650ms' } as React.CSSProperties}
       >
         {HERO_POINTS.map((point) => (
@@ -153,7 +153,7 @@ function StepCopy({ step, index }: { step: Step; index: number }) {
       <h3 className="font-display mt-4 text-[1.75rem] font-semibold leading-[1.08] tracking-[-0.03em] sm:text-4xl lg:text-[2.75rem]">
         {step.title}
       </h3>
-      <p className="mt-4 max-w-[28rem] text-base leading-relaxed text-ink-soft sm:text-lg">
+      <p className="mt-4 max-w-[28rem] text-base leading-relaxed text-ink/80 sm:text-lg">
         {step.text}
       </p>
     </div>
@@ -312,8 +312,10 @@ function ScrollyStory() {
   const track = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({ target: track, offset: ['start start', 'end end'] });
   const progress = useSpring(scrollYProgress, { stiffness: 140, damping: 30, mass: 0.4 });
-  // Без остановок на полпути: после прокрутки страница сама доезжает до шага.
-  useFlightSnap(track);
+  // Без остановок на полпути: после прокрутки страница сама доезжает до шага, видео пролёта
+  // проигрывается до него.
+  const player = useRef<FlightPlayer | null>(null);
+  useFlightSnap(track, player);
 
   const heroOpacity = useTransform(progress, [0, 0.06, 0.1], [1, 1, 0]);
   const heroY = useTransform(progress, [0, 0.1], [0, -48]);
@@ -325,7 +327,7 @@ function ScrollyStory() {
       {/* Якорь «Как это работает» указывает на первый шаг внутри трека. */}
       <span id="how-it-works" aria-hidden="true" className="absolute left-0 top-[12%]" />
       <div className="sticky top-0 h-svh overflow-hidden">
-        <FlightCanvas progress={progress} />
+        <FlightVideo progress={progress} player={player} />
         <div aria-hidden="true" className="flight-scrim pointer-events-none absolute inset-0" />
         <motion.div
           aria-hidden="true"
