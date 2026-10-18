@@ -1,6 +1,6 @@
 // Браузерный тест публичной главной за Caddy: node scripts/landing-e2e.mjs
 // Ожидает web за Caddy с deploy/Caddyfile на BASE_URL (http://localhost подходит для service
-// worker), логин/пароль basic auth в BASIC_USER/BASIC_PASS и команду STOP_PROXY_CMD, которая
+// worker), логин/пароль тестировщика (страница /gate) в BASIC_USER/BASIC_PASS и команду STOP_PROXY_CMD, которая
 // останавливает Caddy (для проверки офлайн-страницы; запускается последней).
 /* global window, getComputedStyle -- выполняется в браузере через page.evaluate */
 import { execSync } from 'node:child_process';
@@ -14,6 +14,7 @@ const STOP_PROXY_CMD = process.env.STOP_PROXY_CMD;
 const PUBLIC_PATHS = [
   /^\/$/,
   /^\/offline$/,
+  /^\/gate$/,
   /^\/sw\.js$/,
   /^\/manifest\.webmanifest$/,
   /^\/icon\.svg$/,
@@ -157,30 +158,51 @@ try {
     await context.close();
   }
 
-  // 5. SW управляет страницей, вход в закрытую часть без сохранённого пароля: навигация
-  //    уходит мимо SW (ответ 401 приходит из сети, браузер может показать диалог пароля).
+  // 5. SW управляет страницей, вход в закрытую часть без пропуска: вместо системного окна пароля
+  //    браузера — переход на страницу входа тестировщика /gate в стиле сайта.
   {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto(`${BASE}/`, { waitUntil: 'load' });
     check('service worker controls the landing', await controlledBySw(page));
-    const native = page.waitForResponse(
-      (res) => res.url() === `${BASE}/jobs` && res.status() === 401 && !res.fromServiceWorker(),
-      { timeout: 15_000 },
+    const unauthorized = [];
+    page.on('response', (res) => {
+      if (res.status() === 401 || res.headers()['www-authenticate']) unauthorized.push(res.url());
+    });
+    await page.goto(`${BASE}/register`, { waitUntil: 'load' });
+    check(
+      'private page without pass: tester login page instead of the browser prompt',
+      page.url() === `${BASE}/gate?next=%2Fregister` &&
+        (await page.getByRole('heading', { name: 'Вход для тестировщиков' }).isVisible()),
+      page.url(),
     );
-    await page.goto(`${BASE}/jobs`).catch(() => {});
-    const res = await native.catch(() => null);
-    check('private page without password: native 401 (password prompt possible)', res !== null);
+    check(
+      'no 401 or WWW-Authenticate on the way',
+      unauthorized.length === 0,
+      unauthorized.join(', '),
+    );
+    await page.getByLabel('Логин').fill(USER);
+    await page.getByLabel('Пароль').fill('wrong-password');
+    await page.getByRole('button', { name: 'Войти' }).click();
+    await page.waitForURL(/\/gate\?error=wrong/);
+    check(
+      'wrong tester password: error on the same page',
+      await page.getByText('Неверный логин или пароль.').isVisible(),
+    );
     await context.close();
   }
 
-  // 6. С паролем закрытая часть открывается через SW, а при недоступном сервере SW отдаёт
-  //    офлайн-страницу, хотя navigator.onLine остаётся true.
+  // 6. После входа тестировщика закрытая часть открывается через SW, а при недоступном сервере SW
+  //    отдаёт офлайн-страницу, хотя navigator.onLine остаётся true.
   {
-    const context = await browser.newContext({
-      httpCredentials: { username: USER, password: PASS },
-    });
+    const context = await browser.newContext();
     const page = await context.newPage();
+    await page.goto(`${BASE}/jobs`, { waitUntil: 'load' });
+    await page.getByLabel('Логин').fill(USER);
+    await page.getByLabel('Пароль').fill(PASS);
+    await page.getByRole('button', { name: 'Войти' }).click();
+    await page.waitForURL(`${BASE}/jobs`).catch(() => {});
+    check('tester login returns to the requested page', page.url() === `${BASE}/jobs`, page.url());
     await page.goto(`${BASE}/`, { waitUntil: 'load' });
     check('service worker controls the page (with password)', await controlledBySw(page));
     const ok = page.waitForResponse((res) => res.url() === `${BASE}/jobs` && res.status() === 200, {

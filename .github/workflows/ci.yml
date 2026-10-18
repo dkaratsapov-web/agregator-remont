@@ -100,6 +100,9 @@ jobs:
           WEB_PUBLIC_ORIGIN: http://localhost:3000
           AUTH_RATE_LIMIT_PER_MIN: '3'
         run: |
+          # Логин и пароль тестировщика (страница /gate) проверяет web: хеш тот же, что в deploy/.env.
+          export BASIC_AUTH_USER=tester
+          export BASIC_AUTH_HASH=$(docker run --rm caddy:2-alpine caddy hash-password --plaintext 'ci-password')
           node apps/api/dist/main.js > api.log 2>&1 &
           echo $! > api.pid
           (cd apps/web && pnpm exec next start --port 3000 > ../../web.log 2>&1 &)
@@ -113,10 +116,9 @@ jobs:
           # Главная за настоящим deploy/Caddyfile (http://localhost:8080, подходит для service
           # worker): публичность, отсутствие запросов в закрытую часть, клавиатура, reduced motion,
           # диалог пароля мимо SW и офлайн-страница при остановленном Caddy (scripts/landing-e2e.mjs).
-          sed 's#reverse_proxy web:3000#reverse_proxy localhost:3000#' deploy/Caddyfile > "$RUNNER_TEMP/Caddyfile"
-          HASH=$(docker run --rm caddy:2-alpine caddy hash-password --plaintext 'ci-password')
+          sed 's#web:3000#localhost:3000#g' deploy/Caddyfile > "$RUNNER_TEMP/Caddyfile"
           docker run -d --name e2e-caddy --network host \
-            -e DOMAIN=http://localhost:8080 -e BASIC_AUTH_USER=tester -e BASIC_AUTH_HASH="$HASH" \
+            -e DOMAIN=http://localhost:8080 \
             -v "$RUNNER_TEMP/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine
           for i in $(seq 1 30); do curl -fs -o /dev/null http://localhost:8080/ && break; sleep 1; done
           STOP_PROXY_CMD='docker stop e2e-caddy' node scripts/landing-e2e.mjs
@@ -254,10 +256,31 @@ jobs:
       - name: Password, HTTPS and closed web port
         run: |
           set -e
+          # Вход тестировщика — своя страница /gate вместо системного окна браузера: форма отдаёт
+          # cookie-пропуск, его проверяет web по запросу Caddy (forward_auth).
+          gate_login() {
+            curl -sk -c "$3" -o /dev/null -w '%{http_code} %{redirect_url}' -X POST \
+              -H "Origin: ${4:-https://localhost}" --data-urlencode "login=$1" \
+              --data-urlencode "password=$2" --data-urlencode 'next=/jobs' https://localhost/gate/login
+          }
           test "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost/jobs)" = "401"
-          test "$(curl -sk -o /dev/null -w '%{http_code}' -u tester:wrong https://localhost/jobs)" = "401"
-          test "$(curl -sk -o /dev/null -w '%{http_code}' -u tester:ci-password https://localhost/jobs)" = "200"
-          curl -sk -D - -o /dev/null -u tester:ci-password https://localhost/jobs | grep -i '^strict-transport-security: max-age=31536000'
+          # Открытие страницы в браузере без пропуска — переход на /gate, без WWW-Authenticate.
+          test "$(curl -sk -o /dev/null -w '%{http_code} %{redirect_url}' -H 'Sec-Fetch-Mode: navigate' -H 'Accept: text/html' https://localhost/jobs)" = "303 https://localhost/gate?next=%2Fjobs"
+          if curl -sk -D - -o /dev/null https://localhost/jobs | grep -qi '^www-authenticate'; then echo 'WWW-Authenticate is sent'; exit 1; fi
+          test "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost/gate)" = "200"
+          curl -sk https://localhost/gate | grep -q 'Вход для тестировщиков'
+          test "$(gate_login tester wrong wrong.jar)" = "303 https://localhost/gate?error=wrong&next=%2Fjobs"
+          test "$(gate_login nobody ci-password wrong.jar)" = "303 https://localhost/gate?error=wrong&next=%2Fjobs"
+          test "$(gate_login tester ci-password evil.jar https://evil.example)" = "303 https://localhost/gate?error=origin&next=%2F"
+          test "$(curl -sk -b wrong.jar -o /dev/null -w '%{http_code}' https://localhost/jobs)" = "401"
+          test "$(curl -sk -b evil.jar -o /dev/null -w '%{http_code}' https://localhost/jobs)" = "401"
+          test "$(gate_login tester ci-password gate.jar)" = "303 https://localhost/jobs"
+          grep -q '__Host-ar_gate' gate.jar
+          test "$(curl -sk -b gate.jar -o /dev/null -w '%{http_code}' https://localhost/jobs)" = "200"
+          curl -sk -D - -o /dev/null -b gate.jar https://localhost/jobs | grep -i '^strict-transport-security: max-age=31536000'
+          # Подделанный или чужой пропуск не принимается.
+          test "$(curl -sk -H 'Cookie: __Host-ar_gate=v1.9999999999.forged' -o /dev/null -w '%{http_code}' https://localhost/jobs)" = "401"
+          test "$(curl -sk -H 'Cookie: __Host-ar_gate=' -o /dev/null -w '%{http_code}' https://localhost/jobs)" = "401
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost/jobs)" = "308"
           if curl -s -o /dev/null --max-time 5 http://127.0.0.1:3000/; then echo 'web port 3000 is reachable on the host'; exit 1; fi
           if curl -s -o /dev/null --max-time 5 http://127.0.0.1:4000/health; then echo 'api port 4000 is reachable on the host'; exit 1; fi
@@ -277,13 +300,13 @@ jobs:
           # Без пароля разрешено только чтение. Next.js принимает Server Actions POST-запросом на
           # любой адрес, поэтому POST (и прочие методы) на открытые адреса тоже требуют пароль.
           for method in POST PUT PATCH DELETE OPTIONS; do
-            for path in / /offline /robots.txt /_next/static/x; do
+            for path in / /offline /gate /robots.txt /_next/static/x; do
               code=$(curl -sk -o /dev/null -w '%{http_code}' -X "$method" "https://localhost$path")
               [ "$code" = "401" ] || { echo "$method $path: expected 401, got $code"; exit 1; }
             done
           done
           test "$(curl -sk -o /dev/null -w '%{http_code}' -X POST -H 'Next-Action: 0' https://localhost/)" = "401"
-          test "$(curl -sk -o /dev/null -w '%{http_code}' -X POST -u tester:ci-password https://localhost/)" != "401"
+          test "$(curl -sk -o /dev/null -w '%{http_code}' -X POST -b gate.jar https://localhost/)" != "401"
           # Большое тело без Content-Length (chunked) на открытый POST /lead: пока приём выключен,
           # web отвечает 503, не читая тело (лимит чтения 2 КБ проверяет unit-тест route.test.ts).
           head -c 9000000 /dev/zero > big.bin
@@ -298,6 +321,9 @@ jobs:
           test "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost/lead)" = "401"
           test "$(curl -sk -o /dev/null -w '%{http_code}' -X PUT https://localhost/lead)" = "401"
           test "$(curl -sk -o /dev/null -w '%{http_code}' -X POST https://localhost/lead/x)" = "401"
+          test "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost/gate/login)" = "401"
+          test "$(curl -sk -o /dev/null -w '%{http_code}' -X POST https://localhost/gate/login/x)" = "401"
+          test "$(curl -sk -o /dev/null -w '%{http_code}' https://localhost/gate/check)" = "401"
           code=$(curl -sk -o /dev/null -w '%{http_code}' -X POST -H 'Origin: https://localhost' \
             -H 'Content-Type: application/json' -d '{"name":"Тест","phone":"+79001234567","consent":true}' \
             https://localhost/lead)
