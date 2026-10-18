@@ -10,8 +10,8 @@ import {
   type JobCategory,
   type JobDetails,
 } from '@agregator/shared';
-import { useActionState, useState } from 'react';
-import type { JobFormState } from '@/app/(site)/account/jobs/actions';
+import { useActionState, useCallback, useEffect, useRef, useState } from 'react';
+import { saveDraftAction, type JobFormState } from '@/app/(site)/account/jobs/actions';
 import { Field } from '@/components/auth/field';
 import { FormError } from '@/components/auth/form-error';
 import { SubmitButton } from '@/components/auth/submit-button';
@@ -32,7 +32,41 @@ interface Props {
   initial?: Partial<JobFormValues>;
   submitLabel: string;
   pendingLabel: string;
+  /**
+   * Черновики (только для нового заказа): кнопка «Сохранить черновик» и автосохранение.
+   * null — черновика ещё нет, строка — продолжаем сохранённый черновик.
+   */
+  draftId?: string | null;
 }
+
+/** Пауза после последней правки перед автосохранением черновика. */
+const AUTOSAVE_DELAY_MS = 4000;
+
+type DraftStatus =
+  | { kind: 'idle' }
+  | { kind: 'pending' }
+  | { kind: 'saving' }
+  | { kind: 'saved'; at: string }
+  | { kind: 'error'; message: string };
+
+interface AutosaveBox {
+  timer?: number;
+  /** Сохранение в пути; следующее ждёт его (again), публикация тоже. */
+  inFlight: Promise<void> | null;
+  again: boolean;
+  /** Публикация началась: черновик больше не пишется. */
+  publishing: boolean;
+  /** Публикация дождалась сохранения и отправляет форму повторно. */
+  publishReady: boolean;
+  /** Форма на момент последней правки: нужна, когда форма уже размонтирована. */
+  snapshot: FormData | null;
+  mounted: boolean;
+  /** id черновика из последнего ответа (раньше, чем перерисуется скрытое поле). */
+  draftId: string | null;
+}
+
+const timeOf = (iso: string) =>
+  new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 
 const CATEGORY_OPTIONS = JOB_CATEGORIES.map((category) => ({
   value: category,
@@ -53,9 +87,19 @@ const fitAnswers = (category: JobCategory, answers: unknown): JobDetails => {
   return result.ok ? result.details : {};
 };
 
-export function JobForm({ action, initial = {}, submitLabel, pendingLabel }: Props) {
+export function JobForm({
+  action,
+  initial = {},
+  submitLabel,
+  pendingLabel,
+  draftId: initialDraftId,
+}: Props) {
   const [state, formAction] = useActionState<JobFormState, FormData>(action, {});
   const values = { ...initial, ...state.values };
+  const drafts = initialDraftId !== undefined;
+  const formRef = useRef<HTMLFormElement>(null);
+  const [draftId, setDraftId] = useState<string | null>(initialDraftId ?? null);
+  const [draftStatus, setDraftStatus] = useState<DraftStatus>({ kind: 'idle' });
 
   const [category, setCategory] = useState<JobCategory | ''>(() =>
     isJobCategory(values.category) ? values.category : '',
@@ -124,9 +168,154 @@ export function JobForm({ action, initial = {}, submitLabel, pendingLabel }: Pro
     if (changed.length > 0) clearIssues('details', changed);
   };
 
+  // --- черновик: сохранение по кнопке и через паузу после правок.
+  // Сохранения идут строго по одному; публикация дожидается сохранения в пути и уходит с его
+  // id, после начала публикации черновик больше не пишется (иначе он остался бы висеть).
+  const autosave = useRef<AutosaveBox>({
+    inFlight: null,
+    again: false,
+    publishing: false,
+    publishReady: false,
+    snapshot: null,
+    mounted: false,
+    draftId: initialDraftId ?? null,
+  });
+
+  const saveNow = useCallback(async (): Promise<void> => {
+    const box = autosave.current;
+    window.clearTimeout(box.timer);
+    box.timer = undefined;
+    if (!drafts || box.publishing) return;
+    if (box.inFlight) {
+      box.again = true;
+      return box.inFlight;
+    }
+    // После ухода со страницы формы уже нет: берём снимок, сделанный при последней правке.
+    const form = box.mounted && formRef.current ? new FormData(formRef.current) : box.snapshot;
+    box.snapshot = null;
+    if (!form) return;
+    // id из последнего ответа сервера: скрытое поле могло ещё не перерисоваться.
+    form.set('draftId', box.draftId ?? '');
+    const run = (async () => {
+      if (box.mounted) setDraftStatus({ kind: 'saving' });
+      try {
+        const result = await saveDraftAction(form);
+        if (result.ok) {
+          box.draftId = result.draftId;
+          if (!box.mounted) return;
+          setDraftId(result.draftId);
+          setDraftStatus({ kind: 'saved', at: result.savedAt });
+          // Адрес с ?draft=…: после перезагрузки или из истории открывается тот же черновик.
+          const url = new URL(window.location.href);
+          if (url.searchParams.get('draft') !== result.draftId) {
+            url.searchParams.set('draft', result.draftId);
+            window.history.replaceState(window.history.state, '', url);
+          }
+        } else {
+          // Черновик опубликован или удалён в другой вкладке: следующее сохранение создаст новый.
+          if (result.reset) box.draftId = null;
+          if (!box.mounted) return;
+          if (result.reset) setDraftId(null);
+          setDraftStatus({ kind: 'error', message: result.error });
+        }
+      } catch {
+        if (box.mounted) {
+          setDraftStatus({
+            kind: 'error',
+            message: 'Не удалось сохранить черновик. Проверьте сеть.',
+          });
+        }
+      }
+    })();
+    box.inFlight = run;
+    try {
+      await run;
+    } finally {
+      box.inFlight = null;
+      const again = box.again && !box.publishing;
+      box.again = false;
+      if (again) void saveNow();
+    }
+  }, [drafts]);
+
+  const scheduleSave = useCallback(() => {
+    const box = autosave.current;
+    if (!drafts || box.publishing || !formRef.current) return;
+    box.snapshot = new FormData(formRef.current);
+    window.clearTimeout(box.timer);
+    box.timer = window.setTimeout(() => void saveNow(), AUTOSAVE_DELAY_MS);
+    setDraftStatus((current) => (current.kind === 'pending' ? current : { kind: 'pending' }));
+  }, [drafts, saveNow]);
+
+  // Выбор категории, города и ответы анкеты меняют состояние, а не поля ввода: следим и за ним.
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    scheduleSave();
+  }, [category, city, answersByCategory, scheduleSave]);
+
+  useEffect(() => {
+    if (!drafts) return;
+    const box = autosave.current;
+    box.mounted = true;
+    const unsaved = () => !box.publishing && (box.timer !== undefined || box.inFlight !== null);
+    // Вкладку прячут или закрывают: пробуем сохранить сразу. Браузер не обязан дождаться
+    // ответа, поэтому при закрытии с несохранёнными правками ещё и спрашиваем подтверждение.
+    const flush = () => {
+      if (document.visibilityState === 'hidden' && box.timer !== undefined) void saveNow();
+    };
+    const warn = (event: BeforeUnloadEvent) => {
+      if (!unsaved()) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    document.addEventListener('visibilitychange', flush);
+    window.addEventListener('beforeunload', warn);
+    return () => {
+      document.removeEventListener('visibilitychange', flush);
+      window.removeEventListener('beforeunload', warn);
+      box.mounted = false;
+      // Переход внутри сайта: страница жива, сохраняем последнюю правку по снимку формы.
+      if (box.timer !== undefined) void saveNow();
+    };
+  }, [drafts, saveNow]);
+
+  // Публикация не удалась (ответ сервера с ошибкой): автосохранение снова работает.
+  const [lastPublishState, setLastPublishState] = useState(state);
+  if (state !== lastPublishState) {
+    setLastPublishState(state);
+    autosave.current.publishing = false;
+    autosave.current.publishReady = false;
+  }
+
   const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     const checked = checkJobForm(readJobForm(new FormData(event.currentTarget)));
-    if (checked.ok) return;
+    if (checked.ok) {
+      const box = autosave.current;
+      const form = event.currentTarget;
+      // Публикуем: отложенное автосохранение больше не нужно и не должно создать черновик.
+      window.clearTimeout(box.timer);
+      box.timer = undefined;
+      box.publishing = true;
+      if (drafts && box.inFlight && !box.publishReady) {
+        // Сохранение ещё в пути: ждём его и отправляем форму заново уже с id черновика.
+        event.preventDefault();
+        setDraftStatus({ kind: 'saving' });
+        void box.inFlight.finally(() => {
+          box.publishReady = true;
+          form.requestSubmit();
+        });
+        return;
+      }
+      box.publishReady = false;
+      // Свежий id черновика прямо в поле: состояние могло ещё не перерисоваться.
+      const field = form.elements.namedItem('draftId');
+      if (drafts && field instanceof HTMLInputElement) field.value = box.draftId ?? '';
+      return;
+    }
     event.preventDefault();
     setIssues(checked.issues);
     const first = checked.issues[0];
@@ -150,8 +339,16 @@ export function JobForm({ action, initial = {}, submitLabel, pendingLabel }: Pro
   return (
     // Ширина считается по контейнеру формы: на странице нового заказа она широкая (две колонки,
     // справа бюджет и кнопка), в правке на странице заказа узкая (одна колонка).
-    <form action={formAction} onSubmit={onSubmit} noValidate className="@container">
+    <form
+      ref={formRef}
+      action={formAction}
+      onSubmit={onSubmit}
+      onInput={scheduleSave}
+      noValidate
+      className="@container"
+    >
       <FormError message={topError} />
+      {drafts ? <input type="hidden" name="draftId" value={draftId ?? ''} /> : null}
 
       <div className="grid items-start gap-5 @5xl:grid-cols-[minmax(0,1fr)_380px] @5xl:gap-6">
         <div className="min-w-0 space-y-5 @container">
@@ -351,6 +548,7 @@ export function JobForm({ action, initial = {}, submitLabel, pendingLabel }: Pro
           </FormSection>
 
           <SubmitButton pending={pendingLabel}>{submitLabel}</SubmitButton>
+          {drafts ? <DraftControls status={draftStatus} onSave={() => void saveNow()} /> : null}
         </div>
       </div>
     </form>
@@ -394,5 +592,37 @@ function FormSection({
       </div>
       <div className="mt-4 space-y-4">{children}</div>
     </section>
+  );
+}
+
+function DraftControls({ status, onSave }: { status: DraftStatus; onSave: () => void }) {
+  const text =
+    status.kind === 'saving'
+      ? 'Сохраняем черновик…'
+      : status.kind === 'pending'
+        ? 'Есть несохранённые изменения: черновик сохранится через несколько секунд.'
+        : status.kind === 'saved'
+          ? `Черновик сохранён в ${timeOf(status.at)}`
+          : status.kind === 'error'
+            ? status.message
+            : 'Не готовы публиковать? Черновик сохраняется сам через несколько секунд после правки, продолжить можно из «Мои заказы».';
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={onSave}
+        disabled={status.kind === 'saving'}
+        className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-line bg-surface px-5 text-sm font-semibold text-ink transition-[border-color,background-color,transform] duration-150 hover:border-ink/25 active:scale-[0.98] disabled:opacity-60"
+      >
+        Сохранить черновик
+      </button>
+      <p
+        role="status"
+        aria-live="polite"
+        className={`text-center text-sm ${status.kind === 'error' ? 'font-medium text-accent' : 'text-ink-soft'}`}
+      >
+        {text}
+      </p>
+    </div>
   );
 }

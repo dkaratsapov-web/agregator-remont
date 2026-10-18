@@ -97,6 +97,9 @@ export class MyJobsService {
           ownerId,
         },
       });
+      // Опубликован из черновика: черновик удаляется вместе с созданием заказа. Чужой или уже
+      // удалённый черновик просто не найдётся (условие по владельцу).
+      if (dto.draftId) await tx.jobDraft.deleteMany({ where: { id: dto.draftId, ownerId } });
       await writeAudit(tx, {
         actorId: ownerId,
         action: 'JOB_CREATED',

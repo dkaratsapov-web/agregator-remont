@@ -8,6 +8,8 @@ import type {
   MyBidDto,
   JobCategory,
   JobDto,
+  JobDraftDto,
+  JobDraftInput,
   JobInput,
   JobStatus,
   LeadDto,
@@ -210,6 +212,51 @@ export async function createMyJob(
 ): Promise<OwnJobDto> {
   const res = await request('/v1/me/jobs', { method: 'POST', body: input, token, clientIp });
   return expectJson<OwnJobDto>(res, 'POST /v1/me/jobs');
+}
+
+/** Черновики нового заказа (только владелец). */
+export async function listDrafts(token: string): Promise<JobDraftDto[]> {
+  const res = await request('/v1/me/drafts', { token });
+  return (await expectJson<{ items: JobDraftDto[] }>(res, 'GET /v1/me/drafts')).items;
+}
+
+/** null, если черновика нет или он принадлежит другому пользователю (API отвечает 404). */
+export async function getDraft(token: string, id: string): Promise<JobDraftDto | null> {
+  const res = await request(`/v1/me/drafts/${encodeURIComponent(id)}`, { token });
+  if (res.status === 404) return null;
+  return expectJson<JobDraftDto>(res, 'GET /v1/me/drafts/:id');
+}
+
+export async function saveDraft(
+  token: string,
+  id: string | null,
+  input: JobDraftInput,
+  clientIp?: string,
+): Promise<JobDraftDto> {
+  const res = id
+    ? await request(`/v1/me/drafts/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        body: input,
+        token,
+        clientIp,
+      })
+    : await request('/v1/me/drafts', { method: 'POST', body: input, token, clientIp });
+  return expectJson<JobDraftDto>(res, id ? 'PUT /v1/me/drafts/:id' : 'POST /v1/me/drafts');
+}
+
+export async function deleteDraft(token: string, id: string, clientIp?: string): Promise<void> {
+  const res = await request(`/v1/me/drafts/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    token,
+    clientIp,
+  });
+  if (res.status !== 204) {
+    throw new ApiError(
+      `DELETE /v1/me/drafts/:id responded ${res.status}`,
+      res.status,
+      await userMessageOf(res),
+    );
+  }
 }
 
 export async function updateMyJob(

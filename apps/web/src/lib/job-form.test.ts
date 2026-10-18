@@ -5,6 +5,8 @@ import {
   checkJobForm,
   parseBudget,
   parseDetailsField,
+  draftIdFrom,
+  parseDraftForm,
   parseJobForm,
   readJobForm,
 } from './job-form';
@@ -170,5 +172,61 @@ describe('checkJobForm', () => {
     expect(!result.ok && result.issues).toEqual([
       { field: 'details', questionId: 'workType', message: 'Ответьте на вопрос «Что за работа»' },
     ]);
+  });
+});
+
+describe('drafts', () => {
+  it('keeps what is filled and turns blanks into null', () => {
+    expect(parseDraftForm(form({ title: '  Плит ', description: '   ' }))).toEqual({
+      title: 'Плит',
+      description: null,
+      category: null,
+      city: null,
+      budgetMin: null,
+      budgetMax: null,
+      details: {},
+    });
+  });
+
+  it('drops invalid values instead of failing', () => {
+    const draft = parseDraftForm(
+      form({
+        title: 'Плитка\u202e в ванной\u0000',
+        description: 'Строка 1\r\nСтрока 2\u200b',
+        category: 'GARDENING',
+        city: 'Казань',
+        budgetMin: 'сорок тысяч',
+        budgetMax: '60 000',
+        details: '{битый json',
+      }),
+    );
+    expect(draft).toEqual({
+      title: 'Плитка в ванной',
+      description: 'Строка 1\nСтрока 2',
+      category: null,
+      city: 'Казань',
+      budgetMin: null,
+      budgetMax: 60000,
+      details: {},
+    });
+  });
+
+  it('passes the questionnaire answers through for the API to check', () => {
+    expect(parseDraftForm(form(base)).details).toEqual(JSON.parse(base.details));
+    expect(parseDraftForm(form({ ...base, details: '["rooms"]' })).details).toEqual({});
+  });
+
+  it('reads the draft id only when it looks like an id', () => {
+    expect(draftIdFrom(form({ draftId: 'cm1abc_DEF-2' }))).toBe('cm1abc_DEF-2');
+    expect(draftIdFrom(form({ draftId: '' }))).toBeNull();
+    expect(draftIdFrom(form({ draftId: '../x' }))).toBeNull();
+    expect(draftIdFrom(form({}))).toBeNull();
+  });
+
+  it('publishes with the draft id so the API removes the draft', () => {
+    const parsed = parseJobForm(form({ ...base, draftId: 'cm1draft' }));
+    expect(parsed.ok && parsed.input.draftId).toBe('cm1draft');
+    const plain = parseJobForm(form(base));
+    expect(plain.ok && 'draftId' in plain.input).toBe(false);
   });
 });

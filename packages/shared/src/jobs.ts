@@ -93,6 +93,8 @@ export interface JobInput {
   budgetMax: number | null;
   /** Ответы анкеты. При создании без поля сохраняется {}; при правке отсутствие = не менять. */
   details?: JobDetails;
+  /** Только при создании: черновик, из которого опубликован заказ; удаляется вместе с ним. */
+  draftId?: string;
 }
 
 /** Заказ в кабинете владельца. */
@@ -101,4 +103,39 @@ export interface OwnJobDto extends JobDto {
   updatedAt: string;
   /** Редактировать можно только открытый заказ. */
   editable: boolean;
+}
+
+/** Черновики нового заказа: видны только владельцу, в каталог не попадают. */
+export const DRAFT_LIMITS = {
+  /** Сколько черновиков может хранить один заказчик. */
+  MAX_PER_USER: 10,
+} as const;
+
+/**
+ * Незаконченный заказ. Любое поле может быть пустым; ответы анкеты проверяются мягко
+ * (неверные отбрасываются). Полная проверка — при публикации (POST /v1/me/jobs с draftId).
+ */
+export interface JobDraftInput {
+  title?: string | null;
+  description?: string | null;
+  category?: JobCategory | null;
+  city?: string | null;
+  budgetMin?: number | null;
+  budgetMax?: number | null;
+  details?: JobDetails;
+}
+
+export interface JobDraftDto {
+  id: string;
+  title: string | null;
+  description: string | null;
+  category: JobCategory | null;
+  city: string | null;
+  budgetMin: number | null;
+  budgetMax: number | null;
+  details: JobDetails;
+  /** ISO 8601 */
+  createdAt: string;
+  /** ISO 8601 */
+  updatedAt: string;
 }

@@ -202,8 +202,6 @@ function FeatureCard({
   );
 }
 
-const LEGEND: FeatureStatus[] = ['live', 'partial', 'soon'];
-
 export function Features() {
   const stack = useRef<HTMLDivElement>(null);
   const stacked = useStacked();
@@ -226,11 +224,6 @@ export function Features() {
             Наши главные преимущества
           </h2>
         </motion.div>
-        <div className="flex flex-wrap gap-2" aria-label="Обозначения">
-          {LEGEND.map((status) => (
-            <StatusPill key={status} status={status} />
-          ))}
-        </div>
       </div>
 
       <div ref={stack} className="relative mt-14 flex flex-col gap-4 lg:mt-6 lg:gap-0">
