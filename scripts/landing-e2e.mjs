@@ -19,6 +19,7 @@ const PUBLIC_PATHS = [
   /^\/icon\.svg$/,
   /^\/apple-icon\.png$/,
   /^\/icons\//,
+  /^\/landing\//,
   /^\/_next\/static\//,
 ];
 
