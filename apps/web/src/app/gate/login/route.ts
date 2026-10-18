@@ -4,9 +4,9 @@ import {
   GATE_TTL_SECONDS,
   gateConfig,
   gateCookieName,
-  isGateLocked,
+  finishGateAttempt,
   issueGatePass,
-  recordGateFailure,
+  reserveGateAttempt,
   resetGateFailures,
 } from '@/lib/gate';
 import { readLimitedBody } from '@/lib/read-limited';
@@ -53,17 +53,16 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const ip = (await getClientIp()) ?? 'unknown';
-  if (isGateLocked(ip)) return back('locked', next);
+  const attempt = reserveGateAttempt(ip);
+  if (attempt !== 'ok') return back(attempt, next);
 
-  const ok = await checkGateCredentials(
-    config,
-    form.get('login') ?? '',
-    form.get('password') ?? '',
-  );
-  if (!ok) {
-    recordGateFailure(ip);
-    return back('wrong', next);
+  let ok = false;
+  try {
+    ok = await checkGateCredentials(config, form.get('login') ?? '', form.get('password') ?? '');
+  } finally {
+    finishGateAttempt();
   }
+  if (!ok) return back('wrong', next);
 
   resetGateFailures(ip);
   const secure = process.env.NODE_ENV === 'production';

@@ -1,5 +1,10 @@
 import { normalizeRuPhone, type SessionDto, type UserDto } from '@agregator/shared';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Prisma, type User } from '@prisma/client';
 import { writeAudit } from '../audit/audit';
 import { hashPassword, verifyPassword } from '../auth/password';
@@ -48,11 +53,11 @@ export class AccountService {
   /**
    * Смена пароля: нужен текущий пароль; все остальные сессии завершаются (если пароль меняют
    * из-за утечки, чужой вход должен прекратиться), текущая остаётся. Запись в журнал аудита.
+   * Строка пользователя блокируется, и текущий пароль проверяется по хешу под блокировкой: две
+   * одновременные смены из разных сессий не проходят обе, а смена из уже завершённой сессии
+   * отклоняется (AUDIT_FINDINGS SEC-5).
    */
   async changePassword(user: User, sessionId: string, dto: ChangePasswordDto): Promise<void> {
-    if (!(await verifyPassword(user.passwordHash, dto.currentPassword))) {
-      throw new BadRequestException('Текущий пароль указан неверно');
-    }
     if (dto.newPassword === dto.currentPassword) {
       throw new BadRequestException('Новый пароль должен отличаться от текущего');
     }
@@ -61,6 +66,14 @@ export class AccountService {
     }
     const passwordHash = await hashPassword(dto.newPassword);
     await this.prisma.$transaction(async (tx) => {
+      const [row] = await tx.$queryRaw<{ password_hash: string }[]>`
+        SELECT password_hash FROM users WHERE id = ${user.id} FOR UPDATE`;
+      if (!row || !(await verifyPassword(row.password_hash, dto.currentPassword))) {
+        throw new BadRequestException('Текущий пароль указан неверно');
+      }
+      if ((await tx.session.count({ where: { id: sessionId, userId: user.id } })) === 0) {
+        throw new UnauthorizedException('Сеанс завершён. Войдите снова');
+      }
       await tx.user.update({ where: { id: user.id }, data: { passwordHash } });
       const { count } = await tx.session.deleteMany({
         where: { userId: user.id, id: { not: sessionId } },

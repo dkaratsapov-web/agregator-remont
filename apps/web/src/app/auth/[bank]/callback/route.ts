@@ -6,6 +6,7 @@ import {
   stateMatches,
   takeBankFlow,
 } from '@/lib/bank-login';
+import { safeRedirectPath } from '@/lib/redirect';
 import { getClientIp, getSessionToken, getUserAgent, setSessionCookie } from '@/lib/session';
 
 /**
@@ -49,7 +50,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ bank
       await getUserAgent(),
     );
     await setSessionCookie(session.token, session.expiresAt);
-    return go(flow.next);
+    // next уже проверен при старте; повторная проверка — на случай подменённой cookie.
+    return go(safeRedirectPath(flow.next));
   } catch (error) {
     if (error instanceof BankLoginError) {
       if (error.code === 'OAUTH_NEED_ROLE' && error.pending) {

@@ -2,7 +2,7 @@ import 'server-only';
 import type { UserDto } from '@agregator/shared';
 import { cookies, headers } from 'next/headers';
 import { cache } from 'react';
-import { getMe } from './api';
+import { getMe, logoutSession } from './api';
 import { clientIpFromForwardedFor, parseTrustProxyHops } from './client-ip';
 
 /**
@@ -26,7 +26,14 @@ function cookieAttributes() {
   };
 }
 
+/**
+ * Новая сессия после входа или регистрации. Прежняя сессия этого браузера (повторный вход, в том
+ * числе под другим аккаунтом) отзывается в API, а не просто затирается в cookie: иначе её токен
+ * жил бы ещё 30 дней (AUDIT_FINDINGS SEC-4). Сбой отзыва вход не прерывает.
+ */
 export async function setSessionCookie(token: string, expiresAt: string): Promise<void> {
+  const previous = await getSessionToken();
+  if (previous && previous !== token) await logoutSession(previous);
   (await cookies()).set(sessionCookieName(), token, {
     ...cookieAttributes(),
     expires: new Date(expiresAt),

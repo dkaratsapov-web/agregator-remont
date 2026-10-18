@@ -57,6 +57,31 @@ const form = (fields: Record<string, string>) => {
   return fd;
 };
 
+describe('loginAction', () => {
+  it('revokes the previous session of this browser before setting the new one', async () => {
+    sameOrigin();
+    state.cookies.set(SESSION, 'old-token');
+    fetchMock.mockImplementation(async (url: string) =>
+      String(url).endsWith('/v1/auth/login')
+        ? new Response(
+            JSON.stringify({
+              token: 'new-token',
+              expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+              user: {},
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          )
+        : new Response(null, { status: 204 }),
+    );
+    await expect(
+      loginAction({}, form({ email: 'a@example.ru', password: 'correct-horse-battery' })),
+    ).rejects.toThrow('NEXT_REDIRECT');
+    const logout = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/v1/auth/logout'));
+    expect(logout?.[1].headers.Authorization).toBe('Bearer old-token');
+    expect(state.cookies.get(SESSION)).toBe('new-token');
+  });
+});
+
 describe('logoutAction', () => {
   it('clears the cookie and redirects when the API revoked the session', async () => {
     sameOrigin();

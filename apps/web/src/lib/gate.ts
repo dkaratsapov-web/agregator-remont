@@ -95,8 +95,9 @@ export async function checkGateCredentials(
 }
 
 /**
- * Лимит неудачных попыток на IP: 10 за 15 минут. Хранится в памяти процесса web (он один);
- * при перезапуске счётчики сбрасываются, это допустимо — bcrypt и так замедляет перебор.
+ * Лимит попыток на IP: 10 неудачных за 15 минут (попытка считается неудачной до успешной
+ * проверки, см. reserveGateAttempt). Хранится в памяти процесса web (он один); при перезапуске
+ * счётчики сбрасываются, это допустимо — bcrypt и так замедляет перебор.
  */
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_FAILURES = 10;
@@ -128,4 +129,29 @@ export function recordGateFailure(ip: string, nowMs = Date.now()): void {
 
 export function resetGateFailures(ip: string): void {
   failures.delete(ip);
+}
+
+/**
+ * Одновременных проверок пароля (bcrypt в основном потоке web) не больше MAX_IN_FLIGHT на весь
+ * процесс: поток параллельных запросов не займёт процессор и не замедлит сайт.
+ */
+const MAX_IN_FLIGHT = 4;
+let inFlight = 0;
+
+/**
+ * Попытка входа учитывается ДО проверки пароля, синхронно: параллельные запросы видят её сразу,
+ * и лимит «10 за 15 минут» нельзя обойти, отправив много запросов одновременно (AUDIT_FINDINGS
+ * SEC-1). Удачный вход сбрасывает счётчик (resetGateFailures). 'ok' — после проверки обязательно
+ * вызвать finishGateAttempt().
+ */
+export function reserveGateAttempt(ip: string, nowMs = Date.now()): 'ok' | 'locked' | 'busy' {
+  if (isGateLocked(ip, nowMs)) return 'locked';
+  if (inFlight >= MAX_IN_FLIGHT) return 'busy';
+  recordGateFailure(ip, nowMs);
+  inFlight += 1;
+  return 'ok';
+}
+
+export function finishGateAttempt(): void {
+  inFlight = Math.max(0, inFlight - 1);
 }

@@ -52,10 +52,17 @@ export class AuthService {
     if (!user || !valid) {
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
-    await this.prisma.session.deleteMany({
-      where: { userId: user.id, expiresAt: { lte: new Date() } },
+    // Сессия создаётся под блокировкой строки пользователя и только если хеш пароля не сменился
+    // после проверки: вход по старому паролю в момент смены не переживёт её (SEC-5).
+    return this.prisma.$transaction(async (tx) => {
+      const [row] = await tx.$queryRaw<{ password_hash: string }[]>`
+        SELECT password_hash FROM users WHERE id = ${user.id} FOR UPDATE`;
+      if (row?.password_hash !== user.passwordHash) {
+        throw new UnauthorizedException(INVALID_CREDENTIALS);
+      }
+      await tx.session.deleteMany({ where: { userId: user.id, expiresAt: { lte: new Date() } } });
+      return this.createSession(tx, user, userAgent);
     });
-    return this.createSession(this.prisma, user, userAgent);
   }
 
   async logout(sessionId: string): Promise<void> {
