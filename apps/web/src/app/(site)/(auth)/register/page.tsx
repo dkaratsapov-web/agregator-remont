@@ -11,14 +11,14 @@ export default async function RegisterPage() {
 
   return (
     <>
-      <h1 className="text-3xl font-semibold tracking-tight">Регистрация</h1>
-      <p className="mt-2 text-ink-soft">
+      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Регистрация</h1>
+      <p className="mt-1.5 text-ink-soft">
         Уже есть аккаунт?{' '}
         <Link href="/login" className="font-semibold text-accent hover:underline">
           Войдите
         </Link>
       </p>
-      <div className="mt-8">
+      <div className="mt-6">
         <RegisterForm />
       </div>
     </>

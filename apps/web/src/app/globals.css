@@ -268,3 +268,8 @@ button {
     transform: scaleX(1);
   }
 }
+
+/* Вход и регистрация помещаются в первый экран: подвал там не нужен и давал бы прокрутку. */
+body:has(.auth-screen) .site-footer {
+  display: none;
+}
