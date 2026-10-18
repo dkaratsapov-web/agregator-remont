@@ -1,6 +1,7 @@
 import { USER_ROLE_LABELS, type UserDto } from '@agregator/shared';
 import Link from 'next/link';
 import { formatDate } from '@/lib/format';
+import { CopyId } from './copy-id';
 import { UserAvatar } from './user-avatar';
 
 const formatPhone = (phone: string) =>
@@ -36,7 +37,7 @@ export function ProfileCard({ user }: { user: UserDto }) {
         className="pointer-events-none absolute -right-20 -top-24 size-72 rounded-full bg-[radial-gradient(closest-side,var(--accent-tint),transparent)]"
       />
       <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex min-w-0 items-center gap-5">
+        <div className="flex min-w-0 flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-5">
           <UserAvatar
             name={user.name}
             avatarVersion={user.avatarVersion}
@@ -48,10 +49,13 @@ export function ProfileCard({ user }: { user: UserDto }) {
             </p>
             <h1
               id="profile-card-title"
-              className="mt-2 text-[1.3rem] font-semibold leading-tight tracking-tight [overflow-wrap:anywhere] sm:text-2xl md:text-[2.2rem]"
+              className="mt-2 text-[1.35rem] font-semibold leading-tight tracking-tight [overflow-wrap:break-word] sm:text-2xl md:text-[2.2rem]"
             >
               Здравствуйте, {user.name}
             </h1>
+            <div className="mt-3">
+              <CopyId publicId={user.publicId} />
+            </div>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">

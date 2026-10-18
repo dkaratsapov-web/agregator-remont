@@ -5,6 +5,7 @@ import type { User } from '@prisma/client';
 export function toUserDto(user: User): UserDto {
   return {
     id: user.id,
+    publicId: user.publicId,
     email: user.email,
     name: user.name,
     role: user.role,

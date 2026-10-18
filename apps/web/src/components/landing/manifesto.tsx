@@ -1,8 +1,15 @@
 'use client';
 
 import { motion, useScroll, useTransform, type MotionValue } from 'motion/react';
-import { useRef } from 'react';
+import { Fragment, useRef } from 'react';
 import { usePrefersReducedMotion } from './use-prefers-reduced-motion';
+
+const BRAND = 'Гарантыч';
+
+/** Название на плашке цвета акцента, как в заголовке героя. */
+const plateClass =
+  'absolute inset-x-0 bottom-[0.04em] top-[0.1em] -z-10 origin-left rounded-[0.18em] bg-accent';
+const markClass = 'relative isolate inline-block px-[0.1em]';
 
 function Word({
   word,
@@ -16,10 +23,27 @@ function Word({
   progress: MotionValue<number>;
 }) {
   const start = index / total;
-  const opacity = useTransform(progress, [start, start + 1 / total], [0.16, 1]);
+  const end = start + 1 / total;
+  const opacity = useTransform(progress, [start, end], [0.16, 1]);
+  // Плашка проезжает под словом, пока оно проявляется; текст светлеет, когда она почти готова.
+  const plate = useTransform(progress, [start, end], [0, 1]);
+  const color = useTransform(progress, [start + 0.55 / total, end], ['#0d1320', '#ffffff']);
+  if (!word.startsWith(BRAND)) {
+    return (
+      <>
+        <motion.span style={{ opacity }}>{word}</motion.span>{' '}
+      </>
+    );
+  }
   return (
     <>
-      <motion.span style={{ opacity }}>{word}</motion.span>{' '}
+      <motion.span style={{ opacity }}>
+        <motion.span className={markClass} style={{ color }}>
+          <motion.span aria-hidden="true" className={plateClass} style={{ scaleX: plate }} />
+          {BRAND}
+        </motion.span>
+        {word.slice(BRAND.length)}
+      </motion.span>{' '}
     </>
   );
 }
@@ -33,10 +57,20 @@ export function Manifesto({ text }: { text: string }) {
   return (
     <p
       ref={ref}
-      className="font-display text-[1.6rem] font-medium leading-[1.25] tracking-[-0.03em] text-ink sm:text-4xl lg:text-[3.1rem]"
+      className="font-display text-[1.6rem] font-medium leading-[1.25] tracking-[-0.03em] text-ink sm:text-4xl lg:text-[3.1rem] xl:text-[3.5rem]"
     >
       {reduce
-        ? text
+        ? text.split(BRAND).map((part, i) => (
+            <Fragment key={i}>
+              {i > 0 ? (
+                <span className={`${markClass} text-accent-ink`}>
+                  <span aria-hidden="true" className={plateClass} />
+                  {BRAND}
+                </span>
+              ) : null}
+              {part}
+            </Fragment>
+          ))
         : words.map((word, i) => (
             <Word
               key={`${word}-${i}`}

@@ -12,7 +12,7 @@ export default async function NewJobPage() {
   if (!token) return <CustomersOnly />;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 pt-10 sm:px-6 md:pt-14">
+    <div className="mx-auto max-w-[1600px] px-4 pb-16 pt-10 sm:px-6 md:pt-14 lg:px-10">
       <p className="text-sm text-ink-soft">
         <Link href="/account/jobs" className="hover:text-ink hover:underline">
           Мои заказы

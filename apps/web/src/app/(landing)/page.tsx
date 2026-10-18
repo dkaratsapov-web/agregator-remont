@@ -55,7 +55,16 @@ export default async function LandingPage() {
   const user = await getCurrentUser();
   return (
     <ViewerProvider
-      viewer={user ? { name: user.name, role: user.role, avatarVersion: user.avatarVersion } : null}
+      viewer={
+        user
+          ? {
+              name: user.name,
+              role: user.role,
+              publicId: user.publicId,
+              avatarVersion: user.avatarVersion,
+            }
+          : null
+      }
     >
       <ScrollReset />
       <Preloader />
@@ -109,7 +118,7 @@ export default async function LandingPage() {
         {/* О сервисе */}
         <section id="about" className="mx-auto max-w-[1600px] px-4 py-28 sm:px-6 lg:px-10 lg:py-40">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">О сервисе</p>
-          <div className="mt-6 max-w-5xl">
+          <div className="mt-6">
             <Manifesto text="Мы делаем Гарантыч, чтобы цена и срок ремонта были известны до начала работ, а деньги переходили мастеру только после того, как вы приняли этап." />
           </div>
         </section>

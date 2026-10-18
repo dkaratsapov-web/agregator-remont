@@ -1144,6 +1144,11 @@
           "preferences": {
             "$ref": "#/components/schemas/UiPreferences"
           },
+          "publicId": {
+            "description": "Короткий номер для поддержки",
+            "minimum": 1,
+            "type": "integer"
+          },
           "role": {
             "allOf": [
               {
@@ -1154,6 +1159,7 @@
         },
         "required": [
           "id",
+          "publicId",
           "email",
           "name",
           "role",

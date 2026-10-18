@@ -1,5 +1,6 @@
-// Миграция, меняющая роль одного аккаунта по известному userId (docs/SECURITY.md, раздел 10):
-//   node scripts/role-migration.mjs <userId> <ADMIN|CUSTOMER|CONTRACTOR> "<причина>"
+// Миграция, меняющая роль одного аккаунта по известному userId или короткому номеру из кабинета
+// («ID 100245»), docs/SECURITY.md, раздел 10:
+//   node scripts/role-migration.mjs <userId|номер> <ADMIN|CUSTOMER|CONTRACTOR> "<причина>"
 // Создаёт apps/api/prisma/migrations/<время>_role_<роль>_<userId>/migration.sql. Миграция идёт
 // через PR и аудит, применяется автодеплоем и пишет запись USER_ROLE_CHANGED в журнал аудита.
 // Если аккаунта нет или роль уже такая, ничего не меняет (без ошибки: упавшая миграция
@@ -10,9 +11,14 @@ import { randomBytes } from 'node:crypto';
 const ROLES = ['ADMIN', 'CUSTOMER', 'CONTRACTOR'];
 const [userId, role, reason] = process.argv.slice(2);
 
-if (!/^c[a-z0-9]{20,32}$/.test(userId ?? '') || !ROLES.includes(role) || !reason?.trim()) {
+const byNumber = /^[1-9][0-9]{5,8}$/.test(userId ?? '');
+if (
+  !(byNumber || /^c[a-z0-9]{20,32}$/.test(userId ?? '')) ||
+  !ROLES.includes(role) ||
+  !reason?.trim()
+) {
   console.error(
-    'usage: node scripts/role-migration.mjs <userId> <ADMIN|CUSTOMER|CONTRACTOR> "<причина>"',
+    'usage: node scripts/role-migration.mjs <userId|номер> <ADMIN|CUSTOMER|CONTRACTOR> "<причина>"',
   );
   process.exit(1);
 }
@@ -21,6 +27,8 @@ if (/[\r\n*]/.test(reason) || reason.length > 200) {
   process.exit(1);
 }
 
+// Проверенные выше значения: только цифры либо cuid, кавычек и SQL в них быть не может.
+const match = byNumber ? `"public_id" = ${userId}` : `"id" = '${userId}'`;
 const stamp = new Date().toISOString().replace(/\D/g, '').slice(0, 14);
 const dir = `apps/api/prisma/migrations/${stamp}_role_${role.toLowerCase()}_${userId}`;
 const auditId = `role${randomBytes(10).toString('hex')}`;
@@ -32,10 +40,10 @@ INSERT INTO "audit_logs" ("id", "actor_id", "action", "entity_type", "entity_id"
 SELECT '${auditId}', NULL, 'USER_ROLE_CHANGED', 'user', "id",
        jsonb_build_object('role', jsonb_build_object('from', "role"::text, 'to', '${role}'))
 FROM "users"
-WHERE "id" = '${userId}' AND "role" <> '${role}';
+WHERE ${match} AND "role" <> '${role}';
 
 UPDATE "users" SET "role" = '${role}', "updated_at" = CURRENT_TIMESTAMP
-WHERE "id" = '${userId}' AND "role" <> '${role}';
+WHERE ${match} AND "role" <> '${role}';
 `;
 
 mkdirSync(dir, { recursive: true });

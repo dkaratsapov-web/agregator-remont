@@ -3,6 +3,7 @@
 import { motion, useMotionValueEvent, useScroll, useSpring } from 'motion/react';
 import { useState } from 'react';
 import { AccountMenu } from '../account-menu';
+import { HeaderSearch } from '../header-search';
 import { useViewer } from './viewer';
 import { Wordmark } from './wordmark';
 
@@ -28,7 +29,7 @@ export function LandingHeader() {
       <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-10">
         <a
           href="#top"
-          className="flex min-h-11 items-center rounded-lg"
+          className="flex min-h-11 shrink-0 items-center rounded-lg"
           aria-label="Гарантыч, наверх"
         >
           <Wordmark />
@@ -44,24 +45,27 @@ export function LandingHeader() {
             </a>
           ))}
         </nav>
-        {viewer ? (
-          <AccountMenu user={viewer} />
-        ) : (
-          <div className="flex items-center gap-2">
-            <a
-              href="/register"
-              className="hidden min-h-11 items-center rounded-full border border-line bg-surface/70 px-5 text-sm font-semibold text-ink transition-[background-color,border-color,transform] duration-200 hover:border-ink/25 hover:bg-surface active:scale-[0.97] sm:inline-flex"
-            >
-              Регистрация
-            </a>
-            <a
-              href="/login"
-              className="inline-flex min-h-11 items-center rounded-full bg-ink px-5 text-sm font-semibold text-canvas transition-[background-color,transform] duration-200 hover:bg-[#1c2536] active:scale-[0.97]"
-            >
-              Войти
-            </a>
-          </div>
-        )}
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 lg:gap-4">
+          <HeaderSearch />
+          {viewer ? (
+            <AccountMenu user={viewer} />
+          ) : (
+            <div className="flex items-center gap-2">
+              <a
+                href="/register"
+                className="hidden min-h-11 items-center rounded-full border border-line bg-surface/70 px-5 text-sm font-semibold text-ink transition-[background-color,border-color,transform] duration-200 hover:border-ink/25 hover:bg-surface active:scale-[0.97] sm:inline-flex"
+              >
+                Регистрация
+              </a>
+              <a
+                href="/login"
+                className="inline-flex min-h-11 items-center rounded-full bg-ink px-5 text-sm font-semibold text-canvas transition-[background-color,transform] duration-200 hover:bg-[#1c2536] active:scale-[0.97]"
+              >
+                Войти
+              </a>
+            </div>
+          )}
+        </div>
       </div>
       <motion.div
         aria-hidden="true"

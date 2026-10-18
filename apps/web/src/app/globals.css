@@ -144,6 +144,11 @@ button {
   border-radius: 6px;
 }
 
+/* Поле внутри «таблетки», которая сама рисует кольцо фокуса (поиск в шапке): без второго контура. */
+[data-focus-ring='within'] input:focus-visible {
+  outline: none;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   html {
     scroll-behavior: smooth;

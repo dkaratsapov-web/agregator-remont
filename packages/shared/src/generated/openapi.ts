@@ -689,6 +689,8 @@ export interface components {
             name: string;
             phone: string | null;
             preferences: components["schemas"]["UiPreferences"];
+            /** @description Короткий номер для поддержки */
+            publicId: number;
             role: components["schemas"]["UserRole"];
         };
         /** @enum {string} */

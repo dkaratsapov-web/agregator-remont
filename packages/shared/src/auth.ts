@@ -53,6 +53,8 @@ export const DEFAULT_UI_PREFERENCES: UiPreferences = {
 /** Пользователь в ответах API для него самого. Хеш пароля и сессии не отдаются никогда. */
 export interface UserDto {
   id: string;
+  /** Короткий номер аккаунта для поддержки («ID 100245»); доступа не даёт. */
+  publicId: number;
   email: string;
   name: string;
   role: UserRole;
