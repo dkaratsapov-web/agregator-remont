@@ -26,6 +26,10 @@ import { readJobDetails, readJobItems } from '../jobs/job.mapper';
 import { toOwnJobDto } from './own-job.mapper';
 
 const JOB_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+/** Повторная публикация того же черновика (ответ 409; web показывает его как есть). */
+export const DRAFT_ALREADY_PUBLISHED =
+  'Заказ из этого черновика уже опубликован. Проверьте «Мои заказы»; если его там нет, опубликуйте ещё раз.';
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const EDITABLE_FIELDS = [
   'title',
@@ -87,6 +91,15 @@ export class MyJobsService {
         );
       }
 
+      // Опубликован из черновика: черновик удаляется в этой же транзакции до создания заказа.
+      // Если его уже нет (опубликован в другой вкладке, повтор запроса после обрыва связи, чужой
+      // id), второй заказ не создаётся. Строка пользователя заблокирована выше, поэтому
+      // параллельные публикации идут по очереди и только первая находит черновик.
+      if (dto.draftId) {
+        const { count } = await tx.jobDraft.deleteMany({ where: { id: dto.draftId, ownerId } });
+        if (count === 0) throw new ConflictException(DRAFT_ALREADY_PUBLISHED);
+      }
+
       // Явный список полей: владелец и статус задаются только сервером.
       const created = await tx.job.create({
         data: {
@@ -101,9 +114,6 @@ export class MyJobsService {
           ownerId,
         },
       });
-      // Опубликован из черновика: черновик удаляется вместе с созданием заказа. Чужой или уже
-      // удалённый черновик просто не найдётся (условие по владельцу).
-      if (dto.draftId) await tx.jobDraft.deleteMany({ where: { id: dto.draftId, ownerId } });
       await writeAudit(tx, {
         actorId: ownerId,
         action: 'JOB_CREATED',

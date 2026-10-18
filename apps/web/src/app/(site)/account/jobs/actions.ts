@@ -32,6 +32,8 @@ export interface JobFormState {
   issues?: JobFormIssue[];
   /** Введённые значения, включая ответы анкеты (JSON), чтобы не потерять их при ошибке. */
   values?: Partial<JobFormValues>;
+  /** Черновик уже опубликован (другая вкладка, повтор запроса): форма забывает его id. */
+  draftReset?: boolean;
 }
 
 const JOB_ERRORS = {
@@ -50,7 +52,9 @@ export async function createJobAction(_prev: JobFormState, form: FormData): Prom
     id = (await createMyJob(token, parsed.input, await getClientIp())).id;
   } catch (error) {
     redirectIfUnauthorized(error, '/account/jobs/new');
-    return { error: apiErrorMessage(error, JOB_ERRORS), values: parsed.values };
+    // 409 — заказ из этого черновика уже опубликован: второй не создаётся (сообщение от API).
+    const draftReset = error instanceof ApiError && error.status === 409 && !!parsed.input.draftId;
+    return { error: apiErrorMessage(error, JOB_ERRORS), values: parsed.values, draftReset };
   }
   redirect(`/account/jobs/${id}?created=1`);
 }
