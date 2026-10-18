@@ -396,6 +396,11 @@ export function JobForm({
     setLastPublishState(state);
     autosave.current.publishing = false;
     autosave.current.publishReady = false;
+    // Черновик уже опубликован: следующая отправка создаст заказ заново, без его id.
+    if (state.draftReset) {
+      autosave.current.draftId = null;
+      setDraftId(null);
+    }
   }
 
   const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {

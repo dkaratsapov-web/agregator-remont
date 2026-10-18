@@ -167,12 +167,12 @@ describe('Job drafts (e2e)', () => {
     expect(job.body.title).toBe(fullJob.title);
     expect(await prisma.jobDraft.count({ where: { id: draft.id } })).toBe(0);
 
-    // Чужой draftId: заказ создаётся, чужой черновик не трогается.
+    // Чужой draftId: как уже опубликованный — 409 без заказа, чужой черновик не трогается.
     await http()
       .post('/v1/me/jobs')
       .set(owner.auth)
       .send({ ...fullJob, draftId: foreign.id })
-      .expect(201);
+      .expect(409);
     expect(await prisma.jobDraft.count({ where: { id: foreign.id } })).toBe(1);
 
     await http()
