@@ -6,6 +6,8 @@ import {
   JOB_CATEGORY_LABELS,
   JOB_ITEM_LIMITS,
   JOB_LIMITS,
+  jobDetailHighlights,
+  jobDetailsProgress,
   SERVICE_AREA_ERROR,
   validateJobDetails,
   type JobCategory,
@@ -18,16 +20,18 @@ import { FormError } from '@/components/auth/form-error';
 import { SubmitButton } from '@/components/auth/submit-button';
 import { CityCombobox } from '@/components/ui/city-combobox';
 import { CITY_GROUPS, CITY_OPTIONS } from '@/lib/city-options';
+import { formatBudget } from '@/lib/format';
 import { Select } from '@/components/ui/select';
 import {
   checkJobForm,
+  parseBudget,
   parseDetailsField,
   parseItemsField,
   readJobForm,
   type JobFormIssue,
   type JobFormValues,
 } from '@/lib/job-form';
-import { JobQuestionnaire } from './job-questionnaire';
+import { JobQuestionnaire, ProgressRuler } from './job-questionnaire';
 
 interface Props {
   action: (state: JobFormState, form: FormData) => Promise<JobFormState>;
@@ -144,6 +148,20 @@ export function JobForm({
       : {},
   );
   const [extras, setExtras] = useState<ExtraPosition[]>(() => initialExtras(values.extraItems));
+  // Поля, которые штамп заказа показывает по мере ввода (сами поля не управляемые).
+  const [live, setLive] = useState(() => ({
+    title: values.title ?? '',
+    budgetMin: values.budgetMin ?? '',
+    budgetMax: values.budgetMax ?? '',
+  }));
+  const trackLive = (event: React.FormEvent<HTMLFormElement>) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    const name = target.name;
+    if (name === 'title' || name === 'budgetMin' || name === 'budgetMax') {
+      setLive((current) => ({ ...current, [name]: target.value }));
+    }
+  };
   const [issues, setIssues] = useState<JobFormIssue[]>(state.issues ?? []);
   const [lastState, setLastState] = useState(state);
   if (state !== lastState) {
@@ -435,9 +453,12 @@ export function JobForm({
       ref={formRef}
       action={formAction}
       onSubmit={onSubmit}
-      onInput={scheduleSave}
+      onInput={(event) => {
+        trackLive(event);
+        scheduleSave();
+      }}
       noValidate
-      className="@container"
+      className="@container/form"
     >
       <FormError message={topError} />
       {drafts ? <input type="hidden" name="draftId" value={draftId ?? ''} /> : null}
@@ -577,11 +598,11 @@ export function JobForm({
                     <button
                       type="button"
                       onClick={addExtra}
-                      className="flex w-full items-center gap-3 rounded-2xl border border-dashed border-line px-5 py-4 text-left transition-colors duration-150 hover:border-accent/50 hover:bg-accent-tint/40"
+                      className="flex w-full items-center gap-3 rounded-[12px] border border-dashed border-ink/25 px-5 py-4 text-left transition-colors duration-150 hover:border-ink/50 hover:bg-canvas"
                     >
                       <span
                         aria-hidden="true"
-                        className="grid size-9 shrink-0 place-items-center rounded-full bg-accent-tint text-lg font-semibold text-accent"
+                        className="grid size-8 shrink-0 place-items-center rounded-[7px] border-[1.5px] border-dashed border-ink/40 text-lg font-semibold text-ink"
                       >
                         +
                       </span>
@@ -624,6 +645,28 @@ export function JobForm({
         </div>
 
         <div className="min-w-0 space-y-4 @5xl:sticky @5xl:top-24">
+          <OrderStamp
+            title={live.title.trim()}
+            categories={[category, ...extras.map((extra) => extra.category)]
+              .filter(isJobCategory)
+              .map((item) => JOB_CATEGORY_LABELS[item])}
+            city={city.trim()}
+            highlights={category ? jobDetailHighlights(category, answers, 3) : []}
+            progress={[
+              ...(category ? [jobDetailsProgress(category, answers)] : []),
+              ...extras.flatMap((extra) =>
+                extra.category ? [jobDetailsProgress(extra.category, extra.answers)] : [],
+              ),
+            ].reduce(
+              (sum, item) => ({
+                answered: sum.answered + item.answered,
+                total: sum.total + item.total,
+              }),
+              { answered: 0, total: 0 },
+            )}
+            budget={stampBudget(live.budgetMin, live.budgetMax)}
+            status={drafts ? draftStatus : null}
+          />
           <FormSection step={3} title="Бюджет и описание">
             <fieldset>
               <legend className="text-sm font-medium text-ink">Бюджет, ₽</legend>
@@ -719,38 +762,44 @@ function FormSection({
       id={id}
       tabIndex={id ? -1 : undefined}
       aria-labelledby={headingId}
-      className="scroll-mt-24 rounded-[22px] border border-line/80 bg-surface p-5 shadow-[0_1px_1px_hsl(var(--shadow-color)/0.04)] outline-none sm:p-6"
+      className="scroll-mt-24 rounded-[14px] border border-line bg-surface outline-none"
     >
-      <div className="flex items-start gap-3">
+      {/* Лист: шапка с номером шага отделена линией, как заголовок листа в документации. */}
+      <div className="flex items-start gap-3.5 border-b border-line px-5 py-4 sm:px-6">
         <span
           aria-hidden="true"
-          className="grid size-7 shrink-0 place-items-center rounded-full bg-ink text-sm font-semibold tabular-nums text-surface"
+          className="grid size-8 shrink-0 place-items-center rounded-[7px] border-[1.5px] border-ink font-display text-[13px] font-semibold tabular-nums text-ink"
         >
           {step}
         </span>
-        <div>
+        <div className="pt-0.5">
           <h2 id={headingId} className="text-lg font-semibold leading-7 tracking-tight text-ink">
             {title}
           </h2>
-          {description ? <p className="mt-1 text-sm text-ink-soft">{description}</p> : null}
+          {description ? (
+            <p className="mt-0.5 max-w-[60ch] text-sm text-ink-soft">{description}</p>
+          ) : null}
         </div>
       </div>
-      <div className="mt-4 space-y-4">{children}</div>
+      <div className="space-y-4 px-5 pb-5 pt-4 sm:px-6 sm:pb-6">{children}</div>
     </section>
   );
 }
 
+/** Текст состояния черновика: в штампе заказа. */
+function draftStatusText(status: DraftStatus): string {
+  return status.kind === 'saving'
+    ? 'Сохраняем черновик…'
+    : status.kind === 'pending'
+      ? 'Есть несохранённые изменения'
+      : status.kind === 'saved'
+        ? `Черновик сохранён в ${timeOf(status.at)}`
+        : status.kind === 'error'
+          ? status.message
+          : 'Черновик сохраняется сам через несколько секунд после правки';
+}
+
 function DraftControls({ status, onSave }: { status: DraftStatus; onSave: () => void }) {
-  const text =
-    status.kind === 'saving'
-      ? 'Сохраняем черновик…'
-      : status.kind === 'pending'
-        ? 'Есть несохранённые изменения: черновик сохранится через несколько секунд.'
-        : status.kind === 'saved'
-          ? `Черновик сохранён в ${timeOf(status.at)}`
-          : status.kind === 'error'
-            ? status.message
-            : 'Не готовы публиковать? Черновик сохраняется сам через несколько секунд после правки, продолжить можно из «Мои заказы».';
   return (
     <div className="flex flex-col gap-2">
       <button
@@ -761,14 +810,107 @@ function DraftControls({ status, onSave }: { status: DraftStatus; onSave: () => 
       >
         Сохранить черновик
       </button>
-      <p
-        role="status"
-        aria-live="polite"
-        className={`text-center text-sm ${status.kind === 'error' ? 'font-medium text-accent' : 'text-ink-soft'}`}
-      >
-        {text}
+      <p className="text-center text-sm text-ink-soft">
+        Продолжить черновик можно из «Мои заказы».
       </p>
     </div>
+  );
+}
+
+const stampBudget = (minRaw: string, maxRaw: string): string => {
+  const min = parseBudget(minRaw);
+  const max = parseBudget(maxRaw);
+  if (min === 'invalid' || max === 'invalid') return 'Проверьте сумму';
+  return formatBudget(min, max, 'RUB');
+};
+
+/**
+ * Штамп заказа — как основная надпись на строительном чертеже: сводка того, что уже
+ * заполнено, обновляется по мере ввода. Толстая внешняя рамка, тонкие внутренние линии.
+ */
+function OrderStamp({
+  title,
+  categories,
+  city,
+  highlights,
+  progress,
+  budget,
+  status,
+}: {
+  title: string;
+  categories: string[];
+  city: string;
+  highlights: string[];
+  progress: { answered: number; total: number };
+  budget: string;
+  status: DraftStatus | null;
+}) {
+  const empty = <span className="font-normal text-ink-soft">не указано</span>;
+  const rows: [string, React.ReactNode][] = [
+    [categories.length > 1 ? 'Категории' : 'Категория', categories.join(', ') || empty],
+    ['Город', city || empty],
+    // То же, что увидят подрядчики на карточке заказа в каталоге.
+    [
+      'На карточке',
+      highlights.join(', ') || <span className="font-normal text-ink-soft">по ответам анкеты</span>,
+    ],
+    ['Бюджет', budget],
+  ];
+  return (
+    <section
+      aria-label="Сводка заказа"
+      className="overflow-hidden rounded-[6px] border-[1.5px] border-ink bg-surface text-sm"
+    >
+      <div className="border-b border-ink/20 px-4 py-3">
+        <p className="text-xs text-ink-soft">Заказ</p>
+        <p className="mt-0.5 font-display text-[17px] font-semibold leading-snug tracking-[-0.01em] text-ink [overflow-wrap:anywhere]">
+          {title || <span className="text-ink-soft/70">Без названия</span>}
+        </p>
+      </div>
+      <dl className="grid grid-cols-[7.25rem_minmax(0,1fr)]">
+        {rows.map(([label, value]) => (
+          <div key={label} className="contents">
+            <dt className="border-b border-r border-ink/15 px-4 py-2.5 text-xs leading-5 text-ink-soft">
+              {label}
+            </dt>
+            <dd className="border-b border-ink/15 px-3 py-2.5 font-medium leading-5 text-ink [overflow-wrap:anywhere]">
+              {value}
+            </dd>
+          </div>
+        ))}
+        <dt className="border-b border-r border-ink/15 px-4 py-2.5 text-xs leading-5 text-ink-soft">
+          Анкета
+        </dt>
+        <dd className="border-b border-ink/15 px-3 py-2.5">
+          <span className="flex items-baseline justify-between gap-2 font-medium leading-5 text-ink">
+            <span className="tabular-nums">
+              {progress.answered} из {progress.total}
+            </span>
+            <span className="text-xs font-normal text-ink-soft">
+              <span aria-hidden="true" className="text-accent">
+                *{' '}
+              </span>
+              обязательные
+            </span>
+          </span>
+          <ProgressRuler answered={progress.answered} total={progress.total} className="mt-2" />
+        </dd>
+      </dl>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto]">
+        <p
+          role="status"
+          aria-live="polite"
+          className={`border-r border-ink/15 px-4 py-2.5 text-xs leading-5 ${
+            status?.kind === 'error' ? 'font-medium text-accent' : 'text-ink-soft'
+          }`}
+        >
+          {status ? draftStatusText(status) : 'Изменения сохранятся после «Сохранить изменения»'}
+        </p>
+        <p className="px-3 py-2.5 font-display text-[11px] font-semibold leading-5 tracking-[-0.01em] text-ink">
+          Гарантыч
+        </p>
+      </div>
+    </section>
   );
 }
 
@@ -804,7 +946,7 @@ function ExtraPositionCard({
       id={`job-position-${position}`}
       tabIndex={-1}
       aria-labelledby={labelId}
-      className="rounded-2xl border border-line bg-canvas/50 p-4 outline-none sm:p-5"
+      className="rounded-[12px] border border-line bg-canvas/60 p-4 outline-none sm:p-5"
     >
       <div className="flex items-center justify-between gap-3">
         <h3 id={labelId} className="text-xs font-semibold uppercase tracking-[0.08em] text-accent">
