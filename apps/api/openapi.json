@@ -1732,6 +1732,37 @@
         ]
       }
     },
+    "/health/ready": {
+      "get": {
+        "operationId": "Health_ready",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Функция временно выключена"
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    },
     "/v1/admin/leads": {
       "get": {
         "operationId": "AdminLeads_list",

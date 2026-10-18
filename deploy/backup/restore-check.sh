@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Проверка восстановления: sudo bash deploy/backup/restore-check.sh [файл.dump]
+# Берёт последнюю копию из BACKUP_DIR (или указанный файл), разворачивает её во временный
+# контейнер postgres без сети и портов и сверяет: все миграции из репозитория применены, таблицы
+# users и jobs читаются. Печатает время восстановления (фактический RTO для этой базы).
+# Запускается таймером раз в неделю (deploy/autodeploy/install.sh). Сбой — уведомление.
+set -euo pipefail
+
+REPO_DIR=${REPO_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}
+# shellcheck source=deploy/autodeploy/lib.sh
+. "$(cd "$(dirname "$0")" && pwd)/../autodeploy/lib.sh"
+cd "$REPO_DIR"
+
+dir=${BACKUP_DIR:-$(env_value BACKUP_DIR)}
+dir=${dir:-/var/backups/agregator}
+image=${RESTORE_IMAGE:-postgres:16-alpine}
+name="agregator-restore-check-$$"
+
+log() { echo "[agregator-restore] $*"; }
+die() {
+  log "ОШИБКА: $1"
+  notify "проверка восстановления не прошла: $1"
+  exit 1
+}
+
+file=${1:-$(find "$dir" -maxdepth 1 -name 'agregator-*.dump' -printf '%T@ %p\n' 2> /dev/null | sort -n | tail -n 1 | cut -d' ' -f2-)}
+[ -n "$file" ] && [ -f "$file" ] || die "нет копии в $dir"
+log "копия: $file"
+
+started=$(date +%s)
+cleanup() { docker rm -f "$name" > /dev/null 2>&1 || true; }
+trap cleanup EXIT
+docker run -d --rm --name "$name" --network none -e POSTGRES_PASSWORD=restore-check "$image" > /dev/null ||
+  die "не запустился контейнер $image"
+for _ in $(seq 1 60); do
+  docker exec "$name" pg_isready -U postgres > /dev/null 2>&1 && break
+  sleep 1
+done
+docker exec "$name" pg_isready -U postgres > /dev/null 2>&1 || die 'временная база не поднялась'
+docker exec -i "$name" sh -c 'createdb -U postgres restore && pg_restore -U postgres -d restore --no-owner --exit-on-error' < "$file" ||
+  die 'pg_restore не удался'
+
+query() { docker exec "$name" psql -U postgres -d restore -tAc "$1"; }
+applied=$(query 'select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null') ||
+  die 'нет таблицы _prisma_migrations'
+expected=$(find apps/api/prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
+users=$(query 'select count(*) from users') || die 'таблица users не читается'
+jobs=$(query 'select count(*) from jobs') || die 'таблица jobs не читается'
+seconds=$(($(date +%s) - started))
+
+log "миграций в копии: $applied, в репозитории: $expected; users: $users; jobs: $jobs; восстановление: ${seconds} с"
+# Копия может быть сделана до последнего обновления: миграций в ней не больше, чем в репозитории.
+[ "$applied" -gt 0 ] && [ "$applied" -le "$expected" ] || die "миграций в копии $applied, в репозитории $expected"
+heartbeat=$(env_value RESTORE_HEARTBEAT_URL)
+if [ -n "$heartbeat" ]; then
+  printf 'url = "%s"\n' "$heartbeat" | curl -fsS --max-time 10 -K - > /dev/null || log 'heartbeat не отправлен'
+fi
+log 'готово'

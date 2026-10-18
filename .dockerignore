@@ -11,3 +11,16 @@
 deploy/.env
 *.log
 api.pid
+# Секреты и данные сервера не должны попасть в образ (AUDIT_FINDINGS DEV-5): сертификаты банков,
+# окружение, дампы БД, состояние автообновления и отчёты.
+**/.env
+**/.env.*
+!**/.env.example
+deploy/secrets
+*.p12
+*.pem
+*.key
+*.dump
+*.dump.age
+backups
+report.txt

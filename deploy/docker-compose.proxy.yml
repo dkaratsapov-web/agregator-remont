@@ -4,6 +4,16 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: '10m', max-file: '5' }
+    # Проверка здоровья: Caddy отвечает на своём локальном адресе управления (автообновление
+    # ждёт healthy у всех сервисов, AUDIT_FINDINGS DEV-10).
+    healthcheck:
+      test: ['CMD', 'wget', '-qO', '/dev/null', 'http://127.0.0.1:2019/config/']
+      interval: 10s
+      timeout: 3s
+      retries: 6
     environment:
       DOMAIN: ${DOMAIN:?Задайте DOMAIN в deploy/.env}
     ports:
@@ -22,6 +32,10 @@ services:
   # Caddy спрашивает его перед каждым запросом в закрытую часть (forward_auth в Caddyfile).
   web:
     environment:
+      # Перед web стоит один прокси (Caddy): IP посетителя берётся из X-Forwarded-For. Без этого
+      # все посетители получают один «неизвестный» IP, и 10 неверных паролей от кого угодно
+      # блокировали бы вход всем тестировщикам (AUDIT_FINDINGS SEC-2).
+      WEB_TRUST_PROXY_HOPS: '1'
       BASIC_AUTH_USER: ${BASIC_AUTH_USER:?Задайте BASIC_AUTH_USER в deploy/.env}
       BASIC_AUTH_HASH: ${BASIC_AUTH_HASH:?Задайте BASIC_AUTH_HASH в deploy/.env}
 

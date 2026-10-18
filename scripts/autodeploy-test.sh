@@ -34,13 +34,28 @@ mkdir -p "$WORK/bin" "$WORK/api"
 # docker: журнал вызовов; сбои по переменным; ps — состояние контейнеров из PS_STATES.
 cat > "$WORK/bin/docker" << 'STUB'
 #!/usr/bin/env bash
-echo "docker $*" >> "$STUB_LOG"
+echo "docker $*${IMAGE_TAG:+ tag=$IMAGE_TAG}" >> "$STUB_LOG"
+case "$1 $2" in
+  'info --format') echo /var/lib/docker; exit 0 ;;
+  # Проверка восстановления: временная база отвечает числом миграций и строк.
+  exec\ *) case "$*" in
+      *_prisma_migrations*) echo "${RESTORE_MIGRATIONS:-1}" ;;
+      *'from users'* | *'from jobs'*) echo 3 ;;
+    esac
+    [ "${RESTORE_FAIL:-0}" = 1 ] && case "$*" in *pg_restore*) exit 1 ;; esac
+    exit 0 ;;
+  'image ls') printf '%b' "${IMAGES:-}"; exit 0 ;;
+  'image inspect') [ "${INSPECT_FAIL:-0}" = 1 ] && exit 1; exit 0 ;;
+esac
 if [ "$1" = compose ]; then
   case " $* " in
+    *" exec "*) [ "${EXEC_FAIL:-0}" = 1 ] && exit 1; printf 'PGDMP-stub' ;;
     *" build "*) [ "${BUILD_FAIL:-0}" = 1 ] && exit 1 ;;
     *" up "*) [ "${UP_FAIL:-0}" = 1 ] && exit 1 ;;
     *" restart caddy "*) [ "${RESTART_FAIL:-0}" = 1 ] && exit 1 ;;
-    *" ps "*) printf '%b\n' "${PS_STATES:-db running healthy\napi running healthy\nweb running healthy\ncaddy running}" ;;
+    # Как настоящий docker compose: у caddy нет healthcheck, {{.Health}} пустой, и строка
+    # заканчивается пробелом («caddy running »).
+    *" ps "*) printf '%b\n' "${PS_STATES:-db running healthy\napi running healthy\nweb running healthy\ncaddy running }" ;;
   esac
 fi
 exit 0
@@ -52,6 +67,8 @@ url='' out=''
 while [ $# -gt 0 ]; do
   case "$1" in
     -o) out=$2; shift ;;
+    # Адрес из stdin (notify.sh, heartbeat): строка «url = "..."».
+    -K) [ "$2" = - ] && url=$(sed -n 's/^url = "\(.*\)"$/\1/p'); shift ;;
     http*) url=$1 ;;
   esac
   shift
@@ -68,6 +85,7 @@ case "$url" in
     exit 0 ;;
 esac
 case "$url" in
+  *hooks.invalid*) exit 0 ;;
   */jobs) code=${PRIVATE_CODE:-401} ;;
   */_next/static/*|*/landing/*) code=${ASSET_CODE:-200} ;;
   *) code=${HOME_CODE:-200}
@@ -82,6 +100,8 @@ export PATH="$WORK/bin:$PATH"
 export REPO_DIR="$WORK/server" STATE_DIR="$WORK/state" LOCK_FILE="$WORK/lock"
 export STUB_LOG="$WORK/docker.log" CURL_LOG="$WORK/curl.log" API_DIR="$WORK/api"
 export GITHUB_API=https://api.github.invalid/repos/x/y HEALTH_ATTEMPTS=2 HEALTH_DELAY=0
+# Базовые сценарии без повторов и проверки диска; повторы, диск, копии и откат — в разделе 14.
+export DEPLOY_ATTEMPTS=1 MIN_FREE_GB=0 BACKUP_DIR="$WORK/backups"
 
 run() {
   : > "$STUB_LOG"
@@ -98,7 +118,8 @@ push_commit() {
 deployed() { cat "$WORK/state/deployed" 2> /dev/null || echo none; }
 failed() { cat "$WORK/state/failed" 2> /dev/null || echo none; }
 docker_calls() { grep -c "$1" "$STUB_LOG" || true; }
-logged() { grep -c "$1" "$WORK/out.log" || true; }
+# Строки уведомлений (notify.sh повторяет причину) не считаются.
+logged() { grep -v '^\[agregator-notify\]' "$WORK/out.log" | grep -c "$1" || true; }
 
 # Ответы GitHub: run для SHA и задачи. job NAME STATUS CONCLUSION.
 ci_run() { # sha status conclusion [path]
@@ -122,7 +143,7 @@ all_green() {
 all_green
 run
 check 'green: deployed sha recorded' "$(deployed)" "$(dev_head)"
-check 'green: build then up' "$(grep -o 'build$\|up -d' "$STUB_LOG" | tr '\n' ' ')" 'build up -d '
+check 'green: build then up' "$(grep -o 'build tag=[0-9a-f]*$\|up -d' "$STUB_LOG" | sed 's/ tag=.*//' | tr '\n' ' ')" 'build up -d '
 check 'green: health checked through Caddy' "$(grep -c 'example.test/jobs' "$CURL_LOG")" 1
 check 'green: static and frame checked' "$(grep -c '_next/static\|/landing/' "$CURL_LOG")" 2
 
@@ -255,8 +276,91 @@ all_green
 run
 check 'bank login: deployed' "$(deployed)" "$(dev_head)"
 check 'bank login: compose with bank-login file' \
-  "$(grep -c 'compose .*docker-compose.bank-login.yml.* build$' "$STUB_LOG" || true)" 1
+  "$(grep -c 'compose .*docker-compose.bank-login.yml.* build tag=' "$STUB_LOG" || true)" 1
 sed -i '/^BANK_LOGIN=/d' "$WORK/server/deploy/.env"
+
+# 14. Обслуживание (AUDIT_FINDINGS DEV-2, DEV-4, DEV-6, DEV-8, DEV-9).
+# Уведомления: вебхук из deploy/.env получает сообщение о сбое.
+echo 'NOTIFY_WEBHOOK_URL=https://hooks.invalid/agregator' >> "$WORK/server/deploy/.env"
+push_commit 'notify me'
+all_green
+BUILD_FAIL=1 run
+check 'notify: failure sent to webhook' "$(grep -c 'hooks.invalid' "$CURL_LOG")" 1
+rm -f "$WORK/state/failed"
+
+# Повторы: временный сбой сборки не помечает коммит, третья неудача — помечает и уведомляет.
+push_commit 'flaky build'
+all_green
+DEPLOY_ATTEMPTS=3 BUILD_FAIL=1 run
+check 'retry 1: exit 1, not marked' "$(logged '^exit 1') $(failed)" "1 none"
+check 'retry 1: attempt logged' "$(logged 'попытка 1 из 3')" 1
+DEPLOY_ATTEMPTS=3 BUILD_FAIL=1 run
+check 'retry 2: not marked' "$(failed)" none
+DEPLOY_ATTEMPTS=3 BUILD_FAIL=1 run
+check 'retry 3: marked failed' "$(failed)" "$(dev_head)"
+check 'retry 3: owner notified' "$(grep -c 'hooks.invalid' "$CURL_LOG")" 1
+rm -f "$WORK/state/failed"
+DEPLOY_ATTEMPTS=3 run
+check 'retry: success after fix, attempts reset' "$(deployed) $(test -f "$WORK/state/attempts" && echo kept || echo reset)" "$(dev_head) reset"
+
+# Образы по коммиту: сборка с IMAGE_TAG, старые версии удаляются, последние KEEP_RELEASES остаются.
+check 'tags: build with commit tag' "$(grep -c "build tag=$(dev_head | cut -c1-12)" "$STUB_LOG")" 1
+push_commit 'cleanup'
+all_green
+keep1=$(tail -n 1 "$WORK/state/history" | cut -c1-12)
+IMAGES="agregator-api:aaaaaaaaaaaa\nagregator-web:aaaaaaaaaaaa\nagregator-api:$keep1\nagregator-api:local\n" KEEP_RELEASES=2 run
+check 'cleanup: old and :local removed' "$(grep -c 'image rm agregator-api:aaaaaaaaaaaa\|image rm agregator-web:aaaaaaaaaaaa\|image rm agregator-api:local' "$STUB_LOG")" 3
+check 'cleanup: previous release kept' "$(grep -c "image rm agregator-api:$keep1" "$STUB_LOG")" 0
+
+# Диск: свободного места меньше порога — кеш сборки чистится, сборка не запускается.
+push_commit 'disk full'
+all_green
+MIN_FREE_GB=999999 run
+check 'disk: builder cache pruned' "$(docker_calls 'builder prune')" 1
+check 'disk: no build' "$(docker_calls 'compose.* build')" 0
+check 'disk: reason logged' "$(logged 'на диске меньше')" 1
+rm -f "$WORK/state/failed"
+
+# Новая миграция: копия базы до переключения; без копии переключения нет.
+mkdir -p "$WORK/dev/apps/api/prisma/migrations/2"
+push_commit 'migration' apps/api/prisma/migrations/2/migration.sql
+all_green
+EXEC_FAIL=1 run
+check 'pre-migration backup failed: no up' "$(docker_calls 'up -d')" 0
+check 'pre-migration backup failed: reason' "$(logged 'копия перед миграцией не сделана')" 1
+rm -f "$WORK/state/failed"
+run
+check 'pre-migration backup: dump before up' "$(grep -n 'exec -T db\|up -d' "$STUB_LOG" | cut -d: -f2 | cut -c1-30 | tr '\n' '|')" \
+  'docker compose -f deploy/docke|docker compose -f deploy/docke|'
+check 'pre-migration backup: file saved' "$(find "$WORK/backups" -name '*-pre-migration.dump' | wc -l | tr -d ' ')" 1
+check 'pre-migration backup: deployed' "$(deployed)" "$(dev_head)"
+
+# Откат на предыдущую версию без сборки: старый коммит, текущий помечен неудачным.
+previous=$(tail -n 2 "$WORK/state/history" | head -n 1)
+current=$(deployed)
+: > "$STUB_LOG"
+bash "$ROOT/deploy/autodeploy/rollback.sh" > "$WORK/out.log" 2>&1 || echo "exit $?" >> "$WORK/out.log"
+check 'rollback: deployed previous' "$(deployed)" "$previous"
+check 'rollback: server tree at previous' "$(head_of "$WORK/server")" "$previous"
+check 'rollback: current marked failed' "$(failed)" "$current"
+check 'rollback: no build' "$(docker_calls ' build tag=')" 0
+check 'rollback: up with previous tag' "$(grep -c "up -d --no-build --remove-orphans tag=$(echo "$previous" | cut -c1-12)" "$STUB_LOG")" 1
+INSPECT_FAIL=1 bash "$ROOT/deploy/autodeploy/rollback.sh" "$current" > "$WORK/out.log" 2>&1 || echo "exit $?" >> "$WORK/out.log"
+check 'rollback: missing image refused' "$(logged 'нет образа')" 1
+# Следующий коммит после отката разворачивается как обычно.
+push_commit 'after rollback'
+all_green
+run
+check 'after rollback: new commit deployed' "$(deployed)" "$(dev_head)"
+# Проверка восстановления: последняя копия разворачивается, миграций не больше, чем в репозитории.
+restore() { : > "$CURL_LOG"; bash "$ROOT/deploy/backup/restore-check.sh" > "$WORK/out.log" 2>&1 || echo "exit $?" >> "$WORK/out.log"; }
+(cd "$WORK/server" && RESTORE_MIGRATIONS=1 restore)
+check 'restore check: passed' "$(logged '^exit 1') $(logged 'готово')" "0 1"
+(cd "$WORK/server" && RESTORE_MIGRATIONS=5 restore)
+check 'restore check: too many migrations fails' "$(logged 'миграций в копии 5')" 1
+(cd "$WORK/server" && RESTORE_FAIL=1 restore)
+check 'restore check: pg_restore failure reported' "$(logged 'pg_restore не удался') $(grep -c 'hooks.invalid' "$CURL_LOG")" "1 1"
+sed -i '/^NOTIFY_WEBHOOK_URL=/d' "$WORK/server/deploy/.env"
 
 # 13. Локальная правка на сервере мешает fast-forward: стоп без пересборки.
 echo local > "$WORK/server/app.txt"

@@ -18,6 +18,9 @@ next-env.d.ts
 # Сертификаты и ключи банков на сервере (deploy/docker-compose.bank-login.yml)
 deploy/secrets/
 *.p12
+# Дампы БД (резервные копии хранятся вне репозитория, deploy/backup)
+*.dump
+*.dump.age
 
 # logs / OS / editors
 *.log
