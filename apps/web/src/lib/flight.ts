@@ -1,23 +1,39 @@
 /**
  * Пролёт камеры по комнате на главной (docs/landing-video-brief.md).
  *
- * Видео 35 с (841 кадр, 24 кадр/с) нарезано в public/landing/flight-v2: каждый 4-й кадр в AVIF
- * в родном разрешении (scripts/landing-flight-frames.py). Широкие кадры для горизонтального
- * экрана и вертикальная обрезка для телефона. При замене роликов кадры кладутся в новую папку
- * (flight-v3), чтобы долгий кеш браузера не показал старые.
+ * Видео 35 с (841 кадр, 24 кадр/с) лежит в public/landing/flight-v3 обычными роликами: широкий для
+ * горизонтального экрана и вертикальная обрезка для телефона, у каждого прямой и обратный (для
+ * прокрутки вверх). Браузер проигрывает их сам, поэтому движение камеры плавное, без склейки
+ * кадров. Ключевой кадр каждую секунду: остановки (целые секунды) показываются точно, а перемотка
+ * при ручной прокрутке быстрая. Нарезка: scripts/landing-flight-video.sh. При замене роликов
+ * файлы кладутся в новую папку (flight-v4), чтобы долгий кеш браузера не показал старые.
  */
 
-export const FLIGHT_BASE = '/landing/flight-v2';
+export const FLIGHT_BASE = '/landing/flight-v3';
 
 /** Длина пролёта, с. */
 export const FLIGHT_SECONDS = 35;
 
-export type FlightSet = { dir: 'desktop' | 'mobile'; count: number };
+export type FlightLayout = 'desktop' | 'mobile';
+export type FlightDirection = 'forward' | 'reverse';
+export type FlightSource = { src: string; type: string };
 
-export const FLIGHT_SETS = {
-  desktop: { dir: 'desktop', count: 211 },
-  mobile: { dir: 'mobile', count: 211 },
-} as const satisfies Record<string, FlightSet>;
+/**
+ * Ролики пролёта по порядку предпочтения: H.264 (аппаратное декодирование почти везде), затем VP9
+ * для браузеров без H.264 (Chromium без проприетарных кодеков, часть Firefox на Linux).
+ */
+export function flightSources(layout: FlightLayout, direction: FlightDirection): FlightSource[] {
+  const name = `${FLIGHT_BASE}/${layout}-${direction}`;
+  return [
+    { src: `${name}.mp4`, type: 'video/mp4; codecs="avc1.640028"' },
+    { src: `${name}.webm`, type: 'video/webm; codecs="vp9"' },
+  ];
+}
+
+/** Первый кадр пролёта картинкой: виден сразу, пока грузится видео. */
+export function flightPoster(layout: FlightLayout): string {
+  return `${FLIGHT_BASE}/${layout}-poster.avif`;
+}
 
 /**
  * Опорные точки «прогресс трека → секунда пролёта», между ними линейно. Ролики пролёта стыкуются
@@ -85,36 +101,10 @@ export function flightSeconds(progress: number): number {
 }
 
 /**
- * Дробная позиция в наборе кадров для прогресса трека: 41,3 — между кадрами 41 и 42, ближе к 41.
- * По дробной части соседние кадры плавно перетекают друг в друга, а не сменяются скачком.
+ * Скорость видео при доезде до остановки: отрезок пролёта (с) проигрывается за 1,2–3 с, чем
+ * длиннее отрезок, тем быстрее, но не медленнее обычной скорости и не быстрее ×4.
  */
-export function flightPosition(progress: number, count: number): number {
-  return (flightSeconds(progress) / FLIGHT_SECONDS) * (count - 1);
-}
-
-/** Номер ближайшего кадра набора для прогресса трека. */
-export function flightFrame(progress: number, count: number): number {
-  return Math.round(flightPosition(progress, count));
-}
-
-export function flightFrameUrl(set: FlightSet, index: number): string {
-  return `${FLIGHT_BASE}/${set.dir}/${String(index).padStart(3, '0')}.avif`;
-}
-
-/**
- * Порядок загрузки: первый и последний кадр, затем всё более частая сетка (каждый 16-й, 8-й, …).
- * Пока догружаются остальные, прокрутка уже показывает ближайший загруженный кадр.
- */
-export function flightLoadOrder(count: number): number[] {
-  const order = count > 1 ? [0, count - 1] : [0];
-  const seen = new Set(order);
-  for (const step of [16, 8, 4, 2, 1]) {
-    for (let i = 0; i < count; i += step) {
-      if (!seen.has(i)) {
-        seen.add(i);
-        order.push(i);
-      }
-    }
-  }
-  return order;
+export function flightGlideRate(seconds: number): number {
+  const duration = Math.min(3, Math.max(1.2, 0.9 + seconds * 0.3));
+  return Math.min(4, Math.max(1, seconds / duration));
 }

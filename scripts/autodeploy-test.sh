@@ -72,7 +72,7 @@ case "$url" in
   */_next/static/*|*/landing/*) code=${ASSET_CODE:-200} ;;
   *) code=${HOME_CODE:-200}
      [ -n "$out" ] && [ "$out" != /dev/null ] &&
-       printf '<script src="/_next/static/chunks/app.js"></script><img src="/landing/flight-v2/desktop/000.avif">' > "$out" ;;
+       printf '<script src="/_next/static/chunks/app.js"></script><img src="/landing/flight-v3/desktop-poster.avif">' > "$out" ;;
 esac
 printf '%s' "$code"
 STUB

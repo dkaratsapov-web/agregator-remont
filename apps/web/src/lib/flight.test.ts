@@ -2,14 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   FLIGHT_KEYS,
   FLIGHT_SECONDS,
-  FLIGHT_SETS,
   FLIGHT_STOPS,
-  flightFrame,
-  flightPosition,
-  flightStopTarget,
-  flightFrameUrl,
-  flightLoadOrder,
+  flightGlideRate,
+  flightPoster,
   flightSeconds,
+  flightSources,
+  flightStopTarget,
 } from './flight';
 
 describe('flightSeconds', () => {
@@ -42,26 +40,6 @@ describe('flightSeconds', () => {
   });
 });
 
-describe('flightFrame', () => {
-  it('переводит прогресс в номер кадра набора', () => {
-    const { count } = FLIGHT_SETS.desktop;
-    expect(flightFrame(0, count)).toBe(0);
-    expect(flightFrame(1, count)).toBe(count - 1);
-    expect(flightFrame(0.6, count)).toBe(Math.round((15 / 35) * (count - 1)));
-  });
-});
-
-describe('flightPosition', () => {
-  it('даёт дробную позицию между кадрами, согласованную с flightFrame', () => {
-    const { count } = FLIGHT_SETS.desktop;
-    expect(flightPosition(0, count)).toBe(0);
-    expect(flightPosition(1, count)).toBe(count - 1);
-    const position = flightPosition(0.65, count);
-    expect(Number.isInteger(position)).toBe(false);
-    expect(flightFrame(0.65, count)).toBe(Math.round(position));
-  });
-});
-
 describe('flightStopTarget', () => {
   it('доезжает до следующей остановки по ходу прокрутки', () => {
     expect(flightStopTarget(0.05, 1)).toBe(0.225);
@@ -86,18 +64,33 @@ describe('flightStopTarget', () => {
   });
 });
 
-describe('flightFrameUrl', () => {
-  it('дополняет номер до трёх цифр', () => {
-    expect(flightFrameUrl(FLIGHT_SETS.mobile, 7)).toBe('/landing/flight-v2/mobile/007.avif');
+describe('остановки и ключевые кадры', () => {
+  it('каждая остановка стоит на целой секунде: там ключевой кадр роликов (-g 24)', () => {
+    for (const stop of FLIGHT_STOPS) expect(Number.isInteger(flightSeconds(stop))).toBe(true);
   });
 });
 
-describe('flightLoadOrder', () => {
-  it('содержит каждый кадр ровно один раз, первым идёт первый кадр', () => {
-    for (const count of [1, 2, 17, 120, 180]) {
-      const order = flightLoadOrder(count);
-      expect(order[0]).toBe(0);
-      expect([...order].sort((a, b) => a - b)).toEqual([...Array(count).keys()]);
+describe('flightGlideRate', () => {
+  it('проигрывает шаг пролёта за 1,2–3 с и не медленнее обычной скорости', () => {
+    for (const seconds of [0.5, 2.5, 5, 10]) {
+      const rate = flightGlideRate(seconds);
+      expect(rate).toBeGreaterThanOrEqual(1);
+      expect(rate).toBeLessThanOrEqual(4);
+      if (rate > 1) {
+        expect(seconds / rate).toBeGreaterThanOrEqual(1.2);
+        expect(seconds / rate).toBeLessThanOrEqual(3);
+      }
     }
+    expect(flightGlideRate(5)).toBeCloseTo(5 / 2.4);
+  });
+});
+
+describe('flightSources', () => {
+  it('сначала H.264, затем VP9, прямой и обратный ролик раздельно', () => {
+    expect(flightSources('mobile', 'reverse')).toEqual([
+      { src: '/landing/flight-v3/mobile-reverse.mp4', type: 'video/mp4; codecs="avc1.640028"' },
+      { src: '/landing/flight-v3/mobile-reverse.webm', type: 'video/webm; codecs="vp9"' },
+    ]);
+    expect(flightPoster('desktop')).toBe('/landing/flight-v3/desktop-poster.avif');
   });
 });
