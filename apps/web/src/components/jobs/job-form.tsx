@@ -10,8 +10,8 @@ import {
   type JobCategory,
   type JobDetails,
 } from '@agregator/shared';
-import { useActionState, useState } from 'react';
-import type { JobFormState } from '@/app/(site)/account/jobs/actions';
+import { useActionState, useCallback, useEffect, useRef, useState } from 'react';
+import { saveDraftAction, type JobFormState } from '@/app/(site)/account/jobs/actions';
 import { Field } from '@/components/auth/field';
 import { FormError } from '@/components/auth/form-error';
 import { SubmitButton } from '@/components/auth/submit-button';
@@ -32,7 +32,24 @@ interface Props {
   initial?: Partial<JobFormValues>;
   submitLabel: string;
   pendingLabel: string;
+  /**
+   * Черновики (только для нового заказа): кнопка «Сохранить черновик» и автосохранение.
+   * null — черновика ещё нет, строка — продолжаем сохранённый черновик.
+   */
+  draftId?: string | null;
 }
+
+/** Пауза после последней правки перед автосохранением черновика. */
+const AUTOSAVE_DELAY_MS = 4000;
+
+type DraftStatus =
+  | { kind: 'idle' }
+  | { kind: 'saving' }
+  | { kind: 'saved'; at: string }
+  | { kind: 'error'; message: string };
+
+const timeOf = (iso: string) =>
+  new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 
 const CATEGORY_OPTIONS = JOB_CATEGORIES.map((category) => ({
   value: category,
@@ -53,9 +70,19 @@ const fitAnswers = (category: JobCategory, answers: unknown): JobDetails => {
   return result.ok ? result.details : {};
 };
 
-export function JobForm({ action, initial = {}, submitLabel, pendingLabel }: Props) {
+export function JobForm({
+  action,
+  initial = {},
+  submitLabel,
+  pendingLabel,
+  draftId: initialDraftId,
+}: Props) {
   const [state, formAction] = useActionState<JobFormState, FormData>(action, {});
   const values = { ...initial, ...state.values };
+  const drafts = initialDraftId !== undefined;
+  const formRef = useRef<HTMLFormElement>(null);
+  const [draftId, setDraftId] = useState<string | null>(initialDraftId ?? null);
+  const [draftStatus, setDraftStatus] = useState<DraftStatus>({ kind: 'idle' });
 
   const [category, setCategory] = useState<JobCategory | ''>(() =>
     isJobCategory(values.category) ? values.category : '',
@@ -124,9 +151,91 @@ export function JobForm({ action, initial = {}, submitLabel, pendingLabel }: Pro
     if (changed.length > 0) clearIssues('details', changed);
   };
 
+  // --- черновик: сохранение по кнопке и через паузу после правок
+  const autosave = useRef<{ timer?: number; saving: boolean; again: boolean; publishing: boolean }>(
+    { saving: false, again: false, publishing: false },
+  );
+  const saveNow = useCallback(async () => {
+    const box = autosave.current;
+    window.clearTimeout(box.timer);
+    box.timer = undefined;
+    if (!drafts || box.publishing || !formRef.current) return;
+    if (box.saving) {
+      box.again = true;
+      return;
+    }
+    box.saving = true;
+    setDraftStatus({ kind: 'saving' });
+    try {
+      const result = await saveDraftAction(new FormData(formRef.current));
+      if (result.ok) {
+        setDraftId(result.draftId);
+        setDraftStatus({ kind: 'saved', at: result.savedAt });
+        // Адрес с ?draft=…: после перезагрузки или из истории открывается тот же черновик.
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('draft') !== result.draftId) {
+          url.searchParams.set('draft', result.draftId);
+          window.history.replaceState(window.history.state, '', url);
+        }
+      } else {
+        setDraftStatus({ kind: 'error', message: result.error });
+      }
+    } catch {
+      setDraftStatus({ kind: 'error', message: 'Не удалось сохранить черновик. Проверьте сеть.' });
+    } finally {
+      box.saving = false;
+      if (box.again) {
+        box.again = false;
+        void saveNow();
+      }
+    }
+  }, [drafts]);
+
+  const scheduleSave = useCallback(() => {
+    if (!drafts || autosave.current.publishing) return;
+    window.clearTimeout(autosave.current.timer);
+    autosave.current.timer = window.setTimeout(() => void saveNow(), AUTOSAVE_DELAY_MS);
+  }, [drafts, saveNow]);
+
+  // Выбор категории, города и ответы анкеты меняют состояние, а не поля ввода: следим и за ним.
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    scheduleSave();
+  }, [category, city, answersByCategory, scheduleSave]);
+
+  useEffect(() => {
+    if (!drafts) return;
+    const box = autosave.current;
+    // Уходят со страницы, пока ждёт автосохранение: сохраняем сразу.
+    const flush = () => {
+      if (document.visibilityState === 'hidden' && box.timer !== undefined) void saveNow();
+    };
+    document.addEventListener('visibilitychange', flush);
+    return () => {
+      document.removeEventListener('visibilitychange', flush);
+      window.clearTimeout(box.timer);
+    };
+  }, [drafts, saveNow]);
+
+  // Публикация не удалась (ответ сервера с ошибкой): автосохранение снова работает.
+  const [lastPublishState, setLastPublishState] = useState(state);
+  if (state !== lastPublishState) {
+    setLastPublishState(state);
+    autosave.current.publishing = false;
+  }
+
   const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     const checked = checkJobForm(readJobForm(new FormData(event.currentTarget)));
-    if (checked.ok) return;
+    if (checked.ok) {
+      // Публикуем: отложенное автосохранение не должно создать черновик заново.
+      window.clearTimeout(autosave.current.timer);
+      autosave.current.publishing = true;
+      return;
+    }
     event.preventDefault();
     setIssues(checked.issues);
     const first = checked.issues[0];
@@ -150,8 +259,16 @@ export function JobForm({ action, initial = {}, submitLabel, pendingLabel }: Pro
   return (
     // Ширина считается по контейнеру формы: на странице нового заказа она широкая (две колонки,
     // справа бюджет и кнопка), в правке на странице заказа узкая (одна колонка).
-    <form action={formAction} onSubmit={onSubmit} noValidate className="@container">
+    <form
+      ref={formRef}
+      action={formAction}
+      onSubmit={onSubmit}
+      onInput={scheduleSave}
+      noValidate
+      className="@container"
+    >
       <FormError message={topError} />
+      {drafts ? <input type="hidden" name="draftId" value={draftId ?? ''} /> : null}
 
       <div className="grid items-start gap-5 @5xl:grid-cols-[minmax(0,1fr)_380px] @5xl:gap-6">
         <div className="min-w-0 space-y-5 @container">
@@ -351,6 +468,7 @@ export function JobForm({ action, initial = {}, submitLabel, pendingLabel }: Pro
           </FormSection>
 
           <SubmitButton pending={pendingLabel}>{submitLabel}</SubmitButton>
+          {drafts ? <DraftControls status={draftStatus} onSave={() => void saveNow()} /> : null}
         </div>
       </div>
     </form>
@@ -394,5 +512,35 @@ function FormSection({
       </div>
       <div className="mt-4 space-y-4">{children}</div>
     </section>
+  );
+}
+
+function DraftControls({ status, onSave }: { status: DraftStatus; onSave: () => void }) {
+  const text =
+    status.kind === 'saving'
+      ? 'Сохраняем черновик…'
+      : status.kind === 'saved'
+        ? `Черновик сохранён в ${timeOf(status.at)}`
+        : status.kind === 'error'
+          ? status.message
+          : 'Не готовы публиковать? Черновик сохранится, его можно продолжить из «Мои заказы».';
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={onSave}
+        disabled={status.kind === 'saving'}
+        className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-line bg-surface px-5 text-sm font-semibold text-ink transition-[border-color,background-color,transform] duration-150 hover:border-ink/25 active:scale-[0.98] disabled:opacity-60"
+      >
+        Сохранить черновик
+      </button>
+      <p
+        role="status"
+        aria-live="polite"
+        className={`text-center text-sm ${status.kind === 'error' ? 'font-medium text-accent' : 'text-ink-soft'}`}
+      >
+        {text}
+      </p>
+    </div>
   );
 }

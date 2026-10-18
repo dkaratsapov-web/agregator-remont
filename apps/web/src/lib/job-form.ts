@@ -6,6 +6,7 @@ import {
   SERVICE_AREA_ERROR,
   validateJobDetails,
   type JobDetails,
+  type JobDraftInput,
   type JobInput,
 } from '@agregator/shared';
 
@@ -173,5 +174,48 @@ export function parseJobForm(form: FormData): ParsedJobForm {
   if (!checked.ok) {
     return { ok: false, error: checked.issues[0].message, issues: checked.issues, values };
   }
-  return { ok: true, values, input: checked.input };
+  const draftId = draftIdFrom(form);
+  return { ok: true, values, input: draftId ? { ...checked.input, draftId } : checked.input };
+}
+
+/** id черновика из скрытого поля формы; null, если черновика нет или значение неверное. */
+export function draftIdFrom(form: FormData): string | null {
+  const value = form.get('draftId');
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? value : null;
+}
+
+/** Без управляющих символов; в многострочном тексте переводы строк и табы остаются. */
+const cleanLine = (value: string, max: number) =>
+  value.replace(/\p{C}/gu, '').trim().slice(0, max) || null;
+const cleanText = (value: string, max: number) =>
+  value
+    .replace(/\r\n?/g, '\n')
+    .replace(/[^\P{C}\n\t]/gu, '')
+    .trim()
+    .slice(0, max) || null;
+
+/**
+ * Черновик из формы: без обязательных проверок. Неверное значение (бюджет буквами, битая
+ * анкета) не сохраняется, остальное сохраняется как есть; ответы анкеты API проверит мягко.
+ */
+export function parseDraftForm(form: FormData): JobDraftInput {
+  const values = readJobForm(form);
+  const budget = (raw: string) => {
+    const value = parseBudget(raw);
+    return value === 'invalid' ? null : value;
+  };
+  const details =
+    values.details.length > DETAILS_FIELD_MAX ? {} : parseDetailsField(values.details);
+  return {
+    title: cleanLine(values.title, JOB_LIMITS.TITLE_MAX),
+    description: cleanText(values.description, JOB_LIMITS.DESCRIPTION_MAX),
+    category: isJobCategory(values.category) ? values.category : null,
+    city: cleanLine(values.city, JOB_LIMITS.CITY_MAX),
+    budgetMin: budget(values.budgetMin),
+    budgetMax: budget(values.budgetMax),
+    details:
+      details !== null && typeof details === 'object' && !Array.isArray(details)
+        ? (details as JobDetails)
+        : {},
+  };
 }
