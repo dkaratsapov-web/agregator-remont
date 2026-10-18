@@ -28,7 +28,7 @@ export function CopyId({ publicId }: { publicId: number }) {
       type="button"
       onClick={copy}
       title="Скопировать номер аккаунта"
-      className="group inline-flex min-h-9 items-center gap-2 rounded-full border border-line bg-canvas px-3 text-sm text-ink-soft transition-colors duration-150 hover:border-ink-soft/50 hover:text-ink active:scale-[0.97]"
+      className="group -my-1 inline-flex min-h-8 items-center gap-2 rounded-[7px] border border-line bg-canvas px-2.5 text-sm text-ink-soft transition-colors duration-150 hover:border-ink/35 hover:text-ink active:scale-[0.97]"
     >
       <span>
         ID <span className="font-semibold tabular-nums text-ink">{publicId}</span>

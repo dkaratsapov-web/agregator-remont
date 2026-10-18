@@ -42,18 +42,20 @@ export function JobDetails({
         </Heading>
         <p className="text-sm text-ink-soft tabular-nums">Ответов: {items.length}</p>
       </div>
-      <div className="mt-4 space-y-4">
+      <div className="mt-4 space-y-3">
         {sections.map((section) => {
           const units = toUnits(section.items);
           return (
             <div
               key={section.id}
-              className="rounded-[22px] border border-line/80 bg-surface p-5 shadow-[0_1px_1px_hsl(var(--shadow-color)/0.04)] sm:p-6"
+              className="overflow-hidden rounded-[14px] border border-line bg-surface"
             >
-              <Sub className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-soft">
+              <Sub className="border-b border-line px-5 py-3 text-sm font-semibold text-ink sm:px-6">
                 {section.title}
               </Sub>
-              <dl className={`mt-4 gap-x-10 ${units.length > 1 ? 'md:columns-2' : ''}`}>
+              <dl
+                className={`gap-x-10 px-5 py-4 sm:px-6 sm:py-5 ${units.length > 1 ? 'md:columns-2' : ''}`}
+              >
                 {units.map(({ item, children }) => (
                   <div key={item.id} className="mb-5 break-inside-avoid last:mb-0">
                     <dt className="text-sm text-ink-soft">{item.label}</dt>
@@ -104,7 +106,7 @@ function AnswerValue({ item }: { item: JobDetailItem }) {
         {item.values.map((value) => (
           <li
             key={value}
-            className="rounded-full bg-canvas px-2.5 py-1 text-sm font-medium text-ink"
+            className="rounded-[7px] border border-line bg-canvas px-2.5 py-1 text-sm font-medium text-ink"
           >
             {value}
           </li>
@@ -134,7 +136,7 @@ export function JobHighlights({
       {highlights.map((text) => (
         <li
           key={text}
-          className={`inline-flex items-center rounded-full border border-line/80 bg-canvas font-medium text-ink ${
+          className={`inline-flex items-center rounded-[7px] border border-line bg-canvas font-medium text-ink ${
             size === 'md' ? 'px-3 py-1.5 text-sm' : 'px-2.5 py-1 text-xs'
           }`}
         >

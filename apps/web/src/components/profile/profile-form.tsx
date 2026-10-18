@@ -24,11 +24,11 @@ export function ProfileForm({
       <FormError message={state.error} />
       <fieldset key={formKey}>
         <legend className="text-sm font-medium text-ink">Категории работ</legend>
-        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {JOB_CATEGORIES.map((category) => (
             <label
               key={category}
-              className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-line bg-surface px-4 text-sm has-[:checked]:border-accent has-[:checked]:bg-accent-tint has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent"
+              className="flex min-h-11 cursor-pointer items-center gap-3 rounded-[10px] border border-line bg-surface px-4 text-sm font-medium text-ink transition-colors duration-150 hover:border-ink/30 has-[:checked]:border-ink has-[:checked]:bg-ink has-[:checked]:text-canvas has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent"
             >
               <input
                 type="checkbox"

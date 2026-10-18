@@ -43,7 +43,7 @@ function ThemePreview({ theme }: { theme: UiTheme }) {
     </div>
   );
   return (
-    <div aria-hidden="true" className="flex h-20 overflow-hidden rounded-xl ring-1 ring-line">
+    <div aria-hidden="true" className="flex h-20 overflow-hidden rounded-[10px] ring-1 ring-line">
       {theme === 'system' ? (
         <>
           <div className="w-1/2 overflow-hidden">{half(light)}</div>
@@ -57,7 +57,7 @@ function ThemePreview({ theme }: { theme: UiTheme }) {
 }
 
 const optionClass =
-  'cursor-pointer rounded-2xl border border-line bg-surface p-3 transition-[border-color,box-shadow,background-color] duration-150 hover:border-ink-soft/50 has-[:checked]:border-accent has-[:checked]:shadow-[0_0_0_3px_var(--accent-tint)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent';
+  'cursor-pointer rounded-[12px] border border-line bg-surface p-3 transition-[border-color,box-shadow,background-color] duration-150 hover:border-ink-soft/50 has-[:checked]:border-ink has-[:checked]:shadow-[inset_0_0_0_1px_var(--ink)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent';
 
 /**
  * Оформление сохраняется сразу при выборе: атрибуты на странице меняются мгновенно, а настройка
@@ -103,11 +103,11 @@ export function AppearanceForm({ preferences }: { preferences: UiPreferences }) 
 
       <fieldset>
         <legend className="font-semibold">Масштаб интерфейса</legend>
-        <div className="mt-3 inline-flex rounded-2xl border border-line bg-canvas p-1">
+        <div className="mt-3 inline-flex rounded-[12px] border border-line bg-canvas p-1">
           {SCALES.map((s, i) => (
             <label
               key={s.value}
-              className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-semibold text-ink-soft transition-colors duration-150 hover:text-ink has-[:checked]:bg-surface has-[:checked]:text-ink has-[:checked]:shadow-[var(--shadow-raised)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent"
+              className="cursor-pointer rounded-[10px] px-4 py-2.5 text-sm font-semibold text-ink-soft transition-colors duration-150 hover:text-ink has-[:checked]:bg-surface has-[:checked]:text-ink has-[:checked]:shadow-[var(--shadow-raised)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent"
             >
               <input
                 type="radio"

@@ -16,6 +16,7 @@ import {
   type TextQuestion,
 } from '@agregator/shared';
 import { useEffect, useId, useRef, useState } from 'react';
+import { ProgressRuler } from '@/components/ui/progress-ruler';
 import { CheckIcon, Select } from '@/components/ui/select';
 
 interface Props {
@@ -634,40 +635,5 @@ function TextControl({
         invalid ? 'border-accent' : 'border-line'
       }`}
     />
-  );
-}
-
-/**
- * Заполненность анкеты как шкала рулетки: деление на каждый вопрос, отвеченные — цветом
- * акцента, каждое пятое деление длиннее. Используется и в штампе заказа.
- */
-export function ProgressRuler({
-  answered,
-  total,
-  className = '',
-}: {
-  answered: number;
-  total: number;
-  className?: string;
-}) {
-  return (
-    <div
-      role="progressbar"
-      aria-label="Заполнение анкеты"
-      aria-valuemin={0}
-      aria-valuemax={total}
-      aria-valuenow={answered}
-      className={`relative flex h-3 items-end justify-between ${className}`}
-    >
-      <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-px bg-ink/15" />
-      {Array.from({ length: Math.max(total, 1) + 1 }, (_, i) => (
-        <span
-          key={i}
-          className={`relative w-[2px] transition-colors duration-300 motion-reduce:transition-none ${
-            i % 5 === 0 ? 'h-3' : 'h-2'
-          } ${i > 0 && i <= answered ? 'bg-accent' : 'bg-ink/25'}`}
-        />
-      ))}
-    </div>
   );
 }

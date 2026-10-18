@@ -11,10 +11,21 @@ import {
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { ProfileCard } from '@/components/account/profile-card';
+import { AccountStamp } from '@/components/account/account-stamp';
 import { LogoutForm } from '@/components/auth/logout-form';
-import { BidStatusBadge } from '@/components/bids/bid-status-badge';
-import { StatusBadge } from '@/components/status-badge';
+import { BID_STATUS_DOTS, BidStatusBadge } from '@/components/bids/bid-status-badge';
+import { jobCategoryLabels } from '@/components/jobs/job-details';
+import { JOB_STATUS_DOTS, StatusBadge } from '@/components/status-badge';
+import { EmptyState, PageHeader, primaryLinkClass } from '@/components/ui/page-header';
+import { ProgressRuler } from '@/components/ui/progress-ruler';
+import {
+  Ledger,
+  LedgerLink,
+  Sheet,
+  SheetBody,
+  SheetHeader,
+  SheetLink,
+} from '@/components/ui/sheet';
 import { getMyProfile, listMyBids, listMyJobs } from '@/lib/api';
 import { formatAmount, formatBudget } from '@/lib/format';
 import { getCurrentUser, getSessionToken } from '@/lib/session';
@@ -32,6 +43,8 @@ function countBy<T extends string>(keys: readonly T[], values: T[]): Record<T, n
 
 /** Заполненность профиля подрядчика: четыре поля, которые видит заказчик. */
 function profileCompleteness(profile: ContractorProfileDto): {
+  done: number;
+  total: number;
   percent: number;
   missing: string[];
 } {
@@ -42,70 +55,61 @@ function profileCompleteness(profile: ContractorProfileDto): {
     [profile.experienceYears !== null, 'опыт'],
   ];
   const missing = checks.filter(([ok]) => !ok).map(([, label]) => label);
-  return { percent: Math.round(((checks.length - missing.length) / checks.length) * 100), missing };
+  const done = checks.length - missing.length;
+  return {
+    done,
+    total: checks.length,
+    percent: Math.round((done / checks.length) * 100),
+    missing,
+  };
 }
 
-function Stat({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
-  return (
-    <div className="rounded-[20px] border border-line/80 bg-surface p-5">
-      <dt className="text-sm text-ink-soft">{label}</dt>
-      <dd className="font-display mt-2 text-3xl font-semibold tabular-nums tracking-[-0.03em]">
-        {value}
-      </dd>
-      {hint ? <p className="mt-1 text-xs text-ink-soft">{hint}</p> : null}
-    </div>
-  );
-}
-
-function ActionCard({
-  href,
-  title,
-  text,
-  primary = false,
+/**
+ * Сводка: числа в одной таблице с тонкими линиями между ячейками, как спецификация на листе.
+ * Первая ячейка — итог, остальные — по статусам.
+ */
+function Tally({
+  items,
+  note,
 }: {
-  href: string;
-  title: string;
-  text: string;
-  primary?: boolean;
+  items: { label: string; value: number; dot?: string }[];
+  note?: string;
 }) {
   return (
-    <Link
-      href={href}
-      className={`group flex flex-col justify-between gap-6 rounded-[22px] p-5 transition-[transform,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 ${
-        primary
-          ? 'bg-ink text-canvas shadow-[0_24px_48px_-28px_hsl(var(--shadow-color)/0.7)]'
-          : 'border border-line/80 bg-surface hover:shadow-[0_18px_40px_-22px_hsl(var(--shadow-color)/0.35)]'
-      }`}
-    >
-      <div>
-        <p className="text-base font-semibold">{title}</p>
-        <p className={`mt-1 text-sm ${primary ? 'text-canvas/65' : 'text-ink-soft'}`}>{text}</p>
-      </div>
-      <span
-        aria-hidden="true"
-        className={`grid size-9 place-items-center self-end rounded-full transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 ${
-          primary ? 'bg-accent text-white' : 'bg-canvas text-ink'
-        }`}
-      >
-        <svg
-          viewBox="0 0 16 16"
-          className="size-3.5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-        >
-          <path d="M4.5 11.5 11.5 4.5M5.5 4.5h6v6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </span>
-    </Link>
+    <>
+      <dl className="grid grid-cols-2 gap-px bg-line sm:grid-cols-4">
+        {items.map((item, index) => (
+          <div key={item.label} className="bg-surface px-5 py-4 sm:px-6">
+            <dt className="flex items-center gap-2 text-sm text-ink-soft">
+              {item.dot ? (
+                <span aria-hidden="true" className={`size-1.5 rounded-[1px] ${item.dot}`} />
+              ) : null}
+              {item.label}
+            </dt>
+            <dd
+              className={`mt-1.5 font-display font-semibold leading-none tabular-nums tracking-[-0.03em] text-ink ${
+                index === 0 ? 'text-[2.4rem]' : 'text-[1.9rem]'
+              }`}
+            >
+              {item.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {note ? (
+        <p className="border-t border-line px-5 py-2.5 text-xs text-ink-soft sm:px-6">{note}</p>
+      ) : null}
+    </>
   );
 }
 
 function Unavailable() {
   return (
-    <p className="rounded-[20px] border border-dashed border-line bg-surface p-5 text-sm text-ink-soft">
-      Не удалось загрузить сводку. Обновите страницу чуть позже.
-    </p>
+    <Sheet>
+      <EmptyState title="Сводка не загрузилась">
+        Сервер не ответил. Обновите страницу чуть позже: данные на месте.
+      </EmptyState>
+    </Sheet>
   );
 }
 
@@ -125,59 +129,61 @@ async function CustomerSummary({ token }: { token: string }) {
   const partial = jobs.total > jobs.items.length;
 
   return (
-    <>
-      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Всего заказов" value={jobs.total} />
-        {JOB_STATUSES.map((status) => (
-          <Stat
-            key={status}
-            label={JOB_STATUS_LABELS[status]}
-            value={counts[status]}
-            hint={partial ? `из последних ${SUMMARY_LIMIT}` : undefined}
-          />
-        ))}
-      </dl>
+    <div className="flex flex-col gap-6">
+      <Sheet labelledBy="summary-title">
+        <SheetHeader id="summary-title" title="Сводка по заказам" />
+        <Tally
+          items={[
+            { label: 'Всего заказов', value: jobs.total },
+            ...JOB_STATUSES.map((status) => ({
+              label: JOB_STATUS_LABELS[status],
+              value: counts[status],
+              dot: JOB_STATUS_DOTS[status],
+            })),
+          ]}
+          note={partial ? `По статусам — из последних ${SUMMARY_LIMIT} заказов.` : undefined}
+        />
+      </Sheet>
 
-      <section aria-labelledby="recent-jobs" className="mt-10">
-        <div className="flex items-end justify-between gap-4">
-          <h2 id="recent-jobs" className="text-lg font-semibold">
-            Последние заказы
-          </h2>
-          {jobs.total > 0 ? (
-            <Link
-              href="/account/jobs"
-              className="text-sm font-semibold text-accent hover:underline"
-            >
-              Все заказы
-            </Link>
-          ) : null}
-        </div>
+      <Sheet labelledBy="recent-jobs">
+        <SheetHeader
+          id="recent-jobs"
+          title="Последние заказы"
+          action={jobs.total > 0 ? <SheetLink href="/account/jobs">Все заказы</SheetLink> : null}
+        />
         {jobs.items.length === 0 ? (
-          <p className="mt-4 rounded-[20px] border border-dashed border-line bg-surface p-6 text-ink-soft">
-            Заказов пока нет. Опишите задачу, и мастера пришлют отклики с ценой и сроком.
-          </p>
+          <EmptyState
+            title="Заказов пока нет"
+            action={
+              <Link href="/account/jobs/new" className={primaryLinkClass}>
+                Новый заказ
+              </Link>
+            }
+          >
+            Опишите задачу, и мастера пришлют отклики с ценой и сроком.
+          </EmptyState>
         ) : (
-          <ul className="mt-4 divide-y divide-line/80 overflow-hidden rounded-[20px] border border-line/80 bg-surface">
-            {jobs.items.slice(0, 4).map((job) => (
-              <li key={job.id}>
-                <Link
-                  href={`/account/jobs/${job.id}`}
-                  className="flex flex-col gap-2 p-4 transition-colors hover:bg-canvas sm:flex-row sm:items-center sm:justify-between sm:px-5"
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate font-medium">{job.title}</span>
-                    <span className="mt-0.5 block text-sm text-ink-soft">
-                      {job.city} · {formatBudget(job.budgetMin, job.budgetMax, job.currency)}
+          <Ledger>
+            {jobs.items.slice(0, 5).map((job) => (
+              <LedgerLink
+                key={job.id}
+                href={`/account/jobs/${job.id}`}
+                title={job.title}
+                meta={`${jobCategoryLabels(job).join(', ')} · ${job.city}`}
+                aside={
+                  <>
+                    <span className="text-sm font-semibold tabular-nums text-ink">
+                      {formatBudget(job.budgetMin, job.budgetMax, job.currency)}
                     </span>
-                  </span>
-                  <StatusBadge status={job.status} />
-                </Link>
-              </li>
+                    <StatusBadge status={job.status} />
+                  </>
+                }
+              />
             ))}
-          </ul>
+          </Ledger>
         )}
-      </section>
-    </>
+      </Sheet>
+    </div>
   );
 }
 
@@ -202,159 +208,164 @@ async function ContractorSummary({ token }: { token: string }) {
   const completeness = profileCompleteness(profile);
 
   return (
-    <>
+    <div className="flex flex-col gap-6">
       {completeness.percent < 100 ? (
-        <div className="mb-6 rounded-[22px] border border-accent/25 bg-accent-tint p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="font-semibold">Профиль заполнен на {completeness.percent}%</p>
-            <Link
-              href="/account/profile"
-              className="inline-flex min-h-10 items-center rounded-full bg-ink px-4 text-sm font-semibold text-canvas hover:bg-ink/85"
-            >
-              Заполнить
-            </Link>
-          </div>
-          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/70">
-            <div
-              className="h-full rounded-full bg-accent"
-              style={{ width: `${completeness.percent}%` }}
+        <Sheet labelledBy="profile-progress" className="border-accent/40">
+          <SheetHeader
+            id="profile-progress"
+            title={`Профиль мастера заполнен на ${completeness.percent}%`}
+            description={`Заказчики видят профиль рядом с вашим откликом. Не хватает: ${completeness.missing.join(', ')}.`}
+            action={
+              <Link href="/account/profile" className={primaryLinkClass}>
+                Заполнить
+              </Link>
+            }
+          />
+          <SheetBody className="!py-4">
+            <ProgressRuler
+              answered={completeness.done}
+              total={completeness.total}
+              label="Заполнение профиля мастера"
             />
-          </div>
-          <p className="mt-3 text-sm text-ink-soft">
-            Заказчики видят профиль рядом с вашим откликом. Не хватает:{' '}
-            {completeness.missing.join(', ')}.
-          </p>
-        </div>
+          </SheetBody>
+        </Sheet>
       ) : null}
 
-      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Всего откликов" value={bids.total} />
-        {(['PENDING', 'ACCEPTED', 'REJECTED'] as const).map((status) => (
-          <Stat
-            key={status}
-            label={BID_STATUS_LABELS[status]}
-            value={counts[status]}
-            hint={partial ? `из последних ${SUMMARY_LIMIT}` : undefined}
-          />
-        ))}
-      </dl>
+      <Sheet labelledBy="summary-title">
+        <SheetHeader id="summary-title" title="Сводка по откликам" />
+        <Tally
+          items={[
+            { label: 'Всего откликов', value: bids.total },
+            ...(['PENDING', 'ACCEPTED', 'REJECTED'] as const).map((status) => ({
+              label: BID_STATUS_LABELS[status],
+              value: counts[status],
+              dot: BID_STATUS_DOTS[status],
+            })),
+          ]}
+          note={partial ? `По статусам — из последних ${SUMMARY_LIMIT} откликов.` : undefined}
+        />
+      </Sheet>
 
-      <section aria-labelledby="recent-bids" className="mt-10">
-        <div className="flex items-end justify-between gap-4">
-          <h2 id="recent-bids" className="text-lg font-semibold">
-            Последние отклики
-          </h2>
-          {bids.total > 0 ? (
-            <Link
-              href="/account/bids"
-              className="text-sm font-semibold text-accent hover:underline"
-            >
-              Все отклики
-            </Link>
-          ) : null}
-        </div>
+      <Sheet labelledBy="recent-bids">
+        <SheetHeader
+          id="recent-bids"
+          title="Последние отклики"
+          action={bids.total > 0 ? <SheetLink href="/account/bids">Все отклики</SheetLink> : null}
+        />
         {bids.items.length === 0 ? (
-          <p className="mt-4 rounded-[20px] border border-dashed border-line bg-surface p-6 text-ink-soft">
-            Откликов пока нет. Найдите заказ в каталоге и предложите свою цену и срок.
-          </p>
+          <EmptyState
+            title="Откликов пока нет"
+            action={
+              <Link href="/jobs?open=1" className={primaryLinkClass}>
+                Найти заказ
+              </Link>
+            }
+          >
+            Найдите заказ в каталоге и предложите свою цену и срок.
+          </EmptyState>
         ) : (
-          <ul className="mt-4 divide-y divide-line/80 overflow-hidden rounded-[20px] border border-line/80 bg-surface">
-            {bids.items.slice(0, 4).map((bid) => (
-              <li key={bid.id}>
-                <Link
-                  href={`/jobs/${bid.job.id}`}
-                  className="flex flex-col gap-2 p-4 transition-colors hover:bg-canvas sm:flex-row sm:items-center sm:justify-between sm:px-5"
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate font-medium">{bid.job.title}</span>
-                    <span className="mt-0.5 block text-sm text-ink-soft">
-                      {bid.job.city} ·{' '}
-                      <span className="tabular-nums">{formatAmount(bid.price)} ₽</span>
+          <Ledger>
+            {bids.items.slice(0, 5).map((bid) => (
+              <LedgerLink
+                key={bid.id}
+                href={`/jobs/${bid.job.id}`}
+                title={bid.job.title}
+                meta={bid.job.city}
+                aside={
+                  <>
+                    <span className="text-sm font-semibold tabular-nums text-ink">
+                      {formatAmount(bid.price)} ₽
                     </span>
-                  </span>
-                  <BidStatusBadge status={bid.status} />
-                </Link>
-              </li>
+                    <BidStatusBadge status={bid.status} />
+                  </>
+                }
+              />
             ))}
-          </ul>
+          </Ledger>
         )}
-      </section>
-    </>
+      </Sheet>
+    </div>
   );
 }
+
+type NavItem = { href: string; title: string; text: string };
+
+const NAV: Record<'CUSTOMER' | 'CONTRACTOR' | 'ADMIN', NavItem[]> = {
+  CUSTOMER: [
+    { href: '/account/jobs', title: 'Мои заказы', text: 'Черновики, отклики, закрытие' },
+    { href: '/jobs', title: 'Каталог', text: 'Заказы других заказчиков' },
+    { href: '/account/settings', title: 'Настройки', text: 'Профиль, пароль, входы' },
+  ],
+  CONTRACTOR: [
+    { href: '/account/bids', title: 'Мои отклики', text: 'Статусы и история' },
+    { href: '/account/profile', title: 'Профиль мастера', text: 'Опыт, категории и города' },
+    { href: '/account/settings', title: 'Настройки', text: 'Профиль, пароль, входы' },
+  ],
+  ADMIN: [
+    { href: '/jobs', title: 'Каталог', text: 'Все опубликованные заказы' },
+    { href: '/account/settings', title: 'Настройки', text: 'Профиль, пароль, входы' },
+  ],
+};
+
+const PRIMARY: Record<'CUSTOMER' | 'CONTRACTOR' | 'ADMIN', { href: string; label: string }> = {
+  CUSTOMER: { href: '/account/jobs/new', label: 'Новый заказ' },
+  CONTRACTOR: { href: '/jobs?open=1', label: 'Найти заказ' },
+  ADMIN: { href: '/admin/leads', label: 'Заявки на тестирование' },
+};
 
 export default async function AccountPage() {
   const [user, token] = await Promise.all([getCurrentUser(), getSessionToken()]);
   if (!user || !token) redirect('/login?next=/account');
 
-  const isContractor = user.role === 'CONTRACTOR';
-  const isAdmin = user.role === 'ADMIN';
+  const primary = PRIMARY[user.role];
 
   return (
-    <div className="mx-auto max-w-[1600px] px-4 pt-10 sm:px-6 lg:px-10 md:pt-14">
-      <ProfileCard user={user} />
+    <div className="mx-auto max-w-[1600px] px-4 pb-16 pt-10 sm:px-6 md:pt-14 lg:px-10">
+      <PageHeader
+        title={`Здравствуйте, ${user.name}`}
+        description={
+          user.role === 'CONTRACTOR'
+            ? 'Отклики, профиль мастера и настройки — всё здесь.'
+            : user.role === 'ADMIN'
+              ? 'Аккаунт администратора: заявки на закрытое тестирование и каталог заказов.'
+              : 'Заказы, черновики и отклики мастеров — всё здесь.'
+        }
+        action={
+          <Link href={primary.href} className={primaryLinkClass}>
+            {primary.label}
+          </Link>
+        }
+      />
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0">
-          {isAdmin ? (
-            <p className="rounded-[20px] border border-line/80 bg-surface p-5 text-ink-soft">
-              Аккаунт администратора: заявки на закрытое тестирование и каталог заказов.
-            </p>
-          ) : isContractor ? (
+          {user.role === 'ADMIN' ? (
+            <Sheet>
+              <EmptyState title="Сводки для администратора нет">
+                Заявки на закрытое тестирование — по кнопке выше, заказы — в каталоге.
+              </EmptyState>
+            </Sheet>
+          ) : user.role === 'CONTRACTOR' ? (
             <ContractorSummary token={token} />
           ) : (
             <CustomerSummary token={token} />
           )}
         </div>
 
-        <aside className="flex flex-col gap-3">
-          {isAdmin ? (
-            <>
-              <ActionCard
-                primary
-                href="/admin/leads"
-                title="Заявки"
-                text="Заявки на закрытое тестирование"
-              />
-              <ActionCard href="/jobs" title="Каталог" text="Все опубликованные заказы" />
-            </>
-          ) : isContractor ? (
-            <>
-              <ActionCard
-                primary
-                href="/jobs?open=1"
-                title="Найти заказ"
-                text="Открытые заказы в каталоге"
-              />
-              <ActionCard href="/account/bids" title="Мои отклики" text="Статусы и история" />
-              <ActionCard href="/account/profile" title="Профиль" text="Опыт, категории и города" />
-            </>
-          ) : (
-            <>
-              <ActionCard
-                primary
-                href="/account/jobs/new"
-                title="Новый заказ"
-                text="Задача, город и бюджет"
-              />
-              <ActionCard
-                href="/account/jobs"
-                title="Мои заказы"
-                text="Отклики, правки, закрытие"
-              />
-              <ActionCard href="/jobs" title="Каталог" text="Заказы других заказчиков" />
-            </>
-          )}
+        <aside aria-label="Аккаунт и разделы" className="flex flex-col gap-6 lg:sticky lg:top-24">
+          <AccountStamp user={user} />
 
-          <div className="mt-3 rounded-[22px] border border-line/80 bg-surface p-5">
-            <dl className="text-sm">
-              <dt className="text-ink-soft">ID аккаунта</dt>
-              <dd className="mt-0.5 break-all font-mono text-xs">{user.id}</dd>
-            </dl>
-            <div className="mt-4 border-t border-line pt-4">
+          <Sheet labelledBy="sections-title">
+            <SheetHeader id="sections-title" title="Разделы" />
+            <Ledger>
+              {NAV[user.role].map((item) => (
+                <LedgerLink key={item.href} href={item.href} title={item.title} meta={item.text} />
+              ))}
+            </Ledger>
+            <div className="border-t border-line px-3 py-2">
               <LogoutForm />
             </div>
-          </div>
+          </Sheet>
         </aside>
       </div>
     </div>

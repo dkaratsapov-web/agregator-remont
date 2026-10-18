@@ -27,7 +27,7 @@ function PasswordInput({
       <label htmlFor={id} className="block text-sm font-medium text-ink">
         {label}
       </label>
-      <div className="mt-1.5 flex min-h-12 items-center rounded-xl border border-line bg-surface focus-within:border-accent focus-within:outline-2 focus-within:outline-accent">
+      <div className="mt-1.5 flex min-h-12 items-center rounded-[10px] border border-line bg-surface focus-within:border-accent focus-within:outline-2 focus-within:outline-accent">
         <input
           id={id}
           name={name}

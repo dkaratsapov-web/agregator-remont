@@ -1,4 +1,4 @@
-import { validateJobDetails } from '@agregator/shared';
+import { JOB_STATUS_LABELS, validateJobDetails } from '@agregator/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -13,6 +13,9 @@ import {
 import { JobForm } from '@/components/jobs/job-form';
 import { Notice } from '@/components/notice';
 import { StatusBadge } from '@/components/status-badge';
+import { EmptyState, PageHeader, secondaryLinkClass } from '@/components/ui/page-header';
+import { Sheet, SheetBody, SheetHeader } from '@/components/ui/sheet';
+import { Stamp } from '@/components/ui/stamp';
 import { JobBidList } from '@/components/bids/job-bid-list';
 import { getMyJob, listJobBids } from '@/lib/api';
 import { requireCustomerPage } from '@/lib/customer';
@@ -61,27 +64,21 @@ export default async function MyJobPage({
           : null;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 pt-10 sm:px-6 md:pt-14">
-      <p className="text-sm text-ink-soft">
-        <Link href="/account/jobs" className="hover:text-ink hover:underline">
-          Мои заказы
-        </Link>
-      </p>
-      <div className="mt-1 flex flex-wrap items-center gap-3">
-        <h1 className="break-words text-3xl font-semibold tracking-tight">{job.title}</h1>
-        <StatusBadge status={job.status} />
-      </div>
-      <p className="mt-2 text-sm text-ink-soft">
-        {jobCategoryLabels(job).join(' · ')}, {job.city}, опубликован{' '}
-        <time dateTime={job.createdAt}>{formatDate(job.createdAt)}</time>{' '}
-        <Link href={`/jobs/${job.id}`} className="font-medium text-accent hover:underline">
-          Как видят подрядчики
-        </Link>
-      </p>
-
-      <div className="mt-4">
-        <JobHighlights category={job.category} details={job.details} size="md" />
-      </div>
+    <div className="mx-auto max-w-[1600px] px-4 pb-16 pt-10 sm:px-6 md:pt-14 lg:px-10">
+      <PageHeader
+        back={{ href: '/account/jobs', label: 'Мои заказы' }}
+        title={job.title}
+        action={
+          <Link href={`/jobs/${job.id}`} className={secondaryLinkClass}>
+            Как видят подрядчики
+          </Link>
+        }
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge status={job.status} />
+          <JobHighlights category={job.category} details={job.details} size="sm" />
+        </div>
+      </PageHeader>
 
       {notice ? (
         <div className="mt-6">
@@ -91,41 +88,133 @@ export default async function MyJobPage({
 
       {job.editable && !validateJobDetails(job.category, job.details).ok ? (
         // Заказ создан до анкеты (или анкета стала строже): владелец дополняет её в форме ниже.
-        <p className="mt-6 rounded-xl border border-accent/40 bg-accent-tint px-4 py-3 text-sm text-ink">
-          Анкета заказа заполнена не полностью, подрядчики видят меньше деталей.{' '}
-          <a href="#edit-title" className="font-semibold text-accent hover:underline">
-            Ответить на вопросы
-          </a>
+        <p className="mt-6 flex items-start gap-2.5 rounded-[10px] border border-accent/40 bg-accent-tint px-4 py-3 text-sm text-ink">
+          <span aria-hidden="true" className="mt-[7px] size-1.5 shrink-0 rounded-[1px] bg-accent" />
+          <span>
+            Анкета заказа заполнена не полностью, подрядчики видят меньше деталей.{' '}
+            <a
+              href="#edit-title"
+              className="font-semibold text-accent underline decoration-accent/40 underline-offset-4 hover:decoration-accent"
+            >
+              Ответить на вопросы
+            </a>
+          </span>
         </p>
       ) : null}
 
-      <div className="mt-10 empty:hidden">
-        <JobPositionsDetails job={job} />
-      </div>
+      <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="flex min-w-0 flex-col gap-8">
+          <Sheet labelledBy="bids-title">
+            <SheetHeader
+              id="bids-title"
+              title={
+                <>
+                  Отклики <span className="tabular-nums text-ink-soft">{bids.length}</span>
+                </>
+              }
+              description={
+                job.status === 'OPEN' && bids.length > 0
+                  ? 'Выберите исполнителя — заказ перейдёт в работу, остальные отклики будут отклонены.'
+                  : undefined
+              }
+            />
+            {bids.length === 0 ? (
+              <EmptyState title="Откликов пока нет">
+                {job.status === 'OPEN'
+                  ? 'Подрядчики видят заказ в каталоге. Отклики с ценой и сроком появятся здесь.'
+                  : 'Заказ больше не принимает отклики.'}
+              </EmptyState>
+            ) : (
+              <JobBidList jobId={job.id} bids={bids} canAccept={job.status === 'OPEN'} />
+            )}
+          </Sheet>
 
-      <section aria-labelledby="bids-title" className="mt-10">
-        <h2 id="bids-title" className="text-lg font-semibold">
-          Отклики <span className="tabular-nums text-ink-soft">{bids.length}</span>
-        </h2>
-        <div className="mt-4">
-          {bids.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-line bg-surface px-4 py-6 text-center text-sm text-ink-soft">
-              {job.status === 'OPEN'
-                ? 'Откликов пока нет. Подрядчики увидят заказ в каталоге.'
-                : 'Откликов нет.'}
-            </p>
-          ) : (
-            <JobBidList jobId={job.id} bids={bids} canAccept={job.status === 'OPEN'} />
+          <div className="empty:hidden">
+            <JobPositionsDetails job={job} />
+          </div>
+
+          {job.editable ? null : (
+            <Sheet labelledBy="description-title">
+              <SheetHeader
+                id="description-title"
+                title="Описание"
+                description={
+                  job.status === 'CLOSED'
+                    ? 'Заказ закрыт, редактирование недоступно.'
+                    : 'Исполнитель выбран, заказ в работе. Редактирование недоступно.'
+                }
+              />
+              <SheetBody>
+                <p className="max-w-[72ch] whitespace-pre-line break-words leading-relaxed text-ink">
+                  {job.description}
+                </p>
+              </SheetBody>
+            </Sheet>
           )}
         </div>
-      </section>
+
+        <aside aria-label="Сводка заказа" className="flex flex-col gap-4 lg:sticky lg:top-24">
+          <Stamp
+            ariaLabel="Сводка заказа"
+            label="Заказ"
+            title={job.title}
+            rows={[
+              ['Статус', JOB_STATUS_LABELS[job.status]],
+              [
+                jobCategoryLabels(job).length > 1 ? 'Категории' : 'Категория',
+                jobCategoryLabels(job).join(', '),
+              ],
+              ['Город', job.city],
+              [
+                'Бюджет',
+                <span key="b" className="tabular-nums">
+                  {formatBudget(job.budgetMin, job.budgetMax, job.currency)}
+                </span>,
+              ],
+              [
+                'Опубликован',
+                <time key="t" dateTime={job.createdAt}>
+                  {formatDate(job.createdAt)}
+                </time>,
+              ],
+              [
+                'Откликов',
+                <span key="n" className="tabular-nums">
+                  {bids.length}
+                </span>,
+              ],
+            ]}
+            footer={
+              job.editable ? (
+                <a
+                  href="#edit-title"
+                  className="font-semibold text-ink underline decoration-ink/25 underline-offset-4 hover:decoration-accent"
+                >
+                  Изменить заказ
+                </a>
+              ) : (
+                'Только просмотр'
+              )
+            }
+          />
+          {job.status !== 'CLOSED' ? (
+            <CloseJobForm action={closeJobAction.bind(null, job.id)} />
+          ) : null}
+        </aside>
+      </div>
 
       {job.editable ? (
-        <>
-          <h2 id="edit-title" className="mt-10 scroll-mt-24 text-lg font-semibold">
+        <section aria-labelledby="edit-title" className="mt-12 border-t border-line pt-8">
+          <h2
+            id="edit-title"
+            className="scroll-mt-24 font-display text-xl font-semibold tracking-[-0.02em] text-ink"
+          >
             Редактирование
           </h2>
-          <div className="mt-4">
+          <p className="mt-1 text-sm text-ink-soft">
+            Подрядчики увидят изменения сразу после сохранения.
+          </p>
+          <div className="mt-6">
             <JobForm
               action={updateJobAction.bind(null, job.id)}
               initial={{
@@ -142,35 +231,7 @@ export default async function MyJobPage({
               pendingLabel="Сохраняем…"
             />
           </div>
-        </>
-      ) : (
-        <div className="mt-8 space-y-4">
-          <p className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink-soft">
-            {job.status === 'CLOSED'
-              ? 'Заказ закрыт, редактирование недоступно.'
-              : 'Исполнитель выбран, заказ в работе. Редактирование недоступно.'}
-          </p>
-          <dl className="grid gap-4 rounded-2xl border border-line bg-surface p-6">
-            <div>
-              <dt className="text-sm text-ink-soft">Бюджет</dt>
-              <dd className="mt-1 font-semibold tabular-nums">
-                {formatBudget(job.budgetMin, job.budgetMax, job.currency)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm text-ink-soft">Описание</dt>
-              <dd className="mt-1 whitespace-pre-line break-words leading-relaxed">
-                {job.description}
-              </dd>
-            </div>
-          </dl>
-        </div>
-      )}
-
-      {job.status !== 'CLOSED' ? (
-        <div className="mt-10">
-          <CloseJobForm action={closeJobAction.bind(null, job.id)} />
-        </div>
+        </section>
       ) : null}
     </div>
   );

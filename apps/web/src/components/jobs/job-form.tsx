@@ -31,7 +31,8 @@ import {
   type JobFormIssue,
   type JobFormValues,
 } from '@/lib/job-form';
-import { JobQuestionnaire, ProgressRuler } from './job-questionnaire';
+import { ProgressRuler } from '@/components/ui/progress-ruler';
+import { JobQuestionnaire } from './job-questionnaire';
 
 interface Props {
   action: (state: JobFormState, form: FormData) => Promise<JobFormState>;
