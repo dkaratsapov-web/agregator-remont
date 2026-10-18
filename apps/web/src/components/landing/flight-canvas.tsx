@@ -93,11 +93,17 @@ export function FlightCanvas({ progress }: { progress: MotionValue<number> }) {
       schedule();
     }
 
-    // Режим экономии трафика: только каждый 4-й кадр, пролёт идёт крупнее шагом.
-    const saveData =
-      (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData ===
-      true;
-    const queue = flightLoadOrder(set.count).filter((i) => !saveData || i % 4 === 0);
+    // Экономия трафика — каждый 4-й кадр, медленная сеть (3G и хуже) — каждый 2-й: переход
+    // между соседними кадрами сглаживает более крупный шаг.
+    const connection = (
+      navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }
+    ).connection;
+    const step = connection?.saveData
+      ? 4
+      : /^(slow-2g|2g|3g)$/.test(connection?.effectiveType ?? '')
+        ? 2
+        : 1;
+    const queue = flightLoadOrder(set.count).filter((i) => i % step === 0);
 
     function loadNext() {
       const index = queue.shift();
@@ -121,10 +127,17 @@ export function FlightCanvas({ progress }: { progress: MotionValue<number> }) {
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);
     const unsubscribe = progress.on('change', schedule);
-    for (let i = 0; i < PARALLEL; i++) loadNext();
+    // Кадры — после загрузки страницы: иначе на медленной сети они задерживают событие load
+    // (на телефоне при «медленном 4G» — до 24 с), а первый кадр и так виден картинкой-заставкой.
+    const start = () => {
+      for (let i = 0; i < PARALLEL; i++) loadNext();
+    };
+    if (document.readyState === 'complete') start();
+    else window.addEventListener('load', start, { once: true });
 
     return () => {
       cancelled = true;
+      window.removeEventListener('load', start);
       observer.disconnect();
       unsubscribe();
       cancelAnimationFrame(raf);
