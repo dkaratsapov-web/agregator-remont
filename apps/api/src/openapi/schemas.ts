@@ -14,6 +14,7 @@ import {
   type JobBidDto,
   type JobCategory,
   type JobDetails,
+  type JobDraftDto,
   type JobDto,
   type JobStatus,
   type LeadDto,
@@ -69,6 +70,27 @@ export class JobSchema implements JobDto {
 export class OwnJobSchema extends JobSchema implements OwnJobDto {
   @dateTime() updatedAt!: string;
   @ApiProperty({ description: 'Редактировать можно только открытый заказ' }) editable!: boolean;
+}
+
+@ApiSchema({ name: 'JobDraftDto' })
+export class JobDraftSchema implements JobDraftDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ type: String, nullable: true }) title!: string | null;
+  @ApiProperty({ type: String, nullable: true }) description!: string | null;
+  @ApiProperty({ enum: JOB_CATEGORIES, enumName: 'JobCategory', nullable: true })
+  category!: JobCategory | null;
+  @ApiProperty({ type: String, nullable: true }) city!: string | null;
+  @int({ nullable: true }) budgetMin!: number | null;
+  @int({ nullable: true }) budgetMax!: number | null;
+  @ApiProperty(jobDetailsProperty('Ответы анкеты, подходящие категории; {} без категории'))
+  details!: JobDetails;
+  @dateTime() createdAt!: string;
+  @dateTime() updatedAt!: string;
+}
+
+@ApiSchema({ name: 'JobDraftList' })
+export class JobDraftListSchema {
+  @ApiProperty({ type: [JobDraftSchema] }) items!: JobDraftSchema[];
 }
 
 @ApiSchema({ name: 'PaginatedJobDto' })

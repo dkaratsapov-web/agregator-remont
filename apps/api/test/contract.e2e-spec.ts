@@ -37,6 +37,7 @@ async function cleanDb(): Promise<void> {
   await prisma.lead.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.bid.deleteMany();
+  await prisma.jobDraft.deleteMany();
   await prisma.job.deleteMany({ where: { ownerId: { not: null } } });
   await prisma.user.deleteMany();
 }
@@ -393,6 +394,77 @@ describe('API contract (e2e)', () => {
           .send({ currentPassword: password, newPassword: 'new-password-2026' }),
         204,
       );
+    });
+  });
+
+  it('draft endpoints match openapi.json', async () => {
+    const high = {
+      RATE_LIMIT_PER_MIN: '1000',
+      AUTH_RATE_LIMIT_PER_MIN: '1000',
+      WRITE_RATE_LIMIT_PER_MIN: '1000',
+    };
+    await withApp(high, async (app) => {
+      const http = () => request(app.getHttpServer());
+      const check = async (
+        method: 'get' | 'post' | 'put' | 'delete',
+        template: string,
+        req: request.Test,
+        status: number,
+      ) => {
+        const res = await req;
+        expect(res.status).toBe(status);
+        expectContract(res, method, template);
+        return res;
+      };
+      const customer = await signUp(app, 'CUSTOMER');
+      const contractor = await signUp(app, 'CONTRACTOR');
+      const LIST = '/v1/me/drafts';
+      const ONE = '/v1/me/drafts/{id}';
+
+      const created = await check(
+        'post',
+        LIST,
+        http().post(LIST).set(customer.auth).send({ title: 'Черновик', category: 'ELECTRICAL' }),
+        201,
+      );
+      const id = created.body.id as string;
+      await check('post', LIST, http().post(LIST).set(customer.auth).send({ budgetMin: -1 }), 400);
+      await check('post', LIST, http().post(LIST).send({}), 401);
+      await check('post', LIST, http().post(LIST).set(contractor.auth).send({}), 403);
+
+      await check('get', LIST, http().get(LIST).set(customer.auth), 200);
+      await check('get', LIST, http().get(LIST), 401);
+      await check('get', LIST, http().get(LIST).set(contractor.auth), 403);
+
+      await check('get', ONE, http().get(`${LIST}/${id}`).set(customer.auth), 200);
+      await check('get', ONE, http().get(`${LIST}/missing`).set(customer.auth), 404);
+      await check('get', ONE, http().get(`${LIST}/${id}`), 401);
+      await check('get', ONE, http().get(`${LIST}/${id}`).set(contractor.auth), 403);
+
+      const put = (
+        auth?: Record<string, string>,
+        body: object = { title: 'Правка' },
+        target = id,
+      ) => {
+        const req = http().put(`${LIST}/${target}`);
+        return (auth ? req.set(auth) : req).send(body);
+      };
+      await check('put', ONE, put(customer.auth), 200);
+      await check('put', ONE, put(customer.auth, { title: 'я'.repeat(200) }), 400);
+      await check('put', ONE, put(customer.auth, {}, 'missing'), 404);
+      await check('put', ONE, put(), 401);
+      await check('put', ONE, put(contractor.auth), 403);
+
+      await check('delete', ONE, http().delete(`${LIST}/missing`).set(customer.auth), 404);
+      await check('delete', ONE, http().delete(`${LIST}/${id}`), 401);
+      await check('delete', ONE, http().delete(`${LIST}/${id}`).set(contractor.auth), 403);
+      await check('delete', ONE, http().delete(`${LIST}/${id}`).set(customer.auth), 204);
+
+      // Лимит черновиков (заполняется напрямую в БД).
+      await prisma.jobDraft.createMany({
+        data: Array.from({ length: 10 }, () => ({ ownerId: customer.id })),
+      });
+      await check('post', LIST, http().post(LIST).set(customer.auth).send({}), 409);
     });
   });
 

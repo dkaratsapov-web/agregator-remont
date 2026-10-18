@@ -92,6 +92,27 @@ model Job {
   @@map("jobs")
 }
 
+/// Черновик нового заказа: виден только владельцу, в каталог не попадает. Поля могут быть
+/// пустыми; полная проверка — при публикации, когда черновик превращается в заказ и удаляется.
+model JobDraft {
+  id          String       @id @default(cuid())
+  ownerId     String       @map("owner_id")
+  owner       User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title       String?      @db.VarChar(160)
+  description String?
+  category    JobCategory?
+  city        String?      @db.VarChar(100)
+  budgetMin   Int?         @map("budget_min")
+  budgetMax   Int?         @map("budget_max")
+  /// Ответы анкеты, проверенные мягко (неверные отброшены). Объект и размер — CHECK в миграции.
+  details     Json         @default("{}")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  @@index([ownerId, updatedAt(sort: Desc)])
+  @@map("job_drafts")
+}
+
 model User {
   id              String             @id @default(cuid())
   /// Короткий номер для пользователя и поддержки («ID 100245»). Ничего не открывает: доступ
@@ -117,6 +138,7 @@ model User {
   avatar          UserAvatar?
   sessions        Session[]
   jobs            Job[]
+  jobDrafts       JobDraft[]
   auditLogs       AuditLog[]
   profile         ContractorProfile?
   bids            Bid[]

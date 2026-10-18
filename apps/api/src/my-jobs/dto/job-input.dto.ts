@@ -22,7 +22,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-import { MULTI_LINE, SINGLE_LINE, trim, trimText } from '../../common/text';
+import { ENTITY_ID_PATTERN, MULTI_LINE, SINGLE_LINE, trim, trimText } from '../../common/text';
 import { jobDetailsProperty } from '../../openapi/job-details';
 
 const budget = () => [
@@ -111,6 +111,14 @@ export class CreateJobDto {
     ),
   )
   details!: Record<string, unknown>;
+
+  @IsOptional()
+  @IsString()
+  @Matches(ENTITY_ID_PATTERN, { message: 'Неверный черновик' })
+  @ApiPropertyOptional({
+    description: 'Черновик, из которого опубликован заказ: удаляется в той же транзакции',
+  })
+  draftId?: string;
 }
 
 /** Правка: любые поля из CreateJobDto; владелец, статус и даты через API не меняются. */
