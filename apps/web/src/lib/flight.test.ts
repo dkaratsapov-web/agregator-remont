@@ -3,7 +3,10 @@ import {
   FLIGHT_KEYS,
   FLIGHT_SECONDS,
   FLIGHT_SETS,
+  FLIGHT_STOPS,
   flightFrame,
+  flightPosition,
+  flightStopTarget,
   flightFrameUrl,
   flightLoadOrder,
   flightSeconds,
@@ -48,9 +51,44 @@ describe('flightFrame', () => {
   });
 });
 
+describe('flightPosition', () => {
+  it('даёт дробную позицию между кадрами, согласованную с flightFrame', () => {
+    const { count } = FLIGHT_SETS.desktop;
+    expect(flightPosition(0, count)).toBe(0);
+    expect(flightPosition(1, count)).toBe(count - 1);
+    const position = flightPosition(0.65, count);
+    expect(Number.isInteger(position)).toBe(false);
+    expect(flightFrame(0.65, count)).toBe(Math.round(position));
+  });
+});
+
+describe('flightStopTarget', () => {
+  it('доезжает до следующей остановки по ходу прокрутки', () => {
+    expect(flightStopTarget(0.05, 1)).toBe(0.225);
+    expect(flightStopTarget(0.3, 1)).toBe(0.39);
+    expect(flightStopTarget(0.3, -1)).toBe(0.225);
+    expect(flightStopTarget(0.9, 1)).toBe(1);
+    expect(flightStopTarget(0.1, -1)).toBe(0);
+  });
+
+  it('не двигает прогресс, который уже на остановке, и без направления берёт ближайшую', () => {
+    for (const stop of FLIGHT_STOPS) expect(flightStopTarget(stop + 0.001, 1)).toBe(stop);
+    expect(flightStopTarget(0.3, 0)).toBe(0.225);
+    expect(flightStopTarget(0.33, 0)).toBe(0.39);
+  });
+
+  it('остановки идут по возрастанию от 0 до 1', () => {
+    expect(FLIGHT_STOPS[0]).toBe(0);
+    expect(FLIGHT_STOPS[FLIGHT_STOPS.length - 1]).toBe(1);
+    for (let i = 1; i < FLIGHT_STOPS.length; i++) {
+      expect(FLIGHT_STOPS[i]!).toBeGreaterThan(FLIGHT_STOPS[i - 1]!);
+    }
+  });
+});
+
 describe('flightFrameUrl', () => {
   it('дополняет номер до трёх цифр', () => {
-    expect(flightFrameUrl(FLIGHT_SETS.mobile, 7)).toBe('/landing/flight-v1/mobile/007.webp');
+    expect(flightFrameUrl(FLIGHT_SETS.mobile, 7)).toBe('/landing/flight-v2/mobile/007.avif');
   });
 });
 
