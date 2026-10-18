@@ -9,7 +9,7 @@ import { SubmitButton } from './submit-button';
 export function LoginForm({ next }: { next?: string }) {
   const [state, action] = useActionState<AuthFormState, FormData>(loginAction, {});
   return (
-    <form action={action} className="space-y-5">
+    <form action={action} className="space-y-4">
       <FormError message={state.error} />
       {next ? <input type="hidden" name="next" value={next} /> : null}
       <Field

@@ -18,14 +18,14 @@ export default async function LoginPage({
 
   return (
     <>
-      <h1 className="text-3xl font-semibold tracking-tight">Вход</h1>
-      <p className="mt-2 text-ink-soft">
+      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Вход</h1>
+      <p className="mt-1.5 text-ink-soft">
         Нет аккаунта?{' '}
         <Link href="/register" className="font-semibold text-accent hover:underline">
           Зарегистрируйтесь
         </Link>
       </p>
-      <div className="mt-8">
+      <div className="mt-6">
         <LoginForm next={target} />
       </div>
     </>
