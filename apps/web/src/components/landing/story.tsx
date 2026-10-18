@@ -5,6 +5,7 @@ import { useRef } from 'react';
 import { FLIGHT_BASE } from '@/lib/flight';
 import { FlightCanvas } from './flight-canvas';
 import { StatusPill } from './status-pill';
+import { useFlightSnap } from './use-flight-snap';
 import { usePrefersReducedMotion } from './use-prefers-reduced-motion';
 import { useViewer } from './viewer';
 
@@ -311,6 +312,8 @@ function ScrollyStory() {
   const track = useRef<HTMLElement>(null);
   const { scrollYProgress } = useScroll({ target: track, offset: ['start start', 'end end'] });
   const progress = useSpring(scrollYProgress, { stiffness: 140, damping: 30, mass: 0.4 });
+  // Без остановок на полпути: после прокрутки страница сама доезжает до шага.
+  useFlightSnap(track);
 
   const heroOpacity = useTransform(progress, [0, 0.06, 0.1], [1, 1, 0]);
   const heroY = useTransform(progress, [0, 0.1], [0, -48]);

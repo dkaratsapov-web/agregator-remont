@@ -13,7 +13,8 @@ import sys
 
 from PIL import Image
 
-SETS = {'desktop': 180, 'mobile': 120}
+SETS = {'desktop': 211, 'mobile': 211}
+QUALITY = {'desktop': 62, 'mobile': 60}
 W, H = 1928, 1072
 MOBILE_WIDTH = 602
 MOBILE_X = 0.55  # вертикальная обрезка чуть правее центра: окно и диван в кадре
@@ -40,13 +41,19 @@ def cut(src: str, out: str) -> None:
     while len(buf := proc.stdout.read(W * H * 3)) == W * H * 3:
         frame = Image.frombytes('RGB', (W, H), buf)
         if n in want['desktop']:
-            frame.resize((1280, 712), Image.LANCZOS).save(
-                f"{out}/desktop/{want['desktop'][n]:03d}.webp", 'WEBP', quality=62, method=6
+            frame.save(
+                f"{out}/desktop/{want['desktop'][n]:03d}.avif",
+                'AVIF',
+                quality=QUALITY['desktop'],
+                speed=4,
             )
         if n in want['mobile']:
             x = round((W - MOBILE_WIDTH) * MOBILE_X)
             frame.crop((x, 0, x + MOBILE_WIDTH, H)).save(
-                f"{out}/mobile/{want['mobile'][n]:03d}.webp", 'WEBP', quality=60, method=6
+                f"{out}/mobile/{want['mobile'][n]:03d}.avif",
+                'AVIF',
+                quality=QUALITY['mobile'],
+                speed=4,
             )
         n += 1
     proc.wait()
@@ -54,7 +61,7 @@ def cut(src: str, out: str) -> None:
 
 def final(src: str, out: str) -> None:
     Image.open(src).convert('RGB').resize((1920, 1072), Image.LANCZOS).save(
-        f'{out}/final.webp', 'WEBP', quality=70, method=6
+        f'{out}/final.webp', 'WEBP', quality=80, method=6
     )
 
 

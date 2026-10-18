@@ -41,7 +41,8 @@ docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.local.yml u
    В `deploy/.env`:
    - `POSTGRES_PASSWORD` — `openssl rand -hex 24`;
    - `DOMAIN=ваш-домен`, `PUBLIC_ORIGIN=https://ваш-домен`, `WEB_TRUST_PROXY_HOPS=1`;
-   - `BASIC_AUTH_USER` и `BASIC_AUTH_HASH` (хеш пароля для входа на сайт):
+   - `BASIC_AUTH_USER` и `BASIC_AUTH_HASH` — логин и хеш пароля тестировщиков (их вводят на
+     странице `/gate` «Вход для тестировщиков»):
      ```bash
      docker run --rm caddy:2-alpine caddy hash-password --plaintext 'пароль-для-тестеров'
      ```
@@ -193,14 +194,16 @@ docker compose -f deploy/docker-compose.yml exec -T db sh -c 'dropdb -U "$POSTGR
   посетителя.
 - `PUBLIC_ORIGIN` попадает в `WEB_PUBLIC_ORIGIN`: формы принимаются только с этого адреса.
 - Без пароля открыта только главная (статичный лендинг) и её статические файлы. Всё приложение
-  (каталог, вход, кабинет) закрыто паролем (basic auth), пока не выполнены условия публичного
-  запуска из `docs/SECURITY.md` (раздел 8: что именно открыто и почему). Для полного открытия
-  убрать matcher `@private` и блок `basic_auth` в `deploy/Caddyfile`.
+  (каталог, вход, кабинет) доступно только тестировщикам: без пропуска браузер уводит на
+  страницу `/gate` в стиле сайта, пока не выполнены условия публичного запуска из
+  `docs/SECURITY.md` (раздел 8: что именно открыто и почему). Для полного открытия убрать
+  matcher `@private` и блок `forward_auth` в `deploy/Caddyfile`. После смены пароля
+  тестировщиков все выданные пропуска перестают действовать.
 - Стек проверяется в CI двумя job: `Docker stack (compose)` (сборка образов, smoke и
   интеграционные тесты по контейнерам, попытка подмены IP из внутренней сети) и
   `Docker stack behind Caddy (proxy)` (Caddy на `https://localhost` со своим сертификатом:
-  приложение без пароля 401, с паролем 200, главная и её статика без пароля 200, попытки обхода
+  приложение без пропуска 401 или переход на `/gate`, с пропуском 200, главная и её статика без пароля 200, попытки обхода
   через `..` не открывают приложение, HSTS, редирект с http, порты 3000 и 4000 на хосте закрыты).
-  Поведение главной в браузере (service worker, диалог пароля, офлайн-страница) проверяет
+  Поведение главной в браузере (service worker, вход тестировщика, офлайн-страница) проверяет
   `scripts/landing-e2e.mjs` в job `Lint, typecheck, test, build` за этим же Caddyfile.
   Получение настоящего сертификата Let's Encrypt проверяется только при запуске на домене.

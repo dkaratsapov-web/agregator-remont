@@ -11,29 +11,45 @@
 	}
 
 	# Закрытое тестирование: без пароля открыта только главная (лендинг без данных приложения;
-	# вошедшему пользователю она показывает только его имя) и её статические файлы. Всё приложение (каталог, вход,
-	# кабинет, /_next/image и прочее) за паролем, пока не выполнены условия публичного запуска
-	# (docs/SECURITY.md, раздел 8). Для полного открытия убрать matcher и блок basic_auth.
+	# вошедшему пользователю она показывает только его имя и мини-фото) и её статические файлы.
+	# Всё приложение (каталог, вход, кабинет, /_next/image и прочее) только для тестировщиков, пока
+	# не выполнены условия публичного запуска (docs/SECURITY.md, раздел 8). Для полного открытия
+	# убрать matcher и блок forward_auth.
 	# /_next/static/* — неизменяемые сборочные файлы (JS, CSS, шрифты) всего приложения: в них
 	# код интерфейса, но нет данных и секретов (серверный код туда не попадает).
 	# /landing/* — кадры пролёта по комнате на главной (apps/web/public/landing, только картинки).
+	# /gate — страница входа для тестировщиков (вместо системного окна пароля браузера).
 	# Без пароля разрешено только чтение (GET, HEAD): Next.js принимает Server Actions
 	# POST-запросом на любой адрес, в том числе на «/», поэтому POST на открытые адреса тоже
-	# идёт через пароль, иначе вход, регистрация и действия кабинета обходили бы его.
-	# Единственный открытый POST — заявка на тестирование с главной (POST /lead, Route Handler,
-	# не Server Action; проверки и лимиты в API).
+	# идёт через проверку, иначе вход, регистрация и действия кабинета обходили бы её.
+	# Открытые POST — Route Handlers, не Server Actions: заявка на тестирование с главной
+	# (POST /lead; проверки и лимиты в API) и форма входа тестировщика (POST /gate/login;
+	# проверка пароля, лимит попыток и выдача пропуска — apps/web/src/lib/gate.ts).
 	@private {
 		not {
 			method GET HEAD
-			path / /offline /privacy /sw.js /robots.txt /manifest.webmanifest /icon.svg /apple-icon.png /icons/* /landing/* /_next/static/*
+			path / /offline /privacy /gate /sw.js /robots.txt /manifest.webmanifest /icon.svg /apple-icon.png /icons/* /landing/* /_next/static/*
 		}
 		not {
 			method POST
-			path /lead
+			path /lead /gate/login
 		}
 	}
-	basic_auth @private {
-		{$BASIC_AUTH_USER} {$BASIC_AUTH_HASH}
+	# Перед каждым запросом в закрытую часть Caddy спрашивает web, есть ли у посетителя пропуск
+	# тестировщика (cookie, подпись проверяет web). 2xx — запрос идёт дальше; иначе посетитель
+	# получает ответ проверки: переход на /gate для страниц или пустой 401 для остального.
+	# Логин и пароль — BASIC_AUTH_USER и BASIC_AUTH_HASH из deploy/.env (их читает web).
+	# Служебные заголовки Next.js в проверку не пересылаются: с заголовком RSC Next.js сам
+	# отвечает 307 на ?_rsc ещё до обработчика. Без них фоновые запросы (RSC, prefetch, fetch)
+	# и так не считаются открытием страницы и получают 401.
+	forward_auth @private web:3000 {
+		uri /gate/check
+		header_up -RSC
+		header_up -Next-Router-Prefetch
+		header_up -Next-Router-State-Tree
+		header_up -Next-Router-Segment-Prefetch
+		header_up -Next-Url
+		header_up -Next-Action
 	}
 
 	header {
