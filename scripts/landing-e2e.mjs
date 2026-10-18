@@ -92,7 +92,14 @@ try {
       await signedIn.addCookies(
         user.cookie.split('; ').map((pair) => {
           const [name, value] = pair.split('=');
-          return { name, value, url: BASE, secure: name.startsWith('__Host-') };
+          // Как в drafts-e2e: domain + path (вариант url + secure Chromium отклоняет на http).
+          return {
+            name,
+            value,
+            domain: new URL(BASE).hostname,
+            path: '/',
+            secure: name.startsWith('__Host-'),
+          };
         }),
       );
       const page2 = await signedIn.newPage();
