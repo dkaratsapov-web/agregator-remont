@@ -148,199 +148,211 @@ export function JobForm({ action, initial = {}, submitLabel, pendingLabel }: Pro
   const topError = issues.length > 0 ? 'Проверьте поля, отмеченные ниже.' : state.error;
 
   return (
-    <form action={formAction} onSubmit={onSubmit} noValidate className="space-y-6">
+    // Ширина считается по контейнеру формы: на странице нового заказа она широкая (две колонки,
+    // справа бюджет и кнопка), в правке на странице заказа узкая (одна колонка).
+    <form action={formAction} onSubmit={onSubmit} noValidate className="@container">
       <FormError message={topError} />
 
-      <FormSection step={1} title="Основное">
-        <Field
-          label="Что нужно сделать"
-          name="title"
-          required
-          minLength={JOB_LIMITS.TITLE_MIN}
-          maxLength={JOB_LIMITS.TITLE_MAX}
-          autoComplete="off"
-          defaultValue={values.title}
-          error={issueOf('title')}
-          onInput={() => clearIssues('title')}
-          hint="Коротко, например: «Укладка плитки в ванной»"
-        />
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <p id="field-category-label" className="block text-sm font-medium text-ink">
-              Категория
-            </p>
-            <div className="mt-1.5">
-              <Select
-                id="field-category"
-                name="category"
-                options={CATEGORY_OPTIONS}
-                value={category}
-                onChange={chooseCategory}
-                placeholder="Выберите категорию"
-                aria-labelledby="field-category-label"
-                aria-describedby={issueOf('category') ? 'field-category-error' : undefined}
-                invalid={Boolean(issueOf('category'))}
-                required
-              />
-            </div>
-            {issueOf('category') ? (
-              <p id="field-category-error" className="mt-1.5 text-sm font-medium text-accent">
-                {issueOf('category')}
-              </p>
-            ) : null}
-          </div>
-          <div>
-            <label htmlFor="field-city" className="block text-sm font-medium text-ink">
-              Город
-            </label>
-            <div className="mt-1.5">
-              <CityCombobox
-                id="field-city"
-                name="city"
-                options={CITY_OPTIONS}
-                groups={CITY_GROUPS}
-                value={city}
-                onChange={(next) => {
-                  setCity(next);
-                  if (next) clearIssues('city');
-                }}
-                placeholder="Начните вводить"
-                strict
-                emptyMessage={SERVICE_AREA_ERROR}
-                aria-describedby={issueOf('city') ? 'field-city-error' : 'field-city-hint'}
-                invalid={Boolean(issueOf('city'))}
-                maxLength={JOB_LIMITS.CITY_MAX}
-                required
-              />
-            </div>
-            {issueOf('city') ? (
-              <p id="field-city-error" className="mt-1.5 text-sm font-medium text-accent">
-                {issueOf('city')}
-              </p>
-            ) : (
-              <p id="field-city-hint" className="mt-1.5 text-sm text-ink-soft">
-                Москва и область, Санкт-Петербург и область
-              </p>
-            )}
-          </div>
-        </div>
-      </FormSection>
-
-      <FormSection
-        step={2}
-        title="Подробности"
-        description={
-          category
-            ? `Вопросы для категории «${JOB_CATEGORY_LABELS[category]}». Чем больше ответов, тем точнее подрядчики оценят работу.`
-            : undefined
-        }
-        id="job-questions"
-      >
-        <input type="hidden" name="details" value={detailsJson} />
-        {category ? (
-          <>
-            {generalDetailsError ? <FormError message={generalDetailsError} /> : null}
-            <JobQuestionnaire
-              key={category}
-              category={category}
-              answers={answers}
-              onChange={changeAnswers}
-              errors={questionErrors}
-            />
-          </>
-        ) : (
-          <div className="flex items-start gap-4 rounded-2xl border border-dashed border-line bg-canvas/60 px-5 py-6">
-            <span
-              aria-hidden="true"
-              className="grid size-10 shrink-0 place-items-center rounded-full bg-accent-tint text-accent"
-            >
-              <svg viewBox="0 0 20 20" className="size-5">
-                <path
-                  d="M4 5.5h12M4 10h8M4 14.5h5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.75"
-                  strokeLinecap="round"
+      <div className="grid items-start gap-5 @5xl:grid-cols-[minmax(0,1fr)_380px] @5xl:gap-6">
+        <div className="min-w-0 space-y-5 @container">
+          <FormSection step={1} title="Основное">
+            {/* Узко: всё в столбик; средне: название на всю ширину, категория и город рядом;
+                широко: всё в одну строку. */}
+            <div className="grid gap-4 @lg:grid-cols-2 @4xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)]">
+              <div className="@lg:col-span-2 @4xl:col-span-1">
+                <Field
+                  label="Что нужно сделать"
+                  name="title"
+                  required
+                  minLength={JOB_LIMITS.TITLE_MIN}
+                  maxLength={JOB_LIMITS.TITLE_MAX}
+                  autoComplete="off"
+                  defaultValue={values.title}
+                  error={issueOf('title')}
+                  onInput={() => clearIssues('title')}
+                  hint="Коротко, например: «Укладка плитки в ванной»"
                 />
-              </svg>
-            </span>
-            <p className="text-sm leading-relaxed text-ink-soft">
-              Выберите категорию, и мы зададим несколько вопросов именно по вашей задаче: площадь,
-              состояние объекта, материалы и сроки. Ответы появятся в карточке заказа.
-            </p>
-          </div>
-        )}
-      </FormSection>
+              </div>
+              <div>
+                <p id="field-category-label" className="block text-sm font-medium text-ink">
+                  Категория
+                </p>
+                <div className="mt-1.5">
+                  <Select
+                    id="field-category"
+                    name="category"
+                    options={CATEGORY_OPTIONS}
+                    value={category}
+                    onChange={chooseCategory}
+                    placeholder="Выберите категорию"
+                    aria-labelledby="field-category-label"
+                    aria-describedby={issueOf('category') ? 'field-category-error' : undefined}
+                    invalid={Boolean(issueOf('category'))}
+                    required
+                  />
+                </div>
+                {issueOf('category') ? (
+                  <p id="field-category-error" className="mt-1.5 text-sm font-medium text-accent">
+                    {issueOf('category')}
+                  </p>
+                ) : null}
+              </div>
+              <div>
+                <label htmlFor="field-city" className="block text-sm font-medium text-ink">
+                  Город
+                </label>
+                <div className="mt-1.5">
+                  <CityCombobox
+                    id="field-city"
+                    name="city"
+                    options={CITY_OPTIONS}
+                    groups={CITY_GROUPS}
+                    value={city}
+                    onChange={(next) => {
+                      setCity(next);
+                      if (next) clearIssues('city');
+                    }}
+                    placeholder="Начните вводить"
+                    strict
+                    emptyMessage={SERVICE_AREA_ERROR}
+                    aria-describedby={issueOf('city') ? 'field-city-error' : 'field-city-hint'}
+                    invalid={Boolean(issueOf('city'))}
+                    maxLength={JOB_LIMITS.CITY_MAX}
+                    required
+                  />
+                </div>
+                {issueOf('city') ? (
+                  <p id="field-city-error" className="mt-1.5 text-sm font-medium text-accent">
+                    {issueOf('city')}
+                  </p>
+                ) : (
+                  <p id="field-city-hint" className="mt-1.5 text-sm text-ink-soft">
+                    Москва и область, Санкт-Петербург и область
+                  </p>
+                )}
+              </div>
+            </div>
+          </FormSection>
 
-      <FormSection step={3} title="Бюджет и описание">
-        <fieldset>
-          <legend className="text-sm font-medium text-ink">Бюджет, ₽</legend>
-          <div className="mt-1.5 grid gap-3 sm:grid-cols-2">
-            <Field
-              label="От"
-              name="budgetMin"
-              inputMode="numeric"
-              autoComplete="off"
-              maxLength={13}
-              defaultValue={values.budgetMin}
-              onInput={() => clearIssues('budget')}
-              aria-invalid={issueOf('budget') ? true : undefined}
-            />
-            <Field
-              label="До"
-              name="budgetMax"
-              inputMode="numeric"
-              autoComplete="off"
-              maxLength={13}
-              defaultValue={values.budgetMax}
-              onInput={() => clearIssues('budget')}
-              aria-invalid={issueOf('budget') ? true : undefined}
-            />
-          </div>
-          {issueOf('budget') ? (
-            <p className="mt-1.5 text-sm font-medium text-accent">{issueOf('budget')}</p>
-          ) : (
-            <p className="mt-1.5 text-sm text-ink-soft">
-              Оставьте пустым, если бюджет по договорённости.
-            </p>
-          )}
-        </fieldset>
-        <div>
-          <label htmlFor="field-description" className="block text-sm font-medium text-ink">
-            Описание работ
-          </label>
-          <textarea
-            id="field-description"
-            name="description"
-            required
-            minLength={JOB_LIMITS.DESCRIPTION_MIN}
-            maxLength={JOB_LIMITS.DESCRIPTION_MAX}
-            rows={6}
-            aria-describedby={
-              issueOf('description')
-                ? 'field-description-error field-description-hint'
-                : 'field-description-hint'
+          <FormSection
+            step={2}
+            title="Подробности"
+            description={
+              category
+                ? `Вопросы для категории «${JOB_CATEGORY_LABELS[category]}». Чем больше ответов, тем точнее подрядчики оценят работу.`
+                : undefined
             }
-            aria-invalid={issueOf('description') ? true : undefined}
-            defaultValue={values.description}
-            onInput={() => clearIssues('description')}
-            className={`mt-1.5 block w-full rounded-xl border bg-surface px-4 py-3 text-base leading-relaxed text-ink focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-0 ${
-              issueOf('description') ? 'border-accent' : 'border-line'
-            }`}
-          />
-          {issueOf('description') ? (
-            <p id="field-description-error" className="mt-1.5 text-sm font-medium text-accent">
-              {issueOf('description')}
-            </p>
-          ) : null}
-          <p id="field-description-hint" className="mt-1.5 text-sm text-ink-soft">
-            Всё, что не вошло в ответы выше: особенности объекта, пожелания, удобное время. Не
-            указывайте телефон и адрес: контакты появятся в следующих обновлениях.
-          </p>
+            id="job-questions"
+          >
+            <input type="hidden" name="details" value={detailsJson} />
+            {category ? (
+              <>
+                {generalDetailsError ? <FormError message={generalDetailsError} /> : null}
+                <JobQuestionnaire
+                  key={category}
+                  category={category}
+                  answers={answers}
+                  onChange={changeAnswers}
+                  errors={questionErrors}
+                />
+              </>
+            ) : (
+              <div className="flex items-start gap-4 rounded-2xl border border-dashed border-line bg-canvas/60 px-5 py-6">
+                <span
+                  aria-hidden="true"
+                  className="grid size-10 shrink-0 place-items-center rounded-full bg-accent-tint text-accent"
+                >
+                  <svg viewBox="0 0 20 20" className="size-5">
+                    <path
+                      d="M4 5.5h12M4 10h8M4 14.5h5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.75"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </span>
+                <p className="text-sm leading-relaxed text-ink-soft">
+                  Выберите категорию, и мы зададим несколько вопросов именно по вашей задаче:
+                  площадь, состояние объекта, материалы и сроки. Ответы появятся в карточке заказа.
+                </p>
+              </div>
+            )}
+          </FormSection>
         </div>
-      </FormSection>
 
-      <SubmitButton pending={pendingLabel}>{submitLabel}</SubmitButton>
+        <div className="min-w-0 space-y-4 @5xl:sticky @5xl:top-24">
+          <FormSection step={3} title="Бюджет и описание">
+            <fieldset>
+              <legend className="text-sm font-medium text-ink">Бюджет, ₽</legend>
+              <div className="mt-1.5 grid gap-3 sm:grid-cols-2">
+                <Field
+                  label="От"
+                  name="budgetMin"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={13}
+                  defaultValue={values.budgetMin}
+                  onInput={() => clearIssues('budget')}
+                  aria-invalid={issueOf('budget') ? true : undefined}
+                />
+                <Field
+                  label="До"
+                  name="budgetMax"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={13}
+                  defaultValue={values.budgetMax}
+                  onInput={() => clearIssues('budget')}
+                  aria-invalid={issueOf('budget') ? true : undefined}
+                />
+              </div>
+              {issueOf('budget') ? (
+                <p className="mt-1.5 text-sm font-medium text-accent">{issueOf('budget')}</p>
+              ) : (
+                <p className="mt-1.5 text-sm text-ink-soft">
+                  Оставьте пустым, если бюджет по договорённости.
+                </p>
+              )}
+            </fieldset>
+            <div>
+              <label htmlFor="field-description" className="block text-sm font-medium text-ink">
+                Описание работ
+              </label>
+              <textarea
+                id="field-description"
+                name="description"
+                required
+                minLength={JOB_LIMITS.DESCRIPTION_MIN}
+                maxLength={JOB_LIMITS.DESCRIPTION_MAX}
+                rows={5}
+                aria-describedby={
+                  issueOf('description')
+                    ? 'field-description-error field-description-hint'
+                    : 'field-description-hint'
+                }
+                aria-invalid={issueOf('description') ? true : undefined}
+                defaultValue={values.description}
+                onInput={() => clearIssues('description')}
+                className={`mt-1.5 block w-full rounded-xl border bg-surface px-4 py-3 text-base leading-relaxed text-ink focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-0 ${
+                  issueOf('description') ? 'border-accent' : 'border-line'
+                }`}
+              />
+              {issueOf('description') ? (
+                <p id="field-description-error" className="mt-1.5 text-sm font-medium text-accent">
+                  {issueOf('description')}
+                </p>
+              ) : null}
+              <p id="field-description-hint" className="mt-1.5 text-sm text-ink-soft">
+                Всё, что не вошло в ответы выше: особенности объекта, пожелания, удобное время. Не
+                указывайте телефон и адрес: контакты появятся в следующих обновлениях.
+              </p>
+            </div>
+          </FormSection>
+
+          <SubmitButton pending={pendingLabel}>{submitLabel}</SubmitButton>
+        </div>
+      </div>
     </form>
   );
 }
@@ -364,7 +376,7 @@ function FormSection({
       id={id}
       tabIndex={id ? -1 : undefined}
       aria-labelledby={headingId}
-      className="scroll-mt-24 rounded-[22px] border border-line/80 bg-surface p-5 shadow-[0_1px_1px_hsl(var(--shadow-color)/0.04)] outline-none sm:p-7"
+      className="scroll-mt-24 rounded-[22px] border border-line/80 bg-surface p-5 shadow-[0_1px_1px_hsl(var(--shadow-color)/0.04)] outline-none sm:p-6"
     >
       <div className="flex items-start gap-3">
         <span
@@ -380,7 +392,7 @@ function FormSection({
           {description ? <p className="mt-1 text-sm text-ink-soft">{description}</p> : null}
         </div>
       </div>
-      <div className="mt-5 space-y-5">{children}</div>
+      <div className="mt-4 space-y-4">{children}</div>
     </section>
   );
 }

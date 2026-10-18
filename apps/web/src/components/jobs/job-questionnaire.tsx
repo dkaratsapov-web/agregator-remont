@@ -45,7 +45,12 @@ export function JobQuestionnaire({ category, answers, onChange, errors = {} }: P
 
   const renderQuestions = (questions: readonly JobQuestion[], depth: number) =>
     questions.map((question) => (
-      <Reveal key={question.id} open={visible.has(question.id)}>
+      <Reveal
+        key={question.id}
+        open={visible.has(question.id)}
+        // Скрытый вопрос верхнего уровня не занимает ячейку в двух колонках.
+        className={depth === 0 && !visible.has(question.id) ? '@3xl:hidden' : ''}
+      >
         <QuestionBlock
           question={question}
           depth={depth}
@@ -60,7 +65,7 @@ export function JobQuestionnaire({ category, answers, onChange, errors = {} }: P
 
   return (
     <div>
-      <div className="sticky top-16 z-20 -mx-5 border-b border-line/70 bg-surface/95 px-5 py-3 backdrop-blur-md sm:-mx-7 sm:px-7">
+      <div className="sticky top-16 z-20 -mx-5 border-b border-line/70 bg-surface/95 px-5 py-3 backdrop-blur-md sm:-mx-6 sm:px-6">
         <div className="flex items-center justify-between gap-4 text-sm">
           <p className="font-medium text-ink" aria-live="polite">
             Заполнено{' '}
@@ -85,16 +90,19 @@ export function JobQuestionnaire({ category, answers, onChange, errors = {} }: P
         </div>
       </div>
 
-      <div className="mt-2">
+      <div className="mt-2 @container">
         {questionnaire.sections.map((section) => (
-          <section key={section.id} aria-labelledby={`qs-${section.id}`} className="pt-6">
+          <section key={section.id} aria-labelledby={`qs-${section.id}`} className="pt-5">
             <h3
               id={`qs-${section.id}`}
               className="text-xs font-semibold uppercase tracking-[0.08em] text-ink-soft"
             >
               {section.title}
             </h3>
-            <div className="mt-1">{renderQuestions(section.questions, 0)}</div>
+            {/* На широкой форме вопросы раздела в две колонки; ветки раскрываются под своим вопросом. */}
+            <div className="mt-1 grid items-start @3xl:grid-cols-2 @3xl:gap-x-10">
+              {renderQuestions(section.questions, 0)}
+            </div>
           </section>
         ))}
       </div>
@@ -103,7 +111,15 @@ export function JobQuestionnaire({ category, answers, onChange, errors = {} }: P
 }
 
 /** Плавное раскрытие ветки (высота и прозрачность); без анимации при prefers-reduced-motion. */
-function Reveal({ open, children }: { open: boolean; children: React.ReactNode }) {
+function Reveal({
+  open,
+  className = '',
+  children,
+}: {
+  open: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
   // После раскрытия снимаем overflow-hidden, чтобы выпадающие списки внутри не обрезались.
   const [settled, setSettled] = useState(open);
   useEffect(() => {
@@ -117,9 +133,9 @@ function Reveal({ open, children }: { open: boolean; children: React.ReactNode }
 
   return (
     <div
-      className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[var(--ease-out)] motion-reduce:transition-none ${
+      className={`grid min-w-0 transition-[grid-template-rows,opacity] duration-300 ease-[var(--ease-out)] motion-reduce:transition-none ${
         open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-      }`}
+      } ${className}`}
       inert={!open}
       aria-hidden={!open || undefined}
     >
@@ -145,7 +161,7 @@ function QuestionBlock({ question, depth, value, error, onChange, children }: Bl
   const nested = depth > 0;
 
   return (
-    <div className="pt-5">
+    <div className="pt-4">
       <div
         id={`q-${question.id}`}
         tabIndex={-1}
