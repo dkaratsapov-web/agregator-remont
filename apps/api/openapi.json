@@ -201,6 +201,47 @@
             "description": "Черновик, из которого опубликован заказ: удаляется в той же транзакции",
             "type": "string"
           },
+          "extraItems": {
+            "description": "Позиции других категорий (до 4); категории не повторяются и не совпадают с основной. Без поля: []",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "category": {
+                  "$ref": "#/components/schemas/JobCategory"
+                },
+                "details": {
+                  "additionalProperties": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      }
+                    ]
+                  },
+                  "description": "Ответы анкеты категории позиции",
+                  "type": "object"
+                }
+              },
+              "required": [
+                "category",
+                "details"
+              ],
+              "type": "object"
+            },
+            "maxItems": 4,
+            "type": "array"
+          },
           "title": {
             "maxLength": 160,
             "minLength": 5,
@@ -414,6 +455,12 @@
             "description": "Ответы анкеты, подходящие категории; {} без категории",
             "type": "object"
           },
+          "extraItems": {
+            "items": {
+              "$ref": "#/components/schemas/JobItemDto"
+            },
+            "type": "array"
+          },
           "id": {
             "type": "string"
           },
@@ -435,6 +482,7 @@
           "budgetMin",
           "budgetMax",
           "details",
+          "extraItems",
           "createdAt",
           "updatedAt"
         ],
@@ -515,6 +563,13 @@
             "description": "Ответы анкеты категории { id вопроса: значение }; {} если анкета не заполнена",
             "type": "object"
           },
+          "extraItems": {
+            "description": "Позиции других категорий (до 4); [] если категория одна",
+            "items": {
+              "$ref": "#/components/schemas/JobItemDto"
+            },
+            "type": "array"
+          },
           "id": {
             "type": "string"
           },
@@ -540,7 +595,48 @@
           "currency",
           "status",
           "details",
+          "extraItems",
           "createdAt"
+        ],
+        "type": "object"
+      },
+      "JobItemDto": {
+        "additionalProperties": false,
+        "properties": {
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/JobCategory"
+              }
+            ]
+          },
+          "details": {
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              ]
+            },
+            "description": "Ответы анкеты категории позиции",
+            "type": "object"
+          }
+        },
+        "required": [
+          "category",
+          "details"
         ],
         "type": "object"
       },
@@ -760,6 +856,13 @@
             "description": "Редактировать можно только открытый заказ",
             "type": "boolean"
           },
+          "extraItems": {
+            "description": "Позиции других категорий (до 4); [] если категория одна",
+            "items": {
+              "$ref": "#/components/schemas/JobItemDto"
+            },
+            "type": "array"
+          },
           "id": {
             "type": "string"
           },
@@ -789,6 +892,7 @@
           "currency",
           "status",
           "details",
+          "extraItems",
           "createdAt",
           "updatedAt",
           "editable"
@@ -993,6 +1097,14 @@
             "description": "Ответы анкеты; проверяются мягко: неверные и не подходящие категории отбрасываются",
             "type": "object"
           },
+          "extraItems": {
+            "description": "Позиции других категорий; проверяются мягко, неверные отбрасываются",
+            "items": {
+              "type": "object"
+            },
+            "maxItems": 4,
+            "type": "array"
+          },
           "title": {
             "maxLength": 160,
             "nullable": true,
@@ -1167,6 +1279,47 @@
             },
             "description": "Ответы анкеты целиком (заменяют прежние); без поля: не менять. При смене категории обязательно",
             "type": "object"
+          },
+          "extraItems": {
+            "description": "Позиции других категорий целиком (заменяют прежние); без поля: не менять",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "category": {
+                  "$ref": "#/components/schemas/JobCategory"
+                },
+                "details": {
+                  "additionalProperties": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      }
+                    ]
+                  },
+                  "description": "Ответы анкеты категории позиции",
+                  "type": "object"
+                }
+              },
+              "required": [
+                "category",
+                "details"
+              ],
+              "type": "object"
+            },
+            "maxItems": 4,
+            "type": "array"
           },
           "title": {
             "maxLength": 160,

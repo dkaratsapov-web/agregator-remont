@@ -1,8 +1,10 @@
 import {
   JOB_LIMITS,
   validateJobDetails,
+  validateJobItems,
   type JobCategory,
   type JobDetails,
+  type JobItem,
   type OwnJobDto,
   type Paginated,
 } from '@agregator/shared';
@@ -20,7 +22,7 @@ import { BidsService } from '../bids/bids.service';
 import { PaginationQuery } from '../jobs/dto/list-jobs.query';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateJobDto, UpdateJobDto } from './dto/job-input.dto';
-import { readJobDetails } from '../jobs/job.mapper';
+import { readJobDetails, readJobItems } from '../jobs/job.mapper';
 import { toOwnJobDto } from './own-job.mapper';
 
 const JOB_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
@@ -69,6 +71,7 @@ export class MyJobsService {
     assertBudgetRange(dto.budgetMin, dto.budgetMax);
     // Анкета обязательна: обязательные вопросы категории должны быть отвечены.
     const details = checkDetails(dto.category, dto.details);
+    const extraItems = checkItems(dto.category, dto.extraItems ?? []);
 
     const job = await this.prisma.$transaction(async (tx) => {
       // Блокировка строки пользователя сериализует создание заказов одним пользователем:
@@ -94,6 +97,7 @@ export class MyJobsService {
           budgetMin: dto.budgetMin,
           budgetMax: dto.budgetMax,
           details,
+          extraItems: extraItems as unknown as Prisma.InputJsonArray,
           ownerId,
         },
       });
@@ -108,6 +112,7 @@ export class MyJobsService {
         changes: {
           ...diffFields(null, created, [...EDITABLE_FIELDS, 'status']),
           ...diffDetails({}, details),
+          ...diffItems([], extraItems),
         },
       });
       return created;
@@ -141,6 +146,18 @@ export class MyJobsService {
       // Правка без details оставляет ответы как есть. У заказов, созданных до анкеты (legacy),
       // ответов нет: владелец видит это на странице заказа и дополняет анкету через форму.
       if (details !== undefined) data.details = details;
+      // Позиции: новые целиком или прежние, проверенные заново против основной категории
+      // (новая основная не должна совпадать с категорией позиции).
+      const itemsBefore = readJobItems(current);
+      let extraItems: JobItem[] | undefined;
+      if (dto.extraItems !== undefined) {
+        extraItems = checkItems(category, dto.extraItems);
+      } else if (category !== current.category) {
+        extraItems = checkItems(category, itemsBefore);
+      }
+      if (extraItems !== undefined) {
+        data.extraItems = extraItems as unknown as Prisma.InputJsonArray;
+      }
       if (Object.keys(data).length === 0) {
         throw new BadRequestException('Нет полей для изменения');
       }
@@ -156,6 +173,7 @@ export class MyJobsService {
       const changes = {
         ...diffFields(current, updated, EDITABLE_FIELDS),
         ...(details !== undefined ? diffDetails(before, details) : {}),
+        ...(extraItems !== undefined ? diffItems(itemsBefore, extraItems) : {}),
       };
       if (Object.keys(changes).length > 0) {
         await writeAudit(tx, {
@@ -219,6 +237,19 @@ function checkDetails(category: JobCategory, input: unknown): JobDetails {
   const result = validateJobDetails(category, input);
   if (!result.ok) throw new BadRequestException(`Анкета заказа: ${result.message}`);
   return result.details;
+}
+
+function checkItems(category: JobCategory, input: unknown): JobItem[] {
+  const result = validateJobItems(category, input);
+  if (!result.ok) throw new BadRequestException(`Позиции заказа: ${result.message}`);
+  return result.items;
+}
+
+/** Позиции в журнале: одно поле extraItems, если они изменились. */
+function diffItems(before: JobItem[], after: JobItem[]): FieldChanges {
+  return JSON.stringify(before) === JSON.stringify(after)
+    ? {}
+    : { extraItems: { from: before, to: after } };
 }
 
 /** Ответы анкеты в журнале: одно поле details, если ответы изменились. */

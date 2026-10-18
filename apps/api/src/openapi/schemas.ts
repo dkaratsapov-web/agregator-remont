@@ -16,6 +16,7 @@ import {
   type JobDetails,
   type JobDraftDto,
   type JobDto,
+  type JobItemDto,
   type JobStatus,
   type LeadDto,
   type MyBidDto,
@@ -44,6 +45,13 @@ const dateTime = (description?: string) =>
 const int = (options: { nullable?: boolean; description?: string } = {}) =>
   ApiProperty({ type: 'integer', ...options });
 
+@ApiSchema({ name: 'JobItemDto' })
+export class JobItemSchema implements JobItemDto {
+  @ApiProperty({ enum: JOB_CATEGORIES, enumName: 'JobCategory' }) category!: JobCategory;
+  @ApiProperty(jobDetailsProperty('Ответы анкеты категории позиции'))
+  details!: JobDetails;
+}
+
 @ApiSchema({ name: 'JobDto' })
 export class JobSchema implements JobDto {
   @ApiProperty() id!: string;
@@ -63,6 +71,11 @@ export class JobSchema implements JobDto {
     ),
   )
   details!: JobDetails;
+  @ApiProperty({
+    type: [JobItemSchema],
+    description: 'Позиции других категорий (до 4); [] если категория одна',
+  })
+  extraItems!: JobItemSchema[];
   @dateTime() createdAt!: string;
 }
 
@@ -84,6 +97,7 @@ export class JobDraftSchema implements JobDraftDto {
   @int({ nullable: true }) budgetMax!: number | null;
   @ApiProperty(jobDetailsProperty('Ответы анкеты, подходящие категории; {} без категории'))
   details!: JobDetails;
+  @ApiProperty({ type: [JobItemSchema] }) extraItems!: JobItemSchema[];
   @dateTime() createdAt!: string;
   @dateTime() updatedAt!: string;
 }

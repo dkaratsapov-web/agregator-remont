@@ -5,4 +5,5 @@ export * from './bids';
 export * from './leads';
 export type { components, operations, paths } from './generated/openapi';
 export * from './job-questions';
+export * from './job-items';
 export * from './service-areas';

@@ -65,30 +65,37 @@ enum UserRole {
 }
 
 model Job {
-  id          String      @id @default(cuid())
-  title       String      @db.VarChar(160)
+  id          String        @id @default(cuid())
+  title       String        @db.VarChar(160)
   description String
   category    JobCategory
-  city        String      @db.VarChar(100)
+  city        String        @db.VarChar(100)
   /// Целые рубли; null — «по договорённости». Ограничения проверяются CHECK в миграции.
-  budgetMin   Int?        @map("budget_min")
-  budgetMax   Int?        @map("budget_max")
-  currency    Currency    @default(RUB)
-  status      JobStatus   @default(OPEN)
+  budgetMin   Int?          @map("budget_min")
+  budgetMax   Int?          @map("budget_max")
+  currency    Currency      @default(RUB)
+  status      JobStatus     @default(OPEN)
   /// Ответы анкеты категории ({ id вопроса: значение }); проверяются validateJobDetails из
   /// @agregator/shared. Объект и размер ограничены CHECK в миграции.
-  details     Json        @default("{}")
+  details     Json          @default("{}")
+  /// Позиции других категорий: [{ category, details }], до 4 (job-items.ts). Проверяются
+  /// validateJobItems; массив и размер ограничены CHECK в миграции.
+  extraItems  Json          @default("[]") @map("extra_items")
+  /// Все категории заказа: основная первой, затем дополнительные. Заполняет триггер базы из
+  /// category и extraItems (писать не нужно); по ней ищет каталог (GIN-индекс).
+  categories  JobCategory[] @default([])
   /// Заказчик-владелец. null у демонстрационных заказов из сида.
-  ownerId     String?     @map("owner_id")
+  ownerId     String?       @map("owner_id")
   /// Restrict: удаление пользователя не должно молча удалять или «осиротить» его заказы.
-  owner       User?       @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  owner       User?         @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   bids        Bid[]
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
 
   @@index([createdAt(sort: Desc), id(sort: Desc)])
   @@index([category, createdAt(sort: Desc)])
   @@index([ownerId, createdAt(sort: Desc)])
+  @@index([categories], type: Gin)
   @@map("jobs")
 }
 
@@ -106,6 +113,8 @@ model JobDraft {
   budgetMax   Int?         @map("budget_max")
   /// Ответы анкеты, проверенные мягко (неверные отброшены). Объект и размер — CHECK в миграции.
   details     Json         @default("{}")
+  /// Позиции других категорий, проверенные мягко.
+  extraItems  Json         @default("[]") @map("extra_items")
   createdAt   DateTime     @default(now()) @map("created_at")
   updatedAt   DateTime     @updatedAt @map("updated_at")
 
