@@ -117,14 +117,14 @@ function HeroCopy() {
 }
 
 /**
- * Главная кнопка: ведёт в приложение (оно за паролем), обычной ссылкой без prefetch.
- * Вошедшему пользователю — сразу в кабинет.
+ * Главная кнопка: ведёт в приложение (оно за паролем), обычной ссылкой без prefetch — пароль
+ * спрашивается только после нажатия. Гостю — к новому заказу (вход по пути), вошедшему — в кабинет.
  */
-export function PrimaryCta({ label = 'Вход для тестировщиков' }: { label?: string }) {
+export function PrimaryCta({ label = 'Разместить заказ' }: { label?: string }) {
   const viewer = useViewer();
   return (
     <a
-      href={viewer ? '/account' : '/login'}
+      href={viewer ? '/account' : '/account/jobs/new'}
       className="group inline-flex min-h-12 items-center gap-3 rounded-full bg-ink py-1.5 pl-5 pr-1.5 text-sm font-semibold text-canvas transition-[background-color,transform] duration-200 hover:bg-[#1c2536] active:scale-[0.97]"
     >
       {viewer ? 'Перейти в кабинет' : label}

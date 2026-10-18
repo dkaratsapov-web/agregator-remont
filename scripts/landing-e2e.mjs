@@ -5,6 +5,7 @@
 /* global window, getComputedStyle -- выполняется в браузере через page.evaluate */
 import { execSync } from 'node:child_process';
 import { chromium } from 'playwright';
+import { API, registerViaApi } from './lib/forms.mjs';
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:8080';
 const USER = process.env.BASIC_USER ?? 'tester';
@@ -69,6 +70,54 @@ try {
     await page.hover('a[href="/login"] >> nth=0');
     await page.waitForTimeout(500);
     check('landing makes no private or failing requests', bad.length === 0, bad.join('; '));
+
+    // 1б. Вошедший пользователь с фото: главная тоже не обращается в закрытую часть. Фото
+    // отдаётся по /account/avatar за паролем, и запрос картинки при загрузке вызвал бы окно
+    // ввода пароля у того, кто не вводил его в этом браузере.
+    {
+      const user = await registerViaApi('CUSTOMER');
+      const png = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+        'base64',
+      );
+      const form = new FormData();
+      form.set('file', new Blob([png], { type: 'image/png' }), 'avatar.png');
+      const upload = await fetch(`${API}/v1/me/avatar`, {
+        method: 'PUT',
+        headers: user.auth,
+        body: form,
+      });
+      check('test user has a profile photo', upload.status === 200, `got ${upload.status}`);
+      const signedIn = await browser.newContext();
+      await signedIn.addCookies(
+        user.cookie.split('; ').map((pair) => {
+          const [name, value] = pair.split('=');
+          return { name, value, url: BASE, secure: name.startsWith('__Host-') };
+        }),
+      );
+      const page2 = await signedIn.newPage();
+      const privateRequests = [];
+      page2.on('request', (req) => {
+        const url = new URL(req.url());
+        if (
+          url.origin === new URL(BASE).origin &&
+          !PUBLIC_PATHS.some((re) => re.test(url.pathname))
+        ) {
+          privateRequests.push(url.pathname);
+        }
+      });
+      await page2.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+      check(
+        'signed-in landing makes no private requests',
+        privateRequests.length === 0,
+        privateRequests.join(', '),
+      );
+      check(
+        'signed-in landing offers the cabinet',
+        await page2.getByRole('link', { name: 'Перейти в кабинет' }).first().isVisible(),
+      );
+      await signedIn.close();
+    }
 
     // 2. Прелоадер не держит экран дольше жёсткого предела.
     const fresh = await context.newPage();
