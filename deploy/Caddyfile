@@ -39,8 +39,17 @@
 	# тестировщика (cookie, подпись проверяет web). 2xx — запрос идёт дальше; иначе посетитель
 	# получает ответ проверки: переход на /gate для страниц или пустой 401 для остального.
 	# Логин и пароль — BASIC_AUTH_USER и BASIC_AUTH_HASH из deploy/.env (их читает web).
+	# Служебные заголовки Next.js в проверку не пересылаются: с заголовком RSC Next.js сам
+	# отвечает 307 на ?_rsc ещё до обработчика. Без них фоновые запросы (RSC, prefetch, fetch)
+	# и так не считаются открытием страницы и получают 401.
 	forward_auth @private web:3000 {
 		uri /gate/check
+		header_up -RSC
+		header_up -Next-Router-Prefetch
+		header_up -Next-Router-State-Tree
+		header_up -Next-Router-Segment-Prefetch
+		header_up -Next-Url
+		header_up -Next-Action
 	}
 
 	header {

@@ -280,7 +280,7 @@ jobs:
           curl -sk -D - -o /dev/null -b gate.jar https://localhost/jobs | grep -i '^strict-transport-security: max-age=31536000'
           # Подделанный или чужой пропуск не принимается.
           test "$(curl -sk -H 'Cookie: __Host-ar_gate=v1.9999999999.forged' -o /dev/null -w '%{http_code}' https://localhost/jobs)" = "401"
-          test "$(curl -sk -H 'Cookie: __Host-ar_gate=' -o /dev/null -w '%{http_code}' https://localhost/jobs)" = "401
+          test "$(curl -sk -H 'Cookie: __Host-ar_gate=' -o /dev/null -w '%{http_code}' https://localhost/jobs)" = "401"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost/jobs)" = "308"
           if curl -s -o /dev/null --max-time 5 http://127.0.0.1:3000/; then echo 'web port 3000 is reachable on the host'; exit 1; fi
           if curl -s -o /dev/null --max-time 5 http://127.0.0.1:4000/health; then echo 'api port 4000 is reachable on the host'; exit 1; fi

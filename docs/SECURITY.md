@@ -258,6 +258,9 @@ worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame
     уходит посетителю: открытие страницы в браузере (Sec-Fetch-Mode: navigate или Accept
     text/html, без RSC) — 303 на `/gate?next=<путь>`, всё остальное — пустой 401 без
     `WWW-Authenticate`. Адрес возврата проходит `safeRedirectPath` (только пути этого сайта).
+    Служебные заголовки Next.js (`RSC`, `Next-Router-*`, `Next-Url`, `Next-Action`) в запрос
+    проверки не пересылаются: с `RSC` Next.js сам отвечает 307 на `?_rsc`, и вместо 401 посетитель
+    получал бы редирект (это ловит проверка RSC-запросов в CI).
   - Форма `/gate` отправляется обычным POST на `/gate/login`: источник формы — этот же сайт
     (Origin и Sec-Fetch-Site против хоста запроса), тело до 2 КБ, логин сравнивается за
     постоянное время, пароль — bcrypt против того же `BASIC_AUTH_HASH`, что был у basic auth.
