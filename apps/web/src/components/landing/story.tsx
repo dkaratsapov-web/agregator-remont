@@ -1,23 +1,17 @@
 'use client';
 
-import {
-  motion,
-  useMotionValue,
-  useScroll,
-  useSpring,
-  useTransform,
-  type MotionStyle,
-  type MotionValue,
-} from 'motion/react';
+import { motion, useScroll, useSpring, useTransform, type MotionValue } from 'motion/react';
 import { useRef } from 'react';
-import { RoomScene } from './room-scene';
+import { FLIGHT_BASE } from '@/lib/flight';
+import { FlightCanvas } from './flight-canvas';
 import { StatusPill } from './status-pill';
 import { usePrefersReducedMotion } from './use-prefers-reduced-motion';
 import { useViewer } from './viewer';
 
 /**
- * Герой + «Как это работает»: блок закреплён на экране, пока идёт прокрутка трека, и комната
- * собирается по шагам. При reduced motion трек не закрепляется: собранная комната и список шагов.
+ * Герой + «Как это работает»: блок закреплён на экране, пока идёт прокрутка трека, а во весь
+ * экран идёт пролёт камеры по комнате от «до ремонта» к готовой гостиной (кадр — по прокрутке,
+ * lib/flight.ts). При reduced motion трек не закрепляется: фото готовой комнаты и список шагов.
  */
 
 type Step = { title: string; text: string };
@@ -41,12 +35,15 @@ const STEPS: Step[] = [
   },
 ];
 
-/** Отрезки прогресса трека: 0 — герой, затем четыре шага. */
+/**
+ * Отрезки прогресса трека: 0 — герой, затем четыре шага. Последний шаг самый длинный: на нём
+ * идёт ремонт. Опорные точки пролёта (FLIGHT_KEYS) согласованы с этими отрезками.
+ */
 const STEP_RANGES: [number, number][] = [
-  [0.16, 0.38],
-  [0.38, 0.58],
-  [0.58, 0.78],
-  [0.78, 1.01],
+  [0.12, 0.3],
+  [0.3, 0.46],
+  [0.46, 0.6],
+  [0.6, 1.01],
 ];
 
 const BIDS = [
@@ -202,12 +199,13 @@ function RailSegment({ index, progress }: { index: number; progress: MotionValue
 
 /** Карточки поверх сцены: заказ, отклики, этапы. Данные в них — пример. */
 function Overlays({ progress }: { progress: MotionValue<number> }) {
-  const task = useTransform(progress, [0.18, 0.26, 0.56, 0.62], [0, 1, 1, 0]);
-  const taskY = useTransform(progress, [0.18, 0.26], [24, 0]);
+  const task = useTransform(progress, [0.14, 0.2, 0.44, 0.48], [0, 1, 1, 0]);
+  const taskY = useTransform(progress, [0.14, 0.2], [24, 0]);
 
-  const stagesOpacity = useTransform(progress, [0.8, 0.86], [0, 1]);
-  const stagesY = useTransform(progress, [0.8, 0.86], [24, 0]);
-  const stageFill = useTransform(progress, [0.84, 0.98], [0.08, 0.86]);
+  const stagesOpacity = useTransform(progress, [0.61, 0.66], [0, 1]);
+  const stagesY = useTransform(progress, [0.61, 0.66], [24, 0]);
+  // Полоса заполняется вместе с пролётом: демонтаж, черновые и чистовая заканчиваются на трети.
+  const stageFill = useTransform(progress, [0.6, 0.71, 0.82, 0.94], [0.04, 0.34, 0.67, 1]);
 
   return (
     <>
@@ -269,15 +267,15 @@ function BidCard({
   progress: MotionValue<number>;
 }) {
   const chosen = index === 1;
-  const inStart = 0.38 + index * 0.035;
+  const inStart = 0.31 + index * 0.025;
   const opacity = useTransform(
     progress,
-    [inStart, inStart + 0.06, 0.6, 0.66, 0.8, 0.84],
+    [inStart, inStart + 0.05, 0.48, 0.53, 0.6, 0.64],
     chosen ? [0, 1, 1, 1, 1, 0] : [0, 1, 1, 0.32, 0.32, 0],
   );
-  const x = useTransform(progress, [inStart, inStart + 0.06], [36, 0]);
-  const scale = useTransform(progress, [0.6, 0.66], [1, chosen ? 1.04 : 0.97]);
-  const ring = useTransform(progress, [0.6, 0.66], [0, 1]);
+  const x = useTransform(progress, [inStart, inStart + 0.05], [36, 0]);
+  const scale = useTransform(progress, [0.48, 0.53], [1, chosen ? 1.04 : 0.97]);
+  const ring = useTransform(progress, [0.48, 0.53], [0, 1]);
   return (
     <motion.div
       className="landing-shadow relative rounded-2xl bg-surface p-3 sm:p-3.5"
@@ -314,40 +312,24 @@ function ScrollyStory() {
   const { scrollYProgress } = useScroll({ target: track, offset: ['start start', 'end end'] });
   const progress = useSpring(scrollYProgress, { stiffness: 140, damping: 30, mass: 0.4 });
 
-  const heroOpacity = useTransform(progress, [0, 0.09, 0.15], [1, 1, 0]);
-  const heroY = useTransform(progress, [0, 0.15], [0, -48]);
+  const heroOpacity = useTransform(progress, [0, 0.06, 0.1], [1, 1, 0]);
+  const heroY = useTransform(progress, [0, 0.1], [0, -48]);
   const heroPointer = useTransform(heroOpacity, (v) => (v < 0.3 ? 'none' : 'auto'));
-  const cueOpacity = useTransform(progress, [0, 0.05], [1, 0]);
-  // Телефон: после первого экрана комната опускается к тексту шага и чуть увеличивается,
-  // чтобы экран был заполнен равномерно (место под текст рассчитано на высокий первый экран).
-  const sceneShift = useTransform(progress, [0.08, 0.16], [0, 1]);
-
-  // Наклон сцены за курсором, только для мыши/трекпада.
-  const tiltXRaw = useMotionValue(0);
-  const tiltYRaw = useMotionValue(0);
-  const tiltX = useSpring(tiltXRaw, { stiffness: 80, damping: 18 });
-  const tiltY = useSpring(tiltYRaw, { stiffness: 80, damping: 18 });
-
-  function onPointerMove(event: React.PointerEvent<HTMLDivElement>) {
-    if (event.pointerType !== 'mouse') return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const nx = (event.clientX - rect.left) / rect.width - 0.5;
-    const ny = (event.clientY - rect.top) / rect.height - 0.5;
-    tiltXRaw.set(nx * 8);
-    tiltYRaw.set(ny * -6);
-  }
-
-  function onPointerLeave() {
-    tiltXRaw.set(0);
-    tiltYRaw.set(0);
-  }
+  const cueOpacity = useTransform(progress, [0, 0.04], [1, 0]);
 
   return (
-    <section ref={track} aria-labelledby="hero-title" className="relative h-[400vh] lg:h-[460vh]">
+    <section ref={track} aria-labelledby="hero-title" className="relative h-[520vh] lg:h-[600vh]">
       {/* Якорь «Как это работает» указывает на первый шаг внутри трека. */}
-      <span id="how-it-works" aria-hidden="true" className="absolute left-0 top-[19%]" />
+      <span id="how-it-works" aria-hidden="true" className="absolute left-0 top-[12%]" />
       <div className="sticky top-0 h-svh overflow-hidden">
-        <div className="mx-auto grid h-full max-w-[1600px] grid-rows-[minmax(0,1fr)_auto] gap-2 px-4 pb-10 pt-16 sm:px-6 lg:grid-cols-12 lg:grid-rows-1 lg:items-center lg:gap-8 lg:px-10 lg:pb-0 lg:pt-16">
+        <FlightCanvas progress={progress} />
+        <div aria-hidden="true" className="flight-scrim pointer-events-none absolute inset-0" />
+        <motion.div
+          aria-hidden="true"
+          className="flight-scrim-hero pointer-events-none absolute inset-0"
+          style={{ opacity: heroOpacity }}
+        />
+        <div className="relative mx-auto grid h-full max-w-[1600px] grid-rows-[minmax(0,1fr)_auto] gap-2 px-4 pb-10 pt-16 sm:px-6 lg:grid-cols-12 lg:grid-rows-1 lg:items-center lg:gap-8 lg:px-10 lg:pb-0 lg:pt-16">
           <div className="relative order-2 grid lg:order-1 lg:col-span-6">
             <motion.div
               className="relative z-10 [grid-area:1/1]"
@@ -363,19 +345,9 @@ function ScrollyStory() {
             </ol>
           </div>
 
-          <motion.div
-            className="relative order-1 min-h-0 max-lg:[transform:translateY(calc(var(--shift)*min(10rem,19svh)))_scale(calc(1+var(--shift)*0.05))] lg:order-2 lg:col-span-6 lg:h-[min(640px,80svh)]"
-            style={{ '--shift': sceneShift } as unknown as MotionStyle}
-            onPointerMove={onPointerMove}
-            onPointerLeave={onPointerLeave}
-          >
-            <div className="absolute left-1/2 top-1/2 h-[460px] w-[520px] -translate-x-1/2 -translate-y-1/2 scale-[0.66] min-[400px]:scale-[0.72] sm:scale-[0.8] lg:scale-105 xl:scale-110">
-              <div className="size-full">
-                <RoomScene progress={progress} tiltX={tiltX} tiltY={tiltY} />
-              </div>
-            </div>
+          <div className="relative order-1 min-h-0 lg:order-2 lg:col-span-6 lg:h-[min(640px,80svh)]">
             <Overlays progress={progress} />
-          </motion.div>
+          </div>
         </div>
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0">
@@ -386,7 +358,7 @@ function ScrollyStory() {
               ))}
             </div>
             <motion.div
-              className="hidden items-center gap-3 text-xs font-medium text-ink-soft lg:flex"
+              className="hidden items-center gap-3 rounded-full bg-surface/80 px-4 py-2 text-xs font-medium text-ink-soft backdrop-blur-md lg:flex"
               style={{ opacity: cueOpacity }}
             >
               Прокрутите
@@ -399,10 +371,8 @@ function ScrollyStory() {
   );
 }
 
-/** Статичная версия для reduced motion: собранная комната и обычный список шагов. */
+/** Статичная версия для reduced motion: фото готовой комнаты и обычный список шагов. */
 function StaticStory() {
-  const done = useMotionValue(1);
-  const zero = useMotionValue(0);
   return (
     <section
       aria-labelledby="hero-title"
@@ -412,12 +382,16 @@ function StaticStory() {
         <div className="lg:col-span-6">
           <HeroCopy />
         </div>
-        <div className="relative h-[340px] lg:col-span-6 lg:h-[520px]">
-          <div className="absolute left-1/2 top-1/2 h-[460px] w-[520px] -translate-x-1/2 -translate-y-1/2 scale-[0.66] sm:scale-[0.8] lg:scale-100">
-            <div className="size-full">
-              <RoomScene progress={done} tiltX={zero} tiltY={zero} />
-            </div>
-          </div>
+        <div className="lg:col-span-6">
+          {/* Статичный файл из public, next/image не нужен. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`${FLIGHT_BASE}/final.webp`}
+            alt="Гостиная после ремонта: терракотовый диван, торшер и растение у окна в вечернем свете"
+            width={1920}
+            height={1072}
+            className="landing-shadow aspect-video w-full rounded-[28px] object-cover"
+          />
         </div>
       </div>
       <h2

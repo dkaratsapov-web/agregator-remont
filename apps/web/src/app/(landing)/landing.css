@@ -51,37 +51,53 @@ html:has(.landing) {
     repeating-linear-gradient(150deg, hsl(var(--shadow-color) / 0.06) 0 1px, transparent 1px 28px);
 }
 
-/* ---------- 3D-сцена ---------- */
+/* ---------- Пролёт по комнате: вуаль под текстом ---------- */
 
-.room-stage {
-  perspective: 1800px;
-  perspective-origin: 50% 35%;
+/* Цвет фона страницы поверх видео у края с текстом (телефон — снизу, компьютер — слева) и под
+   шапкой: заголовок и пункты читаются при любом кадре, в светлой и тёмной теме. */
+.flight-scrim {
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--canvas) 70%, transparent),
+      transparent 9rem
+    ),
+    linear-gradient(
+      to top,
+      color-mix(in srgb, var(--canvas) 94%, transparent) 0,
+      color-mix(in srgb, var(--canvas) 80%, transparent) 22%,
+      transparent 45%
+    );
 }
 
-.preserve-3d {
-  transform-style: preserve-3d;
+/* Телефон, первый экран: текст героя выше и длиннее текста шагов, вуаль поднимается выше. */
+.flight-scrim-hero {
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--canvas) 70%, transparent) 40%,
+    transparent 72%
+  );
 }
 
-.room-floor {
-  background-color: #e9dcc6;
-  background-image:
-    repeating-linear-gradient(90deg, rgb(120 84 46 / 0.13) 0 1px, transparent 1px 38px),
-    repeating-linear-gradient(0deg, rgb(120 84 46 / 0.06) 0 1px, transparent 1px 300px),
-    linear-gradient(135deg, #efe4d1, #e2d2b8);
-}
+@media (min-width: 64rem) {
+  .flight-scrim-hero {
+    display: none;
+  }
 
-.room-blueprint {
-  background-image:
-    linear-gradient(rgb(37 64 110 / 0.18) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(37 64 110 / 0.18) 1px, transparent 1px);
-  background-size: 30px 30px;
-  outline: 1.5px dashed rgb(37 64 110 / 0.45);
-  outline-offset: -1px;
-}
-
-.room-ghost {
-  border: 1.5px dashed rgb(37 64 110 / 0.4);
-  background: rgb(37 64 110 / 0.03);
+  .flight-scrim {
+    background:
+      linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--canvas) 60%, transparent),
+        transparent 8rem
+      ),
+      linear-gradient(
+        to right,
+        color-mix(in srgb, var(--canvas) 92%, transparent) 0,
+        color-mix(in srgb, var(--canvas) 78%, transparent) 30%,
+        transparent 58%
+      );
+  }
 }
 
 /* ---------- Заголовок героя: появление по словам ---------- */
@@ -359,25 +375,29 @@ html.is-ready .preloader {
   animation: preloader-out 350ms var(--ease-out-strong) forwards;
 }
 
-.preloader .draw {
-  fill: none;
+/* «Г» из знака: контур прорисовывается, затем заливается цветом текста. */
+.preloader .preloader-g {
+  fill: var(--ink);
+  fill-opacity: 0;
   stroke: var(--ink);
-  stroke-width: 1.4;
-  stroke-linecap: round;
+  /* В единицах viewBox (444 → 76 px): около 1,6 px на экране. Без vector-effect: иначе
+     stroke-dasharray считается в пикселях и pathLength не работает. */
+  stroke-width: 10;
   stroke-linejoin: round;
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: draw 900ms var(--ease-out-strong) forwards;
-  animation-delay: calc(150ms + var(--i, 0) * 260ms);
+  animation:
+    draw 1000ms var(--ease-out-strong) 150ms forwards,
+    g-fill 450ms ease 950ms forwards;
 }
 
-.preloader .preloader-block {
+/* Щит въезжает снизу справа, вдоль своего наклона, и встаёт под «Г». */
+.preloader .preloader-shield {
   fill: var(--accent);
-  stroke: none;
   opacity: 0;
   transform-box: fill-box;
-  transform-origin: 50% 100%;
-  animation: block-in 500ms var(--ease-out-strong) 1150ms forwards;
+  transform-origin: 0% 100%;
+  animation: shield-in 550ms var(--ease-out-strong) 1250ms forwards;
 }
 
 .preloader-bar {
@@ -404,14 +424,20 @@ html.is-ready .preloader {
   }
 }
 
-@keyframes block-in {
+@keyframes g-fill {
+  to {
+    fill-opacity: 1;
+  }
+}
+
+@keyframes shield-in {
   from {
     opacity: 0;
-    transform: translateY(-6px) scale(0.6);
+    transform: translate(18%, 14%) scale(0.85);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translate(0, 0) scale(1);
   }
 }
 
