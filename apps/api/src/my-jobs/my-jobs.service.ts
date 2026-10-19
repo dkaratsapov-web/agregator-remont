@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   JOB_LIMITS,
   validateJobDetails,
@@ -34,6 +35,28 @@ export const DRAFT_ALREADY_PUBLISHED =
 /** Правка устаревшей формы (заказ изменён в другой вкладке): ответ 409 без изменений. */
 export const JOB_CHANGED_ELSEWHERE =
   'Заказ изменён в другой вкладке или окне. Обновите страницу, чтобы увидеть изменения, и внесите правку ещё раз.';
+
+/** Повтор ключа публикации с другим содержимым (ТЗ #40, п. 6). */
+export const REQUEST_KEY_REUSED =
+  'Этот заказ уже был отправлен с другими данными. Проверьте «Мои заказы»: если заказа там нет, обновите страницу и опубликуйте ещё раз.';
+
+/** Отпечаток содержимого: JSON с упорядоченными ключами, SHA-256. */
+function publishFingerprint(value: unknown): string {
+  const canonical = (v: unknown): unknown =>
+    Array.isArray(v)
+      ? v.map(canonical)
+      : v !== null && typeof v === 'object'
+        ? Object.fromEntries(
+            Object.keys(v as object)
+              .sort()
+              .filter((k) => (v as Record<string, unknown>)[k] !== undefined)
+              .map((k) => [k, canonical((v as Record<string, unknown>)[k])]),
+          )
+        : v;
+  return createHash('sha256')
+    .update(JSON.stringify(canonical(value)))
+    .digest('hex');
+}
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const EDITABLE_FIELDS = [
@@ -81,6 +104,9 @@ export class MyJobsService {
     // Анкета обязательна: обязательные вопросы категории должны быть отвечены.
     const details = checkDetails(dto.category, dto.details);
     const extraItems = checkItems(dto.category, dto.extraItems ?? []);
+    const requestHash = dto.requestId
+      ? publishFingerprint({ ...dto, requestId: undefined, details, extraItems })
+      : null;
 
     const job = await this.prisma.$transaction(async (tx) => {
       // Блокировка строки пользователя сериализует создание заказов одним пользователем:
@@ -89,11 +115,18 @@ export class MyJobsService {
       // Повтор того же запроса (двойной клик, повтор после обрыва связи) с тем же ключом формы:
       // возвращается уже созданный заказ, второй не создаётся. Под блокировкой пользователя
       // параллельные повторы идут по очереди и находят первый (AUDIT_FINDINGS MVP-1).
+      // Тот же ключ с другим содержимым — не повтор, а другая операция: 409, а не молча
+      // прежний заказ (ТЗ #40, п. 6). Ключ действует только в пределах владельца.
       if (dto.requestId) {
         const existing = await tx.job.findUnique({
           where: { ownerId_requestId: { ownerId, requestId: dto.requestId } },
         });
-        if (existing) return existing;
+        if (existing) {
+          if (existing.requestHash !== null && existing.requestHash !== requestHash) {
+            throw new ConflictException(REQUEST_KEY_REUSED);
+          }
+          return existing;
+        }
       }
       const createdToday = await tx.job.count({
         where: { ownerId, createdAt: { gt: new Date(Date.now() - DAY_MS) } },
@@ -127,6 +160,7 @@ export class MyJobsService {
           extraItems: extraItems as unknown as Prisma.InputJsonArray,
           ownerId,
           requestId: dto.requestId ?? null,
+          requestHash,
         },
       });
       await writeAudit(tx, {

@@ -109,6 +109,8 @@ model Job {
   /// Ключ формы публикации (UUID): повтор того же запроса (двойной клик, обрыв связи) вернёт
   /// уже созданный заказ, а не создаст второй. Уникален в пределах владельца.
   requestId    String?          @map("request_id") @db.Uuid
+  /// SHA-256 содержимого публикации с этим ключом: повтор с другим содержимым — 409.
+  requestHash  String?          @map("request_hash") @db.VarChar(64)
 
   @@unique([ownerId, requestId])
   @@index([createdAt(sort: Desc), id(sort: Desc)])

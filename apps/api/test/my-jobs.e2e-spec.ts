@@ -183,6 +183,54 @@ describe('My jobs (e2e)', () => {
     });
   });
 
+  describe('publish key (requestId, ТЗ #37 MVP-1, #40 п. 6)', () => {
+    const key = '6f1c2a0e-8d4b-4c3a-9e7f-1a2b3c4d5e6f';
+
+    it('repeats with the same key and content return the same job', async () => {
+      const customer = await signUp(app, 'CUSTOMER');
+      const first = await create(customer.auth, { ...validJob, requestId: key }).expect(201);
+      const results = await Promise.all(
+        Array.from({ length: 5 }, () => create(customer.auth, { ...validJob, requestId: key })),
+      );
+      expect(results.every((r) => r.status === 201 && r.body.id === first.body.id)).toBe(true);
+      expect(await prisma.job.count({ where: { ownerId: customer.id } })).toBe(1);
+      expect(
+        await prisma.auditLog.count({ where: { actorId: customer.id, action: 'JOB_CREATED' } }),
+      ).toBe(1);
+    });
+
+    it('the same key with different content is refused, not answered with the old job', async () => {
+      const customer = await signUp(app, 'CUSTOMER');
+      await create(customer.auth, { ...validJob, requestId: key }).expect(201);
+      const res = await create(customer.auth, {
+        ...validJob,
+        title: 'Другой заказ с тем же ключом',
+        requestId: key,
+      }).expect(409);
+      expect(res.body.message).toMatch(/другими данными/);
+      const stored = await prisma.job.findMany({ where: { ownerId: customer.id } });
+      expect(stored.map((j) => j.title)).toEqual([validJob.title]);
+    });
+
+    it('a key belongs to its owner only', async () => {
+      const a = await signUp(app, 'CUSTOMER');
+      const b = await signUp(app, 'CUSTOMER');
+      const ja = await create(a.auth, { ...validJob, requestId: key }).expect(201);
+      const jb = await create(b.auth, { ...validJob, requestId: key }).expect(201);
+      expect(jb.body.id).not.toBe(ja.body.id);
+      const owners = await prisma.job.findMany({
+        where: { requestId: key },
+        select: { ownerId: true },
+      });
+      expect(owners.map((o) => o.ownerId).sort()).toEqual([a.id, b.id].sort());
+    });
+
+    it('rejects a key that is not a UUID', async () => {
+      const customer = await signUp(app, 'CUSTOMER');
+      await create(customer.auth, { ...validJob, requestId: 'not-a-uuid' }).expect(400);
+    });
+  });
+
   describe('update and close', () => {
     it('updates own open job and writes an audit entry with the changed fields', async () => {
       const customer = await signUp(app, 'CUSTOMER');
