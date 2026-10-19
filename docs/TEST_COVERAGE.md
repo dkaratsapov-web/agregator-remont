@@ -15,7 +15,7 @@
 | Схема и миграции | CI, шаг «Schema matches migrations» | `prisma migrate diff --exit-code` | CI |
 | HTTP-интеграция (формы без JS) | `scripts/*-integration.mjs`, `scripts/smoke.mjs` | вход, заказы, отклики | CI, production-сборка |
 | Браузер (Playwright) | `scripts/*-e2e.mjs` | 6 сценариев, см. ниже | CI, production-сборка |
-| Автообновление сервера | `scripts/autodeploy-test.sh` | 109 проверок (копии, уведомления, отказы отката) | CI + shellcheck |
+| Автообновление сервера | `scripts/autodeploy-test.sh` | 111 проверок (копии, уведомления, отказы отката) | CI + shellcheck |
 | Учения на настоящем стеке | `scripts/drills.sh` | копия и восстановление, age + rclone, сломанный релиз и откат, отказ отката при DROP COLUMN | CI «Disaster drills» |
 | Секреты в образах | `scripts/image-secrets-check.sh` | самопроверка на подложенных секретах + 2 образа | CI «Docker stack (compose)» |
 | Совместимость схемы | `scripts/schema-compat-test.sh`, `migration-check.sh` | 10 проверок обновления на старых данных + сценарии прежнего и нового API | CI, только PR |

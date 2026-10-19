@@ -135,9 +135,10 @@ jobs_page() { # file total jobs...
   printf '{"total_count":%s,"jobs":[%s]}' "$total" "$*" > "$API_DIR/$file"
 }
 J1='Lint, typecheck, test, build' J2='Docker stack (compose)' J3='Docker stack behind Caddy (proxy)'
+J4='Disaster drills (backup, restore, broken release, rollback)'
 all_green() {
   ci_run "$(dev_head)" completed '"success"'
-  jobs_page jobs1.json 3 "$(job "$J1" completed '"success"')" "$(job "$J2" completed '"success"')" "$(job "$J3" completed '"success"')"
+  jobs_page jobs1.json 4 "$(job "$J1" completed '"success"')" "$(job "$J2" completed '"success"')" "$(job "$J3" completed '"success"')" "$(job "$J4" completed '"success"')"
 }
 
 # 1. Первый запуск: текущий main зелёный — разворачивается и проходит проверку.
@@ -177,14 +178,14 @@ check 'other workflow: docker not called' "$(wc -l < "$STUB_LOG" | tr -d ' ')" 0
 
 # 6. Run зелёный, но задачи: только skipped / neutral / одной нет — коммит не разворачивается.
 ci_run "$(dev_head)" completed '"success"'
-jobs_page jobs1.json 3 "$(job "$J1" completed '"skipped"')" "$(job "$J2" completed '"skipped"')" "$(job "$J3" completed '"skipped"')"
+jobs_page jobs1.json 4 "$(job "$J1" completed '"skipped"')" "$(job "$J2" completed '"skipped"')" "$(job "$J3" completed '"skipped"')" "$(job "$J4" completed '"skipped"')"
 run
 check 'only skipped: not deployed' "$(deployed)" "$(git -C "$WORK/dev" rev-parse HEAD~1)"
 check 'only skipped: marked failed' "$(failed)" "$(dev_head)"
 
 push_commit three
 ci_run "$(dev_head)" completed '"success"'
-jobs_page jobs1.json 3 "$(job "$J1" completed '"success"')" "$(job "$J2" completed '"neutral"')" "$(job "$J3" completed '"success"')"
+jobs_page jobs1.json 4 "$(job "$J1" completed '"success"')" "$(job "$J2" completed '"neutral"')" "$(job "$J3" completed '"success"')" "$(job "$J4" completed '"success"')"
 run
 check 'neutral job: not deployed' "$(failed)" "$(dev_head)"
 check 'neutral job: docker not called' "$(wc -l < "$STUB_LOG" | tr -d ' ')" 0
@@ -195,6 +196,13 @@ jobs_page jobs1.json 2 "$(job "$J1" completed '"success"')" "$(job "$J2" complet
 run
 check 'missing job: marked failed' "$(failed)" "$(dev_head)"
 check 'missing job: reason logged' "$(logged 'нет задачи')" 1
+
+push_commit four-drills
+ci_run "$(dev_head)" completed '"success"'
+jobs_page jobs1.json 4 "$(job "$J1" completed '"success"')" "$(job "$J2" completed '"success"')" "$(job "$J3" completed '"success"')" "$(job "$J4" completed '"failure"')"
+run
+check 'red drills: marked failed' "$(failed)" "$(dev_head)"
+check 'red drills: docker not called' "$(wc -l < "$STUB_LOG" | tr -d ' ')" 0
 
 push_commit five
 ci_run "$(dev_head)" completed '"cancelled"'
@@ -214,8 +222,8 @@ push_commit seven
 ci_run "$(dev_head)" completed '"success"'
 filler=()
 for i in $(seq 1 100); do filler+=("$(job "extra $i" completed '"success"')"); done
-jobs_page jobs1.json 102 "$(job "$J1" completed '"success"')" "${filler[@]:0:99}"
-jobs_page jobs2.json 102 "$(job "$J2" completed '"success"')" "$(job "$J3" completed '"success"')"
+jobs_page jobs1.json 103 "$(job "$J1" completed '"success"')" "${filler[@]:0:99}"
+jobs_page jobs2.json 103 "$(job "$J2" completed '"success"')" "$(job "$J3" completed '"success"')" "$(job "$J4" completed '"success"')"
 run
 check 'pagination: second page read' "$(grep -c 'page=2' "$CURL_LOG")" 1
 check 'pagination: deployed' "$(deployed)" "$(dev_head)"
