@@ -62,8 +62,21 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Test
-        run: pnpm test
+      - name: Test with coverage
+        run: |
+          pnpm --filter @agregator/shared build
+          pnpm --filter @agregator/api test:cov
+          pnpm --filter @agregator/web test:cov
+
+      - name: Coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            apps/api/coverage/lcov.info
+            apps/web/coverage/lcov.info
+          if-no-files-found: ignore
 
       - name: Autodeploy script (shellcheck and scenarios)
         run: |
@@ -116,6 +129,9 @@ jobs:
           # Сценарии MVP из аудита: повтор публикации, две вкладки (заказ и черновик), истёкшая
           # сессия посреди формы, пометка откликов после правки, исход закрытия.
           node scripts/mvp-e2e.mjs
+          # Пробелы тестов из аудита: регистрация, обрыв сети при автосохранении, пустой поиск,
+          # двойной клик по «Откликнуться» и «Выбрать», выход в другой вкладке.
+          node scripts/cabinet-e2e.mjs
           # Главная за настоящим deploy/Caddyfile (http://localhost:8080, подходит для service
           # worker): публичность, отсутствие запросов в закрытую часть, клавиатура, reduced motion,
           # диалог пароля мимо SW и офлайн-страница при остановленном Caddy (scripts/landing-e2e.mjs).

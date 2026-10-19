@@ -85,6 +85,8 @@ interface AutosaveBox {
   version: string | null;
   /** Черновик изменён в другой вкладке: не сохраняем, пока человек не выберет версию. */
   conflict: boolean;
+  /** Сохранение не дошло (нет сети): повторяем, как только связь вернётся. */
+  offline: boolean;
 }
 
 const timeOf = (iso: string) =>
@@ -308,6 +310,7 @@ export function JobForm({
     draftId: initialDraftId ?? null,
     version: draftVersion ?? null,
     conflict: false,
+    offline: false,
   });
 
   const saveNow = useCallback(async (): Promise<void> => {
@@ -330,6 +333,7 @@ export function JobForm({
       if (box.mounted) setDraftStatus({ kind: 'saving' });
       try {
         const result = await saveDraftAction(form);
+        box.offline = false;
         if (result.ok) {
           box.draftId = result.draftId;
           box.version = result.savedAt;
@@ -358,10 +362,12 @@ export function JobForm({
           );
         }
       } catch {
+        // Запрос не дошёл до сервера: правки остаются в форме, сохранение повторится само.
+        box.offline = true;
         if (box.mounted) {
           setDraftStatus({
             kind: 'error',
-            message: 'Не удалось сохранить черновик. Проверьте сеть.',
+            message: 'Нет связи, черновик не сохранён. Сохраним, как только сеть вернётся.',
           });
         }
       }
@@ -403,7 +409,11 @@ export function JobForm({
     const box = autosave.current;
     box.mounted = true;
     const unsaved = () =>
-      !box.publishing && (box.timer !== undefined || box.inFlight !== null || box.conflict);
+      !box.publishing &&
+      (box.timer !== undefined || box.inFlight !== null || box.conflict || box.offline);
+    const retry = () => {
+      if (box.offline) void saveNow();
+    };
     // Вкладку прячут или закрывают: пробуем сохранить сразу. Браузер не обязан дождаться
     // ответа, поэтому при закрытии с несохранёнными правками ещё и спрашиваем подтверждение.
     const flush = () => {
@@ -416,9 +426,11 @@ export function JobForm({
     };
     document.addEventListener('visibilitychange', flush);
     window.addEventListener('beforeunload', warn);
+    window.addEventListener('online', retry);
     return () => {
       document.removeEventListener('visibilitychange', flush);
       window.removeEventListener('beforeunload', warn);
+      window.removeEventListener('online', retry);
       box.mounted = false;
       // Переход внутри сайта: страница жива, сохраняем последнюю правку по снимку формы.
       if (box.timer !== undefined) void saveNow();

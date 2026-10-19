@@ -22,7 +22,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 const fetchMock = vi.fn();
-const { closeJobAction, createJobAction, saveDraftAction, updateJobAction } =
+const { closeJobAction, createJobAction, deleteDraftAction, saveDraftAction, updateJobAction } =
   await import('./actions');
 
 const job = {
@@ -269,6 +269,36 @@ describe('saveDraftAction', () => {
   it('rejects a cross-origin save', async () => {
     state.headers.set('origin', 'https://evil.example');
     expect(await saveDraftAction(form({ title: 'Плитка' }))).toMatchObject({ ok: false });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('deleteDraftAction', () => {
+  it('deletes the draft and returns to my jobs', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await expect(deleteDraftAction('d1')).rejects.toThrow('NEXT_REDIRECT');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect([url, init.method]).toEqual(['http://api.test/v1/me/drafts/d1', 'DELETE']);
+    expect(state.redirectedTo).toBe('/account/jobs?draftDeleted=1');
+  });
+
+  it('treats an already deleted draft as deleted (another tab)', async () => {
+    fetchMock.mockResolvedValueOnce(json(404, { message: 'Черновик не найден' }));
+    await expect(deleteDraftAction('d1')).rejects.toThrow('NEXT_REDIRECT');
+    expect(state.redirectedTo).toBe('/account/jobs?draftDeleted=1');
+  });
+
+  it('reports a failure instead of claiming success', async () => {
+    fetchMock.mockResolvedValueOnce(json(500, {}));
+    await expect(deleteDraftAction('d1')).rejects.toThrow('NEXT_REDIRECT');
+    expect(state.redirectedTo).toBe('/account/jobs?draftError=1');
+  });
+
+  it('refuses bad ids and foreign origins without calling the API', async () => {
+    await expect(deleteDraftAction('../x')).rejects.toThrow('NEXT_REDIRECT');
+    state.headers.set('origin', 'https://evil.example');
+    await expect(deleteDraftAction('d1')).rejects.toThrow('NEXT_REDIRECT');
+    expect(state.redirectedTo).toBe('/account/jobs');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
