@@ -490,6 +490,204 @@ describe('API contract (e2e)', () => {
     });
   });
 
+  it('plan and stage endpoints match openapi.json', async () => {
+    const high = {
+      RATE_LIMIT_PER_MIN: '1000',
+      AUTH_RATE_LIMIT_PER_MIN: '1000',
+      WRITE_RATE_LIMIT_PER_MIN: '1000',
+    };
+    await withApp(high, async (app) => {
+      const http = () => request(app.getHttpServer());
+      const check = async (
+        method: 'get' | 'post' | 'put',
+        template: string,
+        req: request.Test,
+        status: number,
+      ) => {
+        const res = await req;
+        expect(res.status).toBe(status);
+        expectContract(res, method, template);
+        return res;
+      };
+      const owner = await signUp(app, 'CUSTOMER');
+      const contractor = await signUp(app, 'CONTRACTOR');
+      const stranger = await signUp(app, 'CUSTOMER');
+      /** Заказ в работе с выбранным исполнителем. */
+      const inProgress = async () => {
+        const { body: created } = await http().post('/v1/me/jobs').set(owner.auth).send(job);
+        const { body: placed } = await http()
+          .post(`/v1/jobs/${created.id}/bids`)
+          .set(contractor.auth)
+          .send(bid);
+        await http()
+          .post(`/v1/me/jobs/${created.id}/bids/${placed.id}/accept`)
+          .set(owner.auth)
+          .expect(200);
+        return created.id as string;
+      };
+      const jobId = await inProgress();
+      const base = `/v1/jobs/${jobId}`;
+      const T = '/v1/jobs/{jobId}';
+      const post = (path: string, auth: Record<string, string> | null, body: object = {}) => {
+        const req = http().post(`${base}${path}`);
+        return (auth ? req.set(auth) : req).send(body);
+      };
+
+      // Чтение.
+      await check('get', `${T}/plan`, http().get(`${base}/plan`).set(owner.auth), 200);
+      await check('get', `${T}/plan`, http().get(`${base}/plan`), 401);
+      await check('get', `${T}/plan`, http().get(`${base}/plan`).set(stranger.auth), 404);
+
+      // Черновик плана (составитель — исполнитель).
+      const stages = [
+        { title: 'Подготовка', description: '', durationDays: 1 },
+        { title: 'Основные работы', description: 'Описание', durationDays: null },
+      ];
+      const put = (auth: Record<string, string> | null, body: object) => {
+        const req = http().put(`${base}/plan`);
+        return (auth ? req.set(auth) : req).send(body);
+      };
+      const plan = { version: 0, sequential: true, stages };
+      await check(
+        'put',
+        `${T}/plan`,
+        put(contractor.auth, { ...plan, stages: [{ title: 'я' }] }),
+        400,
+      );
+      await check('put', `${T}/plan`, put(null, plan), 401);
+      await check('put', `${T}/plan`, put(owner.auth, plan), 403);
+      await check('put', `${T}/plan`, put(stranger.auth, plan), 404);
+      await check('put', `${T}/plan`, put(contractor.auth, { ...plan, version: 5 }), 409);
+      await check('put', `${T}/plan`, put(contractor.auth, plan), 200);
+
+      // Составитель (меняет заказчик).
+      const A = `${T}/plan/author`;
+      await check('post', A, post('/plan/author', owner.auth, { version: 1, author: 'КТО' }), 400);
+      await check('post', A, post('/plan/author', null, { version: 1, author: 'OWNER' }), 401);
+      await check(
+        'post',
+        A,
+        post('/plan/author', contractor.auth, { version: 1, author: 'OWNER' }),
+        403,
+      );
+      await check(
+        'post',
+        A,
+        post('/plan/author', stranger.auth, { version: 1, author: 'OWNER' }),
+        404,
+      );
+      await check(
+        'post',
+        A,
+        post('/plan/author', owner.auth, { version: 1, author: 'CONTRACTOR' }),
+        200,
+      );
+
+      // Отправка, возврат, повторная отправка, согласование.
+      const P = `${T}/plan/propose`;
+      await check('post', P, post('/plan/propose', contractor.auth, { version: -1 }), 400);
+      await check('post', P, post('/plan/propose', null, { version: 1 }), 401);
+      await check('post', P, post('/plan/propose', owner.auth, { version: 1 }), 403);
+      await check('post', P, post('/plan/propose', stranger.auth, { version: 1 }), 404);
+      await check('post', P, post('/plan/propose', contractor.auth, { version: 99 }), 409);
+      await check('post', P, post('/plan/propose', contractor.auth, { version: 1 }), 200);
+
+      const R = `${T}/plan/return`;
+      const reason = { version: 2, reason: 'Добавьте уборку' };
+      await check('post', R, post('/plan/return', owner.auth, { version: 2, reason: 'нет' }), 400);
+      await check('post', R, post('/plan/return', null, reason), 401);
+      await check('post', R, post('/plan/return', contractor.auth, reason), 403);
+      await check('post', R, post('/plan/return', stranger.auth, reason), 404);
+      await check('post', R, post('/plan/return', owner.auth, reason), 200);
+      await post('/plan/propose', contractor.auth, { version: 3 }).expect(200);
+      // План отправлен: составителя не сменить.
+      await check(
+        'post',
+        A,
+        post('/plan/author', owner.auth, { version: 4, author: 'OWNER' }),
+        409,
+      );
+
+      const AP = `${T}/plan/approve`;
+      await check('post', AP, post('/plan/approve', owner.auth, { version: 'x' }), 400);
+      await check('post', AP, post('/plan/approve', null, { version: 4 }), 401);
+      await check('post', AP, post('/plan/approve', contractor.auth, { version: 4 }), 403);
+      await check('post', AP, post('/plan/approve', stranger.auth, { version: 4 }), 404);
+      await check('post', AP, post('/plan/approve', owner.auth, { version: 99 }), 409);
+      const approved = await check(
+        'post',
+        AP,
+        post('/plan/approve', owner.auth, { version: 4 }),
+        200,
+      );
+      await check(
+        'post',
+        R,
+        post('/plan/return', owner.auth, { version: 5, reason: 'Поздно уже' }),
+        409,
+      );
+
+      // Этапы.
+      const [first, second] = approved.body.stages as { id: string }[];
+      const S = (id: string, action: string) => `/stages/${id}/${action}`;
+      const ST = (action: string) => `${T}/stages/{stageId}/${action}`;
+      const done = { comment: 'Этап выполнен' };
+      await check(
+        'post',
+        ST('submit'),
+        post(S(first.id, 'submit'), contractor.auth, { comment: 'да' }),
+        400,
+      );
+      await check('post', ST('submit'), post(S(first.id, 'submit'), null, done), 401);
+      await check('post', ST('submit'), post(S(first.id, 'submit'), owner.auth, done), 403);
+      await check('post', ST('submit'), post(S('missing', 'submit'), contractor.auth, done), 404);
+      await check('post', ST('submit'), post(S(second.id, 'submit'), contractor.auth, done), 409);
+      await check('post', ST('submit'), post(S(first.id, 'submit'), contractor.auth, done), 200);
+
+      await check('post', ST('accept'), post(S(first.id, 'accept'), null), 401);
+      await check('post', ST('accept'), post(S(first.id, 'accept'), contractor.auth), 403);
+      await check('post', ST('accept'), post(S('missing', 'accept'), owner.auth), 404);
+      await check('post', ST('accept'), post(S(second.id, 'accept'), owner.auth), 409);
+      await check('post', ST('accept'), post(S(first.id, 'accept'), owner.auth), 200);
+
+      await post(S(second.id, 'submit'), contractor.auth, done).expect(200);
+      const fix = { comment: 'Переделать угол' };
+      await check(
+        'post',
+        ST('rework'),
+        post(S(second.id, 'rework'), owner.auth, { comment: '' }),
+        400,
+      );
+      await check('post', ST('rework'), post(S(second.id, 'rework'), null, fix), 401);
+      await check('post', ST('rework'), post(S(second.id, 'rework'), contractor.auth, fix), 403);
+      await check('post', ST('rework'), post(S('missing', 'rework'), owner.auth, fix), 404);
+      await check('post', ST('rework'), post(S(first.id, 'rework'), owner.auth, fix), 409);
+      await check('post', ST('rework'), post(S(second.id, 'rework'), owner.auth, fix), 200);
+
+      // Отказ исполнителя.
+      const Q = `${T}/quit`;
+      const why = { reason: 'Не успеваю по срокам' };
+      await check('post', Q, post('/quit', contractor.auth, { reason: 'нет' }), 400);
+      await check('post', Q, post('/quit', null, why), 401);
+      await check('post', Q, post('/quit', owner.auth, why), 403);
+      await check('post', Q, post('/quit', stranger.auth, why), 404);
+      // Заказ уже закрыт: отказаться нельзя.
+      const closedId = await inProgress();
+      await http()
+        .post(`/v1/me/jobs/${closedId}/close`)
+        .set(owner.auth)
+        .send({ outcome: 'COMPLETED' })
+        .expect(200);
+      await check(
+        'post',
+        Q,
+        http().post(`/v1/jobs/${closedId}/quit`).set(contractor.auth).send(why),
+        409,
+      );
+      await check('post', Q, post('/quit', contractor.auth, why), 204);
+    });
+  });
+
   it('lead endpoints match openapi.json', async () => {
     const high = {
       RATE_LIMIT_PER_MIN: '1000',

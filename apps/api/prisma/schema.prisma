@@ -53,6 +53,15 @@ enum AuditAction {
   USER_ROLE_CHANGED
   PASSWORD_CHANGED
   SESSIONS_REVOKED
+  PLAN_SAVED
+  PLAN_AUTHOR_CHANGED
+  PLAN_PROPOSED
+  PLAN_APPROVED
+  PLAN_RETURNED
+  STAGE_SUBMITTED
+  STAGE_ACCEPTED
+  STAGE_REWORK
+  CONTRACTOR_QUIT
 }
 
 // Синхронизировано с BID_STATUSES в packages/shared/src/bids.ts.
@@ -104,6 +113,7 @@ model Job {
   /// Restrict: удаление пользователя не должно молча удалять или «осиротить» его заказы.
   owner        User?            @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   bids         Bid[]
+  plan         JobPlan?
   createdAt    DateTime         @default(now()) @map("created_at")
   updatedAt    DateTime         @updatedAt @map("updated_at")
   /// Ключ формы публикации (UUID): повтор того же запроса (двойной клик, обрыв связи) вернёт
@@ -283,6 +293,70 @@ model Bid {
 
 /// Заявка на участие в закрытом тестировании (форма на главной). Персональные данные:
 /// доступ только у администраторов, согласие фиксируется версией политики.
+/// Сторона сделки: заказчик-владелец или выбранный исполнитель.
+enum PlanParty {
+  OWNER
+  CONTRACTOR
+}
+
+enum JobPlanStatus {
+  DRAFT
+  PROPOSED
+  APPROVED
+}
+
+enum JobStageStatus {
+  PLANNED
+  SUBMITTED
+  ACCEPTED
+  REWORK
+}
+
+/// План работ по заказу в работе (packages/shared/src/plans.ts). Один на заказ; при отказе
+/// исполнителя удаляется вместе с этапами (история — в журнале).
+model JobPlan {
+  id           String        @id @default(cuid())
+  jobId        String        @unique @map("job_id")
+  /// Cascade: прежний код, удаляя заказ, не упрётся в план (проверка миграций).
+  job          Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  /// Кто составляет план; другая сторона согласует. Меняет заказчик, пока план не согласован.
+  author       PlanParty     @default(CONTRACTOR)
+  /// true — этапы сдаются строго по порядку.
+  sequential   Boolean       @default(true)
+  status       JobPlanStatus @default(DRAFT)
+  /// Растёт при каждом изменении плана: правка с устаревшей версией — 409.
+  version      Int           @default(1)
+  returnReason String?       @map("return_reason")
+  proposedAt   DateTime?     @map("proposed_at")
+  approvedAt   DateTime?     @map("approved_at")
+  stages       JobStage[]
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  @@map("job_plans")
+}
+
+model JobStage {
+  id            String         @id @default(cuid())
+  planId        String         @map("plan_id")
+  plan          JobPlan        @relation(fields: [planId], references: [id], onDelete: Cascade)
+  /// С 1, порядок сдачи.
+  position      Int
+  title         String         @db.VarChar(120)
+  description   String         @default("")
+  durationDays  Int?           @map("duration_days")
+  status        JobStageStatus @default(PLANNED)
+  submitComment String?        @map("submit_comment")
+  reworkComment String?        @map("rework_comment")
+  submittedAt   DateTime?      @map("submitted_at")
+  acceptedAt    DateTime?      @map("accepted_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  @@unique([planId, position])
+  @@map("job_stages")
+}
+
 model Lead {
   id             String    @id @default(cuid())
   name           String    @db.VarChar(80)
