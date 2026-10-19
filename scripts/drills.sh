@@ -142,7 +142,7 @@ echo "$newer" > "$STATE_DIR/deployed"
 printf '%s\n%s\n' "$good" "$newer" > "$STATE_DIR/history"
 rm -f "$STATE_DIR/failed"
 REPO_DIR=$server bash deploy/autodeploy/rollback.sh "$good" > "$WORK/rollback.log" 2>&1 && code=0 || code=$?
-check 'rollback over applied DROP COLUMN: refused' "$code $(grep -c '29990101000000_drill' "$WORK/rollback.log")" '1 1'
+check 'rollback over applied DROP COLUMN: refused' "$code $(grep -c '^\[agregator-rollback\]   29990101000000_drill$' "$WORK/rollback.log")" '1 1'
 check 'rollback over applied DROP COLUMN: still deployed' "$(cat "$STATE_DIR/deployed")" "$newer"
 check 'rollback over applied DROP COLUMN: stack untouched' "$(api_ready)" ready
 # Порядок из отказа: остановить api и web, восстановить копию перед миграцией, повторить откат.
