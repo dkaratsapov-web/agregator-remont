@@ -90,8 +90,9 @@ jobs:
 
       - name: Autodeploy script (shellcheck and scenarios)
         run: |
-          shellcheck -x deploy/autodeploy/*.sh deploy/backup/*.sh scripts/autodeploy-test.sh scripts/perf/*.sh scripts/image-secrets-check.sh scripts/drills.sh scripts/schema-compat-test.sh
+          shellcheck -x deploy/autodeploy/*.sh deploy/backup/*.sh scripts/autodeploy-test.sh scripts/perf/*.sh scripts/image-secrets-check.sh scripts/drills.sh scripts/schema-compat-test.sh scripts/migration-check-test.sh
           bash scripts/autodeploy-test.sh
+          bash scripts/migration-check-test.sh
 
       - name: Build
         run: pnpm build

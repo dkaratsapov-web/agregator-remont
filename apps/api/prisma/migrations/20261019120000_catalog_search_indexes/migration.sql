@@ -14,4 +14,5 @@ CREATE INDEX "jobs_open_created_at_idx" ON "jobs" ("created_at" DESC, "id" DESC)
 
 -- Ни один запрос не фильтрует по основной категории: каталог ищет по всем категориям заказа
 -- (GIN jobs_categories_idx).
+-- rollback-safe: индекс только ускорял запросы, которых нет и в прежнем коде; без него всё работает
 DROP INDEX "jobs_category_created_at_idx";

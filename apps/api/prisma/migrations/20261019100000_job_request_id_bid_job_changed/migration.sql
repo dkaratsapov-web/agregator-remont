@@ -1,6 +1,7 @@
 -- Идемпотентная публикация заказа: ключ формы (UUID), уникальный в пределах владельца
 -- (AUDIT_FINDINGS MVP-1). NULL у старых заказов и у публикаций без ключа.
 ALTER TABLE "jobs" ADD COLUMN "request_id" UUID;
+-- rollback-safe: прежний код не заполняет request_id (NULL), а NULL уникальность не нарушает
 CREATE UNIQUE INDEX "jobs_owner_id_request_id_key" ON "jobs"("owner_id", "request_id");
 
 -- Пометка отклика «заказ изменён после вашего отклика» (MVP-3).
