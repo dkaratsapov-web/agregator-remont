@@ -1,4 +1,4 @@
-/* global window, document, requestAnimationFrame -- выполняется в браузере через addInitScript и evaluate */
+/* global window, document, MutationObserver, HTMLVideoElement -- выполняется в браузере через addInitScript и evaluate */
 // Видео первого экрана главной на разных сетях (ТЗ #42, п. 6):
 //   node scripts/perf/landing-video.mjs [адрес сайта, по умолчанию http://localhost:3000] [метка]
 // Профили Chromium: компьютер без ограничений; телефон 390×844 (процессор в 4 раза медленнее) на
@@ -83,10 +83,22 @@ async function measure(profile) {
       inp: 0,
       lcpEl: '',
       firstFrame: 0,
+      intent: 0,
       reverseShown: false,
       shifts: [],
       ect: navigator.connection?.effectiveType ?? '',
     };
+    // Первое действие человека (прокрутка, касание, клавиша): с него считается задержка кадра,
+    // если ролик грузится по первому действию (FLIGHT_VIDEO_LOAD = on-intent).
+    for (const type of ['wheel', 'touchstart', 'keydown', 'scroll']) {
+      window.addEventListener(
+        type,
+        () => {
+          if (!window.__v.intent) window.__v.intent = performance.now();
+        },
+        { passive: true, capture: true },
+      );
+    }
     new PerformanceObserver((l) => {
       for (const e of l.getEntries()) {
         window.__v.lcp = e.startTime;
@@ -111,17 +123,17 @@ async function measure(profile) {
       }
     }).observe({ type: 'event', buffered: true, durationThreshold: 16 });
     // Первый кадр видео на экране: прямой ролик стал непрозрачным; обратный — показывался ли.
-    const watch = () => {
-      const videos = document.querySelectorAll('video');
-      for (const video of videos) {
-        if (video.style.opacity !== '1') continue;
-        if (/forward/.test(video.currentSrc) && !window.__v.firstFrame)
-          window.__v.firstFrame = performance.now();
-        if (/reverse/.test(video.currentSrc)) window.__v.reverseShown = true;
-      }
-      requestAnimationFrame(watch);
+    // По изменению стиля (MutationObserver), а не по requestAnimationFrame: в простаивающей
+    // странице без анимации кадры отрисовки редки, и момент показа записывался с опозданием.
+    const seen = (video) => {
+      if (video.style.opacity !== '1') return;
+      if (/forward/.test(video.currentSrc) && !window.__v.firstFrame)
+        window.__v.firstFrame = performance.now();
+      if (/reverse/.test(video.currentSrc)) window.__v.reverseShown = true;
     };
-    requestAnimationFrame(watch);
+    new MutationObserver((records) => {
+      for (const r of records) if (r.target instanceof HTMLVideoElement) seen(r.target);
+    }).observe(document, { attributes: true, attributeFilter: ['style'], subtree: true });
   }, profile.saveData === true);
 
   const started = Date.now();
@@ -132,7 +144,8 @@ async function measure(profile) {
   await page
     .locator('a[href="#how-it-works"]')
     .first()
-    .click()
+    // На телефоне ссылка в меню и не видна: не ждать стандартные 30 с.
+    .click({ timeout: 3000 })
     .catch(() => undefined);
   await page.waitForTimeout(1500);
   // Вниз до первого шага и обратно вверх: на обычной сети вверх играет обратный ролик.
@@ -158,7 +171,7 @@ const browser = await chromium.launch(
 try {
   const notes = [];
   console.log(
-    `| ${LABEL} | LCP, мс (элемент) | CLS | INP, мс | load, мс | первый кадр видео, мс | видео за ${WATCH_MS / 1000} с: прямой / обратный, КБ | обратный ролик показан | ошибки JS |`,
+    `| ${LABEL} | LCP, мс (элемент) | CLS | INP, мс | load, мс | первый кадр видео, мс (после первого действия) | видео за ${WATCH_MS / 1000} с: прямой / обратный, КБ | обратный ролик показан | ошибки JS |`,
   );
   console.log('|---|---|---|---|---|---|---|---|---|');
   for (const [name, profile] of Object.entries(profiles)) {
@@ -167,7 +180,7 @@ try {
     const pick = (key) => median(runs.map((r) => r[key]));
     const frame = pick('firstFrame');
     console.log(
-      `| ${name} (ECT ${runs[0].ect || '—'}) | ${Math.round(pick('lcp'))} (${runs[0].lcpEl}) | ${pick('cls').toFixed(3)} | ${Math.round(pick('inp'))} | ${pick('loadMs')} | ${frame ? Math.round(frame) : 'не показан'} | ${pick('forwardKb')} / ${pick('reverseKb')} | ${runs.filter((r) => r.reverseShown).length} из ${RUNS} | ${runs.reduce((n, r) => n + r.errors, 0)} |`,
+      `| ${name} (ECT ${runs[0].ect || '—'}) | ${Math.round(pick('lcp'))} (${runs[0].lcpEl}) | ${pick('cls').toFixed(3)} | ${Math.round(pick('inp'))} | ${pick('loadMs')} | ${frame ? `${Math.round(frame)}${pick('intent') && frame > pick('intent') ? ` (+${Math.round(frame - pick('intent'))})` : ''}` : 'не показан'} | ${pick('forwardKb')} / ${pick('reverseKb')} | ${runs.filter((r) => r.reverseShown).length} из ${RUNS} | ${runs.reduce((n, r) => n + r.errors, 0)} |`,
     );
     const shifts = runs.flatMap((r) => r.shifts);
     if (shifts.length) notes.push(`${name}: сдвиги ${shifts.slice(0, 6).join(', ')}`);
