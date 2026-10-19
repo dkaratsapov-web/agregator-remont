@@ -6,7 +6,9 @@
 # deploy/docker-compose.proxy.yml` с образами agregator-api:local и agregator-web:local.
 # Сценарии:
 #   1. копия базы (backup.sh) и проверка восстановления (restore-check.sh) во временном
-#      контейнере; обрезанная копия — проверка восстановления не проходит;
+#      контейнере; обрезанная копия — проверка восстановления не проходит; копия вне сервера
+#      (age + rclone, «хранилище» — локальный каталог rclone) скачивается, расшифровывается и
+#      восстанавливается (offsite-restore-check.sh), испорченная — нет;
 #   2. сломанное обновление (API падает при старте) и откат rollback.sh на прошлую версию:
 #      сайт снова отвечает, данные на месте;
 #   3. несовместимая миграция (DROP COLUMN) применена к базе: откат отказывает, стек не тронут;
@@ -85,6 +87,27 @@ if command -v age > /dev/null && command -v rclone > /dev/null; then
   check 'offsite backup: the encrypted copy restores' "$code $(status restore-status result)" '0 ok'
   grep -q "users: $users_before;" "$WORK/restore.log" && restored=same || restored=differs
   check 'offsite backup: same number of users as the live base' "$restored" same
+  # Проверка целиком (ТЗ #42): скачать последнюю копию из хранилища, расшифровать,
+  # восстановить; повреждённая копия, чужой ключ, старая или незашифрованная копия — отказ.
+  offsite() { # remote [ключ]
+    AGE_IDENTITY=${2:-$WORK/age.key} bash deploy/backup/offsite-restore-check.sh "$1" > "$WORK/offsite.log" 2>&1 && echo 0 || echo 1
+  }
+  check 'offsite restore check: latest copy downloaded, decrypted, restored' \
+    "$(offsite ":local:$WORK/offsite") $(status offsite-restore-status result)" '0 ok'
+  grep -q "users: $users_before;" "$WORK/offsite.log" && restored=same || restored=differs
+  check 'offsite restore check: same number of users as the live base' "$restored" same
+  check 'offsite restore check: stale copy refused' \
+    "$(OFFSITE_MAX_AGE_HOURS=-1 offsite ":local:$WORK/offsite") $(grep -c 'выгрузка не работает' "$WORK/offsite.log")" '1 1'
+  age-keygen -o "$WORK/other.key" 2> /dev/null
+  check 'offsite restore check: wrong key refused' "$(offsite ":local:$WORK/offsite" "$WORK/other.key")" 1
+  cp -r "$WORK/offsite" "$WORK/offsite-bad"
+  bad_copy=$(find "$WORK/offsite-bad" -name '*.age' | sort | tail -n 1)
+  python3 -c 'import sys; b = bytearray(open(sys.argv[1], "rb").read()); b[len(b) // 2] ^= 0xFF; open(sys.argv[1], "wb").write(b)' "$bad_copy"
+  check 'offsite restore check: corrupted copy refused' \
+    "$(offsite ":local:$WORK/offsite-bad") $(status offsite-restore-status result)" '1 failed'
+  cp "$dump" "$WORK/offsite-bad/"
+  check 'offsite restore check: plaintext copy in the storage refused' \
+    "$(offsite ":local:$WORK/offsite-bad") $(grep -c 'незашифрованная копия' "$WORK/offsite.log")" '1 1'
   echo "BACKUP_RCLONE_REMOTE=:local:/proc/forbidden" >> "$ENV_FILE"
   bash deploy/backup/backup.sh drill-offsite > "$WORK/out.log" 2>&1 && code=0 || code=$?
   check 'offsite upload failure: error, local copy kept' \

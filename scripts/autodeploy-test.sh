@@ -38,7 +38,7 @@ cat > "$WORK/bin/docker" << 'STUB'
 #!/usr/bin/env bash
 echo "docker $*${IMAGE_TAG:+ tag=$IMAGE_TAG}" >> "$STUB_LOG"
 case "$1 $2" in
-  'info --format') echo /var/lib/docker; exit 0 ;;
+  'info --format') [ "${DOCKER_HANG:-0}" = 1 ] && sleep 30; echo /var/lib/docker; exit 0 ;;
   info\ *) [ "${DOCKER_DOWN:-0}" = 1 ] && exit 1; exit 0 ;;
   # Проверка восстановления: временная база отвечает числом миграций и строк.
   exec\ *) case "$*" in
@@ -533,6 +533,27 @@ printf 'result=ok\nat=%s\n' "$(date +%s)" > "$WORK/state/restore-status"
 sed -i 's/^at=.*/at=1/' "$WORK/state/backup-status"
 monitor
 check 'monitor: stale backup is reported' "$(logged 'копия базы старше')" 1
+# Выгрузка копии вне сервера упала: копия только на сервере — проблема, внешнему монитору /fail.
+sed -i 's/^at=.*/at='"$(date +%s)"'/' "$WORK/state/backup-status"
+RCLONE_FAIL=1 backup
+monitor
+check 'monitor: failed offsite upload is a problem, heartbeat /fail' \
+  "$(logged 'только на сервере (failed)') $(grep -c 'hc.invalid/ping/abc/fail' "$CURL_LOG")" '1 1'
+backup
+# Каналы уведомлений не настроены: сообщить можно только внешнему монитору — /fail.
+printf 'MONITOR_HEARTBEAT_URL=https://hc.invalid/ping/abc\nBACKUP_RCLONE_REMOTE=store:bk\nBACKUP_AGE_RECIPIENT=age1test\n' > "$ENV_FILE"
+monitor
+check 'monitor: no notify channels is a problem, heartbeat /fail' \
+  "$(logged 'каналы уведомлений не настроены') $(grep -c 'hc.invalid/ping/abc/fail' "$CURL_LOG")" '1 1'
+# Сервер «лёг» (модель): monitor.sh завис или убит до конца проверок — «жив» не отправлен, и
+# внешний монитор поднимет тревогу по отсутствию сигнала. Никто, кроме monitor.sh, этот адрес не
+# дёргает: ни обновление, ни копия не могут подтвердить «жив» за упавший сервер.
+printf 'NOTIFY_WEBHOOK_URL=https://hooks.invalid/agregator\nMONITOR_HEARTBEAT_URL=https://hc.invalid/ping/abc\nBACKUP_RCLONE_REMOTE=store:bk\nBACKUP_AGE_RECIPIENT=age1test\n' > "$ENV_FILE"
+: > "$CURL_LOG"
+DOCKER_HANG=1 DISK_ALERT_PERCENT=101 timeout 3 bash "$ROOT/deploy/autodeploy/monitor.sh" > "$WORK/out.log" 2>&1 || true
+check 'server down (monitor killed mid-run): no heartbeat sent' "$(grep -c 'hc.invalid' "$CURL_LOG")" 0
+backup
+check 'backup never pings the external monitor' "$(grep -c 'hc.invalid/ping/abc' "$CURL_LOG")" 0
 sed -i '/^MONITOR_HEARTBEAT_URL=/d' "$ENV_FILE"
 monitor
 check 'monitor: missing external monitor is logged' "$(logged 'внешний монитор не настроен')" 1
