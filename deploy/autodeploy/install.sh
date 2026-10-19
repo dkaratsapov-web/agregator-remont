@@ -100,6 +100,14 @@ UNIT
 chmod +x "$REPO_DIR/deploy/autodeploy/"*.sh "$REPO_DIR/deploy/backup/"*.sh
 systemctl daemon-reload
 systemctl enable --now agregator-deploy.timer agregator-backup.timer agregator-restore-check.timer agregator-monitor.timer
+# Без них сбои видны только в журнале сервера (deploy/README.md, «Уведомления и обслуживание»).
+. "$REPO_DIR/deploy/autodeploy/lib.sh"
+for setting in MONITOR_HEARTBEAT_URL BACKUP_RCLONE_REMOTE; do
+  [ -n "$(cd "$REPO_DIR" && env_value "$setting")" ] || echo "ВНИМАНИЕ: не задан $setting в deploy/.env — до публичного запуска обязателен"
+done
+if [ -z "$(cd "$REPO_DIR" && env_value NOTIFY_WEBHOOK_URL)$(cd "$REPO_DIR" && env_value NOTIFY_TELEGRAM_TOKEN)" ]; then
+  echo 'ВНИМАНИЕ: не задан канал уведомлений (NOTIFY_*) в deploy/.env'
+fi
 echo 'Автообновление включено. Первая проверка запущена, это может занять несколько минут...'
 systemctl start agregator-deploy.service || true
 journalctl -u agregator-deploy.service -n 20 --no-pager

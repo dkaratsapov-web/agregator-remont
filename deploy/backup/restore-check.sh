@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# Проверка восстановления: sudo bash deploy/backup/restore-check.sh [файл.dump]
+# Проверка восстановления: sudo bash deploy/backup/restore-check.sh [файл.dump | файл.dump.age]
 # Берёт последнюю копию из BACKUP_DIR (или указанный файл), разворачивает её во временный
 # контейнер postgres без сети и портов и сверяет: все миграции из репозитория применены, таблицы
 # users и jobs читаются. Печатает время восстановления (фактический RTO для этой базы).
 # Запускается таймером раз в неделю (deploy/autodeploy/install.sh). Сбой — уведомление; итог —
 # в STATE_DIR/restore-status (monitor.sh напоминает, если проверки давно не было или она упала).
+# Копия вне сервера (шифрованная, скачанная из хранилища ключом на чтение):
+#   AGE_IDENTITY=<приватный ключ age> bash deploy/backup/restore-check.sh копия.dump.age
+# — расшифровка во временный файл (права 600, удаляется после проверки) и та же проверка.
 set -euo pipefail
 
 REPO_DIR=${REPO_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}
@@ -30,8 +33,22 @@ if [ -z "$file" ] || [ ! -f "$file" ]; then die "нет копии в $dir"; fi
 log "копия: $file"
 
 started=$(date +%s)
-cleanup() { docker rm -f "$name" > /dev/null 2>&1 || true; }
+plain=''
+cleanup() {
+  docker rm -f "$name" > /dev/null 2>&1 || true
+  if [ -n "$plain" ]; then rm -f "$plain"; fi
+}
 trap cleanup EXIT
+source_file=$file
+if [[ "$file" == *.age ]]; then
+  if [ -z "${AGE_IDENTITY:-}" ] || [ ! -f "$AGE_IDENTITY" ]; then
+    die 'зашифрованная копия: укажите приватный ключ age в AGE_IDENTITY'
+  fi
+  command -v age > /dev/null || die 'не установлен age (apt install age)'
+  plain=$(mktemp)
+  age -d -i "$AGE_IDENTITY" -o "$plain" "$file" || die 'расшифровка не удалась: не тот ключ или файл повреждён'
+  file=$plain
+fi
 docker run -d --rm --name "$name" --network none -e POSTGRES_PASSWORD=restore-check "$image" > /dev/null ||
   die "не запустился контейнер $image"
 # Готовность — по TCP: при первом запуске образ postgres поднимает временный сервер только на
@@ -58,7 +75,7 @@ log "миграций в копии: $applied, в репозитории: $expec
 if [ "$applied" -le 0 ] || [ "$applied" -gt "$expected" ]; then
   die "миграций в копии $applied, в репозитории $expected"
 fi
-write_status restore-status result=ok "file=$file" "seconds=$seconds" "migrations=$applied"
+write_status restore-status result=ok "file=$source_file" "seconds=$seconds" "migrations=$applied"
 heartbeat=$(env_value RESTORE_HEARTBEAT_URL)
 if [ -n "$heartbeat" ]; then
   printf 'url = "%s"\n' "$heartbeat" | curl -fsS --max-time 10 -K - > /dev/null || log 'heartbeat не отправлен'

@@ -61,10 +61,10 @@ if [ -z "$backup_at" ]; then
   alert backup-none 'резервных копий ещё не было (deploy/backup/backup.sh, таймер agregator-backup)'
 elif [ $((now - backup_at)) -gt $((BACKUP_MAX_AGE_HOURS * 3600)) ]; then
   alert backup-stale "последняя копия базы старше $BACKUP_MAX_AGE_HOURS ч: journalctl -u agregator-backup"
-elif [ "$(status_value backup-status mode)" != offsite-verified ]; then
+elif [[ "$(status_value backup-status mode)" != offsite-* ]]; then
   alert backup-local-only "копии базы только на сервере ($(status_value backup-status offsite)): при потере сервера они потеряются. Настройте BACKUP_RCLONE_REMOTE и BACKUP_AGE_RECIPIENT"
 else
-  log "копия базы: вне сервера, проверена, $(((now - backup_at) / 3600)) ч назад"
+  log "копия базы: вне сервера ($(status_value backup-status mode)), $(((now - backup_at) / 3600)) ч назад"
 fi
 restore_at=$(status_value restore-status at)
 if [ -z "$restore_at" ] || [ $((now - restore_at)) -gt $((8 * 86400)) ]; then

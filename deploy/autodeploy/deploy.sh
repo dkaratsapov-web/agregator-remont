@@ -231,8 +231,10 @@ rm -f "$STATE_DIR/failed" "$STATE_DIR/attempts"
 # Место на диске (на сервере 30 ГБ): образы старше KEEP_RELEASES последних версий, висячие образы
 # и кеш сборки старше трёх суток.
 keep=$(tail -n "$KEEP_RELEASES" "$STATE_DIR/history" | cut -c1-12)
-docker image ls --format '{{.Repository}}:{{.Tag}}' 2> /dev/null |
-  grep -E '^agregator-(api|web):([0-9a-f]{12}|local)$' | while read -r image; do
+# Нет ни одного подходящего образа — не ошибка (иначе pipefail завершил бы скрипт кодом 1 уже
+# после успешного обновления, и служба сообщила бы о сбое).
+{ docker image ls --format '{{.Repository}}:{{.Tag}}' 2> /dev/null || true; } |
+  { grep -E '^agregator-(api|web):([0-9a-f]{12}|local)$' || true; } | while read -r image; do
   printf '%s\n' "$keep" | grep -qx "${image##*:}" || docker image rm "$image" > /dev/null 2>&1 || true
 done
 docker image prune -f > /dev/null || true
@@ -241,5 +243,10 @@ docker builder prune -f --filter until=72h > /dev/null 2>&1 || true
 heartbeat=$(env_value DEPLOY_HEARTBEAT_URL)
 if [ -n "$heartbeat" ]; then
   printf 'url = "%s"\n' "$heartbeat" | curl -fsS --max-time 10 -K - > /dev/null || log 'heartbeat не отправлен'
+fi
+# Без внешнего монитора о падении всего сервера и о недошедших уведомлениях никто не узнает
+# (monitor.sh намеренно не роняет службу каждый час) — напоминание в каждом обновлении.
+if [ -z "$(env_value MONITOR_HEARTBEAT_URL)" ]; then
+  log 'ВНИМАНИЕ: внешний монитор не настроен (MONITOR_HEARTBEAT_URL): падение сервера и недошедшие уведомления никто не увидит'
 fi
 log "готово: $target, проверка пройдена"

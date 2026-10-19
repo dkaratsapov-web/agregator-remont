@@ -12,8 +12,11 @@
 #   BACKUP_REQUIRE_OFFSITE  true — копия без проверенной выгрузки вне сервера считается сбоем
 #                         (публичный запуск); по умолчанию — предупреждение (закрытый тест)
 #   BACKUP_HEARTBEAT_URL  адрес, который дёргается после успешной копии (healthchecks.io и т. п.)
-# Итог — в STATE_DIR/backup-status: mode=offsite-verified (копия выгружена и найдена в хранилище
-# с тем же размером) или mode=local-only (только на сервере). monitor.sh напоминает о local-only.
+# Итог — в STATE_DIR/backup-status: mode=offsite-hash-checked (копия выгружена, в хранилище тот
+# же размер и та же контрольная сумма), offsite-size-checked (хранилище не отдаёт сумму —
+# сверен только размер) или local-only (только на сервере). monitor.sh напоминает о local-only.
+# Это проверка выгрузки, а не восстановимости: копию вне сервера проверяет restore-check.sh по
+# скачанному файлу .age (deploy/README.md, «Резервные копии»).
 # Сбой копии — выход с ошибкой и уведомление (notify.sh). Локальная копия при сбое выгрузки
 # остаётся на сервере.
 set -euo pipefail
@@ -70,16 +73,27 @@ if [ -n "$remote" ]; then
   command -v rclone > /dev/null || offsite_failed 'не установлен rclone (apt install rclone)'
   age -r "$recipient" -o "$file.age" "$file" || offsite_failed 'шифрование age не удалось'
   rclone copy --immutable "$file.age" "$remote" || offsite_failed "выгрузка в $remote не удалась"
-  # Проверка: файл есть в хранилище и того же размера. Нужно только право на список, не на
-  # чтение содержимого (ключ хранилища — запись и список, без удаления).
+  # Проверка по списку файлов хранилища (право на чтение содержимого не нужно): размер и, если
+  # хранилище отдаёт контрольную сумму (SHA-256, SHA-1 или MD5 — зависит от хранилища), сумма.
   name=$(basename "$file.age")
   size=$(stat -c %s "$file.age")
-  stored=$(rclone lsjson --files-only --include "/$name" "$remote" 2> /dev/null |
-    python3 -c 'import json, sys; print(sum(f["Size"] for f in json.load(sys.stdin)))' 2> /dev/null || true)
-  [ "$stored" = "$size" ] || offsite_failed "в $remote нет $name нужного размера (ожидалось $size, найдено ${stored:-ничего})"
+  read -r stored hash_type stored_hash <<< "$(rclone lsjson --hash --files-only --include "/$name" "$remote" 2> /dev/null |
+    python3 -c '
+import json, sys
+files = json.load(sys.stdin)
+hashes = (files[0].get("Hashes") or {}) if files else {}
+kind = next((k for k in ("sha256", "sha1", "md5") if hashes.get(k)), "-")
+print(files[0]["Size"] if files else "-", kind, hashes.get(kind, "-"))' 2> /dev/null || echo '- - -')"
+  [ "$stored" = "$size" ] || offsite_failed "в $remote нет $name нужного размера (ожидалось $size, найдено $stored)"
+  mode=offsite-size-checked
+  if [ "$hash_type" != - ]; then
+    [ "$("${hash_type}sum" "$file.age" | cut -d' ' -f1)" = "$stored_hash" ] ||
+      offsite_failed "в $remote у $name другая контрольная сумма ($hash_type): файл повреждён при выгрузке"
+    mode=offsite-hash-checked
+  fi
   rm -f "$file.age"
-  write_status backup-status mode=offsite-verified "file=$file" "label=$label" "remote=$remote"
-  log "выгружено в $remote (шифровано), размер в хранилище проверен"
+  write_status backup-status "mode=$mode" "file=$file" "label=$label" "remote=$remote"
+  log "выгружено в $remote (шифровано), проверка в хранилище: $mode"
 else
   write_status backup-status mode=local-only "file=$file" "label=$label" offsite=not-configured
   # Публичный запуск: без копии вне сервера — сбой (fail closed); локальная копия остаётся.

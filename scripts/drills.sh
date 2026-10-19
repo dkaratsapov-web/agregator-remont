@@ -9,7 +9,8 @@
 #      контейнере; обрезанная копия — проверка восстановления не проходит;
 #   2. сломанное обновление (API падает при старте) и откат rollback.sh на прошлую версию:
 #      сайт снова отвечает, данные на месте;
-#   3. откат поверх несовместимой миграции (DROP COLUMN) — отказ, работающий стек не тронут.
+#   3. несовместимая миграция (DROP COLUMN) применена к базе: откат отказывает, стек не тронут;
+#      по порядку из отказа база восстанавливается из копии до миграции — откат проходит.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -77,12 +78,13 @@ if command -v age > /dev/null && command -v rclone > /dev/null; then
     echo "BACKUP_RCLONE_REMOTE=:local:$WORK/offsite"
   } >> "$ENV_FILE"
   bash deploy/backup/backup.sh drill-offsite > "$WORK/out.log" 2>&1 && code=0 || code=$?
-  check 'offsite backup: uploaded and verified' "$code $(status backup-status mode)" '0 offsite-verified'
+  check 'offsite backup: uploaded, size and checksum match' "$code $(status backup-status mode)" '0 offsite-hash-checked'
+  # Как владелец проверяет копию вне сервера: скачанный .age и приватный ключ.
   uploaded=$(find "$WORK/offsite" -name '*.age' | tail -n 1)
-  age -d -i "$WORK/age.key" "$uploaded" > "$WORK/decrypted.dump"
-  check 'offsite backup: decrypts to a pg_dump' "$(head -c 5 "$WORK/decrypted.dump")" PGDMP
-  bash deploy/backup/restore-check.sh "$WORK/decrypted.dump" > "$WORK/restore.log" 2>&1 && code=0 || code=$?
-  check 'offsite backup: restores' "$code" 0
+  AGE_IDENTITY="$WORK/age.key" bash deploy/backup/restore-check.sh "$uploaded" > "$WORK/restore.log" 2>&1 && code=0 || code=$?
+  check 'offsite backup: the encrypted copy restores' "$code $(status restore-status result)" '0 ok'
+  grep -q "users: $users_before;" "$WORK/restore.log" && restored=same || restored=differs
+  check 'offsite backup: same number of users as the live base' "$restored" same
   echo "BACKUP_RCLONE_REMOTE=:local:/proc/forbidden" >> "$ENV_FILE"
   bash deploy/backup/backup.sh drill-offsite > "$WORK/out.log" 2>&1 && code=0 || code=$?
   check 'offsite upload failure: error, local copy kept' \
@@ -122,20 +124,40 @@ check 'rollback: previous version deployed' "$(cat "$STATE_DIR/deployed")" "$goo
 check 'rollback: broken version marked failed' "$(cat "$STATE_DIR/failed")" "$bad"
 check 'rollback: data kept' "$(sql 'select count(*) from users')" "$users_before"
 
-# --- 3. Несовместимая миграция между версиями: отказ, стек не тронут.
+# --- 3. Несовместимая миграция применена к базе: отказ; база восстановлена из копии — откат.
 mkdir -p apps/api/prisma/migrations/29990101000000_drill
 echo 'ALTER TABLE "jobs" DROP COLUMN "title";' > apps/api/prisma/migrations/29990101000000_drill/migration.sql
 git add -A && git commit -q -m 'drill: incompatible migration'
 newer=$(git rev-parse HEAD)
 docker tag agregator-api:local "agregator-api:${newer:0:12}"
 docker tag agregator-web:local "agregator-web:${newer:0:12}"
+# Как автообновление: копия перед миграцией, затем миграция (по-настоящему, с записью в журнал
+# миграций Prisma).
+bash deploy/backup/backup.sh pre-migration > "$WORK/out.log" 2>&1
+pre=$(status backup-status file)
+sql 'ALTER TABLE "jobs" DROP COLUMN "title"' > /dev/null
+sql "insert into _prisma_migrations (id, checksum, migration_name, finished_at, applied_steps_count)
+     values ('drill', 'drill', '29990101000000_drill', now(), 1)" > /dev/null
 echo "$newer" > "$STATE_DIR/deployed"
 printf '%s\n%s\n' "$good" "$newer" > "$STATE_DIR/history"
 rm -f "$STATE_DIR/failed"
 REPO_DIR=$server bash deploy/autodeploy/rollback.sh "$good" > "$WORK/rollback.log" 2>&1 && code=0 || code=$?
-check 'rollback over DROP COLUMN: refused' "$code $(grep -c 'несовместимы со старым кодом' "$WORK/rollback.log")" '1 1'
-check 'rollback over DROP COLUMN: still deployed' "$(cat "$STATE_DIR/deployed")" "$newer"
-check 'rollback over DROP COLUMN: stack untouched' "$(api_ready)" ready
+check 'rollback over applied DROP COLUMN: refused' "$code $(grep -c '29990101000000_drill' "$WORK/rollback.log")" '1 1'
+check 'rollback over applied DROP COLUMN: still deployed' "$(cat "$STATE_DIR/deployed")" "$newer"
+check 'rollback over applied DROP COLUMN: stack untouched' "$(api_ready)" ready
+# Порядок из отказа: остановить api и web, восстановить копию перед миграцией, повторить откат.
+"${compose[@]}" stop api web > /dev/null 2>&1
+# Переменные раскрывает shell внутри контейнера db.
+# shellcheck disable=SC2016
+"${compose[@]}" exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner' \
+  < "$pre" > "$WORK/pg_restore.log" 2>&1 && code=0 || code=$?
+check 'restore of the pre-migration copy into the live base' "$code" 0
+check 'restored base: dropped column is back' "$(sql "select count(*) from information_schema.columns where table_name = 'jobs' and column_name = 'title'")" 1
+REPO_DIR=$server bash deploy/autodeploy/rollback.sh "$good" > "$WORK/rollback.log" 2>&1 && code=0 || code=$?
+check 'rollback after the restore: done' "$code $(grep -c 'опасных миграций в базе нет' "$WORK/rollback.log")" '0 1'
+wait_ready && back=ready || back=down
+check 'rollback after the restore: API answers' "$back" ready
+check 'rollback after the restore: data kept' "$(sql 'select count(*) from users')" "$users_before"
 
 cd "$ROOT"
 if [ "$failures" -gt 0 ]; then

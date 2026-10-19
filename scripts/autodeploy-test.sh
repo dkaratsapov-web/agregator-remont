@@ -24,6 +24,8 @@ git clone -q "$WORK/origin.git" "$WORK/dev" 2> /dev/null
 cd "$WORK/dev"
 git config user.email t@example.ru && git config user.name test
 mkdir -p deploy && echo 'site {}' > deploy/Caddyfile && echo one > app.txt
+# Как в репозитории: настройки сервера в git не попадают.
+printf 'deploy/.env\n' > .gitignore
 git add -A && git commit -qm one && git push -q origin main 2> /dev/null
 
 # «Сервер».
@@ -50,6 +52,8 @@ case "$1 $2" in
 esac
 if [ "$1" = compose ]; then
   case " $* " in
+    # Откат: применённые миграции живой базы (DB_MIGRATIONS, по одной в строке).
+    *" exec "*_prisma_migrations*) [ "${EXEC_FAIL:-0}" = 1 ] && exit 1; printf '%b' "${DB_MIGRATIONS:-}" ;;
     *" exec "*) [ "${EXEC_FAIL:-0}" = 1 ] && exit 1; printf 'PGDMP-stub' ;;
     *" build "*) [ "${BUILD_FAIL:-0}" = 1 ] && exit 1 ;;
     *" up "*) [ "${UP_FAIL:-0}" = 1 ] && exit 1 ;;
@@ -145,7 +149,9 @@ all_green() {
 all_green
 run
 check 'green: deployed sha recorded' "$(deployed)" "$(dev_head)"
+check 'green: exit 0 even without old images to clean' "$(logged '^exit') $(logged 'готово: ')" '0 1'
 check 'green: build then up' "$(grep -o 'build tag=[0-9a-f]*$\|up -d' "$STUB_LOG" | sed 's/ tag=.*//' | tr '\n' ' ')" 'build up -d '
+check 'green: missing external monitor is warned' "$(logged 'внешний монитор не настроен')" 1
 check 'green: health checked through Caddy' "$(grep -c 'example.test/jobs' "$CURL_LOG")" 1
 check 'green: static and frame checked' "$(grep -c '_next/static\|/landing/' "$CURL_LOG")" 2
 
@@ -386,7 +392,7 @@ check 'diverged: docker not called' "$(docker_calls compose)" 0
 cat > "$WORK/bin/age" << 'STUB'
 #!/usr/bin/env bash
 out=''
-while [ $# -gt 1 ]; do case "$1" in -o) out=$2; shift ;; -r) shift ;; esac; shift; done
+while [ $# -gt 1 ]; do case "$1" in -o) out=$2; shift ;; -r | -i) shift ;; esac; shift; done
 cp "$1" "$out"
 STUB
 cat > "$WORK/bin/rclone" << 'STUB'
@@ -397,9 +403,15 @@ case "$1" in
     cp "$3" "$REMOTE_DIR/"
     [ "${RCLONE_TRUNCATE:-0}" = 1 ] && : > "$REMOTE_DIR/$(basename "$3")"
     exit 0 ;;
-  lsjson) name=${4#/}
+  # Список хранилища: размер и MD5 (RCLONE_NO_HASH — хранилище сумму не отдаёт,
+  # RCLONE_BAD_HASH — сумма не совпадает).
+  lsjson) name=$(printf '%s\n' "$@" | sed -n '/^--include$/{n;s#^/##;p}')
     if [ -f "$REMOTE_DIR/$name" ]; then
-      printf '[{"Name":"%s","Size":%s}]' "$name" "$(stat -c %s "$REMOTE_DIR/$name")"
+      md5=$(md5sum "$REMOTE_DIR/$name" | cut -d' ' -f1)
+      [ "${RCLONE_BAD_HASH:-0}" = 1 ] && md5=00000000000000000000000000000000
+      hashes=',"Hashes":{"md5":"'$md5'"}'
+      [ "${RCLONE_NO_HASH:-0}" = 1 ] && hashes=''
+      printf '[{"Name":"%s","Size":%s%s}]' "$name" "$(stat -c %s "$REMOTE_DIR/$name")" "$hashes"
     else echo '[]'; fi ;;
 esac
 STUB
@@ -423,8 +435,21 @@ check 'backup required offsite missing: fails, notifies, keeps dump' \
   "$(logged '^exit 1') $(grep -c hooks.invalid "$CURL_LOG") $(mode) $(kept)" '1 1 local-only kept'
 printf 'BACKUP_RCLONE_REMOTE=store:bk\nBACKUP_AGE_RECIPIENT=age1test\n' >> "$ENV_FILE"
 backup
-check 'backup offsite: uploaded and verified' "$(logged '^exit') $(mode) $(find "$WORK/remote" -name '*.age' | wc -l | tr -d ' ')" '0 offsite-verified 1'
+check 'backup offsite: uploaded, size and checksum match' "$(logged '^exit') $(mode) $(find "$WORK/remote" -name '*.age' | wc -l | tr -d ' ')" '0 offsite-hash-checked 1'
 check 'backup offsite: no plaintext dump uploaded' "$(find "$WORK/remote" -name '*.dump' | wc -l | tr -d ' ')" 0
+# Копия вне сервера проверяется восстановлением скачанного .age (нужен приватный ключ).
+uploaded=$(find "$WORK/remote" -name '*.age' | head -n 1)
+(cd "$WORK/server" && bash "$ROOT/deploy/backup/restore-check.sh" "$uploaded" > "$WORK/out.log" 2>&1) || echo "exit $?" >> "$WORK/out.log"
+check 'restore check of an encrypted copy without the key: refused' "$(logged '^exit 1') $(logged 'AGE_IDENTITY')" '1 1'
+echo 'AGE-SECRET-KEY-TEST' > "$WORK/age.key"
+mkdir -p "$WORK/tmp"
+(cd "$WORK/server" && TMPDIR="$WORK/tmp" AGE_IDENTITY="$WORK/age.key" bash "$ROOT/deploy/backup/restore-check.sh" "$uploaded" > "$WORK/out.log" 2>&1) || echo "exit $?" >> "$WORK/out.log"
+check 'restore check of an encrypted copy: decrypted, restored, temp file removed' \
+  "$(logged '^exit') $(sed -n 's/^result=//p' "$WORK/state/restore-status") $(grep -c "file=$uploaded" "$WORK/state/restore-status") $(find "$WORK/tmp" -type f | wc -l | tr -d ' ')" '0 ok 1 0'
+RCLONE_NO_HASH=1 backup
+check 'backup offsite without a checksum from the store: size only, said so' "$(logged '^exit') $(mode)" '0 offsite-size-checked'
+RCLONE_BAD_HASH=1 backup
+check 'backup checksum mismatch: error, local-only' "$(logged '^exit 1') $(logged 'другая контрольная сумма') $(mode) $(kept)" '1 1 local-only kept'
 RCLONE_FAIL=1 backup
 check 'backup upload failure: error, local-only, dump kept' "$(logged '^exit 1') $(mode) $(kept)" '1 local-only kept'
 RCLONE_TRUNCATE=1 backup
@@ -470,39 +495,64 @@ monitor
 check 'monitor: missing external monitor is logged' "$(logged 'внешний монитор не настроен')" 1
 unset ENV_FILE
 
-# 16. Откат (ТЗ #40): правки на сервере, Docker не отвечает, нет сохранённого SHA, несовместимая
-# миграция между версиями — отказ без изменений; после восстановления базы — откат разрешён.
+# 16. Откат (ТЗ #40): правки и посторонние файлы на сервере, Docker и база не отвечают, нет
+# сохранённого SHA, опасная миграция применена в базе — отказ без изменений; база восстановлена
+# до опасной миграции — откат разрешён (проверяется сама база, флагов обхода нет).
 git -C "$WORK/server" reset -q --hard origin/main
 rm -f "$WORK/state/failed"
+cd "$WORK/dev"
+echo 'данные прежней версии' > old.txt && echo dump > keep.dump
+git add -A && git commit -qm 'files of the previous version' && git push -q origin main 2> /dev/null
+all_green
+run
 mkdir -p "$WORK/dev/apps/api/prisma/migrations/3" "$WORK/dev/apps/api/prisma/migrations/4"
-push_commit 'ALTER TABLE "jobs" DROP COLUMN "title";' apps/api/prisma/migrations/3/migration.sql
+cd "$WORK/dev"
+git rm -q old.txt keep.dump && echo '*.dump' >> .gitignore
+echo 'ALTER TABLE "jobs" DROP COLUMN "title";' > apps/api/prisma/migrations/3/migration.sql
+git add -A && git commit -qm 'drop column' && git push -q origin main 2> /dev/null
 all_green
 run
 check 'drop column migration deployed' "$(deployed)" "$(dev_head)"
 new=$(deployed)
 rollback() { : > "$STUB_LOG"; bash "$ROOT/deploy/autodeploy/rollback.sh" > "$WORK/out.log" 2>&1 || echo "exit $?" >> "$WORK/out.log"; }
-rollback
-check 'rollback over incompatible migration: refused' "$(logged 'несовместимы со старым кодом') $(deployed) $(docker_calls 'up -d')" "1 $new 0"
-check 'rollback refusal shows the runbook' "$(logged 'ROLLBACK_SCHEMA_RESTORED=yes')" 1
+DB_MIGRATIONS='0_init\n3' rollback
+check 'rollback over applied incompatible migration: refused' "$(logged 'несовместимы со старым кодом') $(deployed) $(docker_calls 'up -d')" "1 $new 0"
+check 'rollback refusal names the migration and the runbook' "$(logged '\]   3$') $(logged 'проверит базу сам')" '1 1'
+ROLLBACK_SCHEMA_RESTORED=yes DB_MIGRATIONS='3' rollback
+check 'no environment flag bypasses the database check' "$(logged 'несовместимы со старым кодом') $(deployed)" "1 $new"
+EXEC_FAIL=1 rollback
+check 'rollback with the database down: refused' "$(logged 'база не отвечает') $(deployed) $(docker_calls 'up -d')" "1 $new 0"
 echo dirty >> "$WORK/server/app.txt"
-ROLLBACK_SCHEMA_RESTORED=yes rollback
+rollback
 check 'rollback with local changes: refused' "$(logged 'есть изменения') $(deployed)" "1 $new"
 git -C "$WORK/server" checkout -q -- app.txt
-DOCKER_DOWN=1 ROLLBACK_SCHEMA_RESTORED=yes rollback
+# Аудит #40: неотслеживаемый файл по пути, который есть в прошлой версии, — reset его перезаписал бы.
+echo 'локальные данные' > "$WORK/server/old.txt"
+rollback
+check 'untracked file in the way: refused' "$(logged 'посторонние файлы') $(deployed)" "1 $new"
+check 'untracked file in the way: kept as is' "$(cat "$WORK/server/old.txt")" 'локальные данные'
+rm "$WORK/server/old.txt"
+# Игнорируемый файл (git status его не показывает) по пути из прошлой версии.
+echo 'локальный дамп' > "$WORK/server/keep.dump"
+rollback
+check 'ignored file in the way: refused' "$(logged 'перезапишет откат') $(deployed)" "1 $new"
+check 'ignored file in the way: kept as is' "$(cat "$WORK/server/keep.dump")" 'локальный дамп'
+rm "$WORK/server/keep.dump"
+DOCKER_DOWN=1 rollback
 check 'rollback with Docker down: refused' "$(logged 'Docker не отвечает') $(deployed)" "1 $new"
 mv "$WORK/state/deployed" "$WORK/state/deployed.bak"
-ROLLBACK_SCHEMA_RESTORED=yes rollback
+rollback
 check 'rollback without saved SHA: refused' "$(logged 'нет сохранённого')" 1
 mv "$WORK/state/deployed.bak" "$WORK/state/deployed"
-ROLLBACK_SCHEMA_RESTORED=yes rollback
-check 'rollback after database restore: done' "$(logged '^exit') $(failed)" "0 $new"
-# Совместимая миграция с пометкой rollback-safe не мешает откату.
+DB_MIGRATIONS='0_init' rollback
+check 'rollback after database restore: done' "$(logged '^exit') $(logged 'опасных миграций в базе нет') $(failed)" "0 1 $new"
+# Опасный оператор с пометкой rollback-safe прямо перед ним не мешает откату.
 push_commit "$(printf -- '-- rollback-safe: значение enum только для записи в журнал\nALTER TYPE "AuditAction" ADD VALUE '"'"'X'"'"';')" apps/api/prisma/migrations/4/migration.sql
 all_green
 rm -f "$WORK/state/failed"
 run
 marked=$(deployed)
-rollback
+DB_MIGRATIONS='0_init\n3\n4' rollback
 check 'rollback over rollback-safe migration: allowed' "$(logged '^exit') $(failed)" "0 $marked"
 
 # Секреты не попадают в журнал (в .env на сервере их нет, но проверяем, что .env не печатается).
