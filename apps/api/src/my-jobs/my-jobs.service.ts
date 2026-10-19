@@ -3,6 +3,7 @@ import {
   validateJobDetails,
   validateJobItems,
   type JobCategory,
+  type JobCloseOutcome,
   type JobDetails,
   type JobItem,
   type OwnJobDto,
@@ -227,19 +228,34 @@ export class MyJobsService {
     return toOwnJobDto(job);
   }
 
-  async close(ownerId: string, id: string): Promise<OwnJobDto> {
+  /**
+   * Закрытие с исходом. Открытый заказ (исполнитель не выбран) можно только отменить; у заказа
+   * в работе исход обязателен: «выполнен» или «отменён» (AUDIT_FINDINGS MVP-5).
+   */
+  async close(ownerId: string, id: string, outcome?: JobCloseOutcome): Promise<OwnJobDto> {
     const job = await this.prisma.$transaction(async (tx) => {
       const current = await this.lockOwned(tx, ownerId, id);
       if (current.status === 'CLOSED') throw new ConflictException('Заказ уже закрыт');
-      const closed = await tx.job.update({ where: { id }, data: { status: 'CLOSED' } });
+      if (current.status === 'OPEN' && outcome === 'COMPLETED') {
+        throw new ConflictException(
+          'Исполнитель не выбран: заказ можно только отменить. Выберите исполнителя, чтобы завершить заказ',
+        );
+      }
+      if (current.status === 'IN_PROGRESS' && !outcome) {
+        throw new BadRequestException('Укажите, чем закончился заказ: выполнен или отменён');
+      }
+      const closed = await tx.job.update({
+        where: { id },
+        data: { status: 'CLOSED', closeOutcome: outcome ?? 'CANCELLED' },
+      });
       // Ожидающие отклики закрытого заказа больше не могут быть выбраны.
-      await this.bids.rejectPending(tx, ownerId, id);
+      await this.bids.rejectPending(tx, ownerId, id, null, 'JOB_CLOSED');
       await writeAudit(tx, {
         actorId: ownerId,
         action: 'JOB_CLOSED',
         entityType: 'job',
         entityId: id,
-        changes: diffFields(current, closed, ['status']),
+        changes: diffFields(current, closed, ['status', 'closeOutcome']),
       });
       return closed;
     });

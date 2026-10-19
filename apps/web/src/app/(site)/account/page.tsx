@@ -276,7 +276,7 @@ async function ContractorSummary({ token }: { token: string }) {
                     <span className="text-sm font-semibold tabular-nums text-ink">
                       {formatAmount(bid.price)} ₽
                     </span>
-                    <BidStatusBadge status={bid.status} />
+                    <BidStatusBadge status={bid.status} rejectReason={bid.rejectReason} />
                   </>
                 }
               />

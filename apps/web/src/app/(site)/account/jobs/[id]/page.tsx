@@ -1,4 +1,4 @@
-import { JOB_STATUS_LABELS, validateJobDetails } from '@agregator/shared';
+import { JOB_CLOSE_OUTCOME_LABELS, JOB_STATUS_LABELS, validateJobDetails } from '@agregator/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -58,7 +58,11 @@ export default async function MyJobPage({
     : query.saved
       ? 'Изменения сохранены.'
       : query.closed
-        ? 'Заказ закрыт.'
+        ? query.closed === 'done'
+          ? 'Заказ закрыт как выполненный.'
+          : query.closed === 'cancelled'
+            ? 'Заказ отменён.'
+            : 'Заказ закрыт.'
         : query.accepted
           ? 'Исполнитель выбран, заказ в работе.'
           : null;
@@ -159,7 +163,12 @@ export default async function MyJobPage({
             label="Заказ"
             title={job.title}
             rows={[
-              ['Статус', JOB_STATUS_LABELS[job.status]],
+              [
+                'Статус',
+                job.closeOutcome
+                  ? `${JOB_STATUS_LABELS[job.status]}: ${JOB_CLOSE_OUTCOME_LABELS[job.closeOutcome].toLowerCase()}`
+                  : JOB_STATUS_LABELS[job.status],
+              ],
               [
                 jobCategoryLabels(job).length > 1 ? 'Категории' : 'Категория',
                 jobCategoryLabels(job).join(', '),
@@ -198,7 +207,10 @@ export default async function MyJobPage({
             }
           />
           {job.status !== 'CLOSED' ? (
-            <CloseJobForm action={closeJobAction.bind(null, job.id)} />
+            <CloseJobForm
+              action={closeJobAction.bind(null, job.id)}
+              inProgress={job.status === 'IN_PROGRESS'}
+            />
           ) : null}
         </aside>
       </div>
@@ -227,6 +239,7 @@ export default async function MyJobPage({
                 details: JSON.stringify(job.details),
                 extraItems: JSON.stringify(job.extraItems),
               }}
+              version={job.updatedAt}
               submitLabel="Сохранить изменения"
               pendingLabel="Сохраняем…"
             />

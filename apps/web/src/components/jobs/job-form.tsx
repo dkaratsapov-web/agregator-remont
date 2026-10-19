@@ -44,6 +44,15 @@ interface Props {
    * null — черновика ещё нет, строка — продолжаем сохранённый черновик.
    */
   draftId?: string | null;
+  /** updatedAt открытого черновика: сохранение не перезапишет его правку из другой вкладки. */
+  draftVersion?: string | null;
+  /**
+   * Ключ публикации нового заказа (UUID, выдаёт страница): повтор отправки (двойной клик,
+   * обрыв связи) вернёт уже созданный заказ, а не создаст второй.
+   */
+  requestId?: string;
+  /** Правка: updatedAt заказа на момент открытия формы. Изменён в другой вкладке → ошибка. */
+  version?: string;
 }
 
 /** Пауза после последней правки перед автосохранением черновика. */
@@ -54,7 +63,9 @@ type DraftStatus =
   | { kind: 'pending' }
   | { kind: 'saving' }
   | { kind: 'saved'; at: string }
-  | { kind: 'error'; message: string };
+  | { kind: 'error'; message: string; login?: string }
+  /** Черновик изменён в другой вкладке: автосохранение ждёт решения человека. */
+  | { kind: 'conflict'; message: string };
 
 interface AutosaveBox {
   timer?: number;
@@ -70,6 +81,10 @@ interface AutosaveBox {
   mounted: boolean;
   /** id черновика из последнего ответа (раньше, чем перерисуется скрытое поле). */
   draftId: string | null;
+  /** Версия черновика из последнего сохранения; null — перезаписать без проверки. */
+  version: string | null;
+  /** Черновик изменён в другой вкладке: не сохраняем, пока человек не выберет версию. */
+  conflict: boolean;
 }
 
 const timeOf = (iso: string) =>
@@ -129,6 +144,9 @@ export function JobForm({
   submitLabel,
   pendingLabel,
   draftId: initialDraftId,
+  draftVersion,
+  requestId,
+  version,
 }: Props) {
   const [state, formAction] = useActionState<JobFormState, FormData>(action, {});
   const values = { ...initial, ...state.values };
@@ -136,6 +154,8 @@ export function JobForm({
   const formRef = useRef<HTMLFormElement>(null);
   const [draftId, setDraftId] = useState<string | null>(initialDraftId ?? null);
   const [draftStatus, setDraftStatus] = useState<DraftStatus>({ kind: 'idle' });
+  // Ключ публикации закрепляется при первой отрисовке: перерисовка страницы его не меняет.
+  const [publishKey] = useState(requestId);
 
   const [category, setCategory] = useState<JobCategory | ''>(() =>
     isJobCategory(values.category) ? values.category : '',
@@ -286,13 +306,15 @@ export function JobForm({
     snapshot: null,
     mounted: false,
     draftId: initialDraftId ?? null,
+    version: draftVersion ?? null,
+    conflict: false,
   });
 
   const saveNow = useCallback(async (): Promise<void> => {
     const box = autosave.current;
     window.clearTimeout(box.timer);
     box.timer = undefined;
-    if (!drafts || box.publishing) return;
+    if (!drafts || box.publishing || box.conflict) return;
     if (box.inFlight) {
       box.again = true;
       return box.inFlight;
@@ -303,12 +325,14 @@ export function JobForm({
     if (!form) return;
     // id из последнего ответа сервера: скрытое поле могло ещё не перерисоваться.
     form.set('draftId', box.draftId ?? '');
+    form.set('expectedUpdatedAt', box.version ?? '');
     const run = (async () => {
       if (box.mounted) setDraftStatus({ kind: 'saving' });
       try {
         const result = await saveDraftAction(form);
         if (result.ok) {
           box.draftId = result.draftId;
+          box.version = result.savedAt;
           if (!box.mounted) return;
           setDraftId(result.draftId);
           setDraftStatus({ kind: 'saved', at: result.savedAt });
@@ -320,10 +344,18 @@ export function JobForm({
           }
         } else {
           // Черновик опубликован или удалён в другой вкладке: следующее сохранение создаст новый.
-          if (result.reset) box.draftId = null;
+          if (result.reset) {
+            box.draftId = null;
+            box.version = null;
+          }
+          if (result.conflict) box.conflict = true;
           if (!box.mounted) return;
           if (result.reset) setDraftId(null);
-          setDraftStatus({ kind: 'error', message: result.error });
+          setDraftStatus(
+            result.conflict
+              ? { kind: 'conflict', message: result.error }
+              : { kind: 'error', message: result.error, login: result.login },
+          );
         }
       } catch {
         if (box.mounted) {
@@ -349,6 +381,8 @@ export function JobForm({
     const box = autosave.current;
     if (!drafts || box.publishing || !formRef.current) return;
     box.snapshot = new FormData(formRef.current);
+    // Конфликт версий: правки остаются в форме, сохранение ждёт выбора человека.
+    if (box.conflict) return;
     window.clearTimeout(box.timer);
     box.timer = window.setTimeout(() => void saveNow(), AUTOSAVE_DELAY_MS);
     setDraftStatus((current) => (current.kind === 'pending' ? current : { kind: 'pending' }));
@@ -368,7 +402,8 @@ export function JobForm({
     if (!drafts) return;
     const box = autosave.current;
     box.mounted = true;
-    const unsaved = () => !box.publishing && (box.timer !== undefined || box.inFlight !== null);
+    const unsaved = () =>
+      !box.publishing && (box.timer !== undefined || box.inFlight !== null || box.conflict);
     // Вкладку прячут или закрывают: пробуем сохранить сразу. Браузер не обязан дождаться
     // ответа, поэтому при закрытии с несохранёнными правками ещё и спрашиваем подтверждение.
     const flush = () => {
@@ -389,6 +424,22 @@ export function JobForm({
       if (box.timer !== undefined) void saveNow();
     };
   }, [drafts, saveNow]);
+
+  /** Конфликт черновика: сохранить версию из этой вкладки поверх другой. */
+  const keepMine = () => {
+    const box = autosave.current;
+    box.conflict = false;
+    box.version = null;
+    void saveNow();
+  };
+  /** Конфликт черновика: открыть сохранённую версию (правки этой вкладки не сохраняются). */
+  const openSaved = () => {
+    const box = autosave.current;
+    window.clearTimeout(box.timer);
+    box.timer = undefined;
+    box.conflict = false;
+    window.location.reload();
+  };
 
   // Публикация не удалась (ответ сервера с ошибкой): автосохранение снова работает.
   const [lastPublishState, setLastPublishState] = useState(state);
@@ -466,8 +517,10 @@ export function JobForm({
       noValidate
       className="@container/form"
     >
-      <FormError message={topError} />
+      <FormError message={topError} login={issues.length > 0 ? undefined : state.login} />
       {drafts ? <input type="hidden" name="draftId" value={draftId ?? ''} /> : null}
+      {publishKey ? <input type="hidden" name="requestId" value={publishKey} /> : null}
+      {version ? <input type="hidden" name="expectedUpdatedAt" value={version} /> : null}
 
       <div className="grid items-start gap-5 @5xl:grid-cols-[minmax(0,1fr)_380px] @5xl:gap-6">
         <div className="min-w-0 space-y-5 @container">
@@ -742,7 +795,14 @@ export function JobForm({
           </FormSection>
 
           <SubmitButton pending={pendingLabel}>{submitLabel}</SubmitButton>
-          {drafts ? <DraftControls status={draftStatus} onSave={() => void saveNow()} /> : null}
+          {drafts ? (
+            <DraftControls
+              status={draftStatus}
+              onSave={() => void saveNow()}
+              onKeepMine={keepMine}
+              onOpenSaved={openSaved}
+            />
+          ) : null}
         </div>
       </div>
     </form>
@@ -800,14 +860,64 @@ function draftStatusText(status: DraftStatus): string {
       ? 'Есть несохранённые изменения'
       : status.kind === 'saved'
         ? `Черновик сохранён в ${timeOf(status.at)}`
-        : status.kind === 'error'
+        : status.kind === 'error' || status.kind === 'conflict'
           ? status.message
           : 'Черновик сохраняется сам через несколько секунд после правки';
 }
 
-function DraftControls({ status, onSave }: { status: DraftStatus; onSave: () => void }) {
+const draftLinkClass =
+  'font-semibold text-accent underline decoration-accent/40 underline-offset-4 hover:decoration-accent';
+
+function DraftControls({
+  status,
+  onSave,
+  onKeepMine,
+  onOpenSaved,
+}: {
+  status: DraftStatus;
+  onSave: () => void;
+  onKeepMine: () => void;
+  onOpenSaved: () => void;
+}) {
+  if (status.kind === 'conflict') {
+    return (
+      <div
+        role="alert"
+        className="space-y-3 rounded-xl border border-accent/40 bg-accent-tint px-4 py-3 text-sm text-ink"
+      >
+        <p>
+          {status.message} Оставьте версию из этой вкладки или откройте сохранённую (правки этой
+          вкладки тогда пропадут).
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onKeepMine}
+            className="inline-flex min-h-11 items-center rounded-xl bg-ink px-4 font-semibold text-canvas transition-transform duration-150 active:scale-[0.98]"
+          >
+            Оставить мою версию
+          </button>
+          <button
+            type="button"
+            onClick={onOpenSaved}
+            className="inline-flex min-h-11 items-center rounded-xl border border-line bg-surface px-4 font-semibold text-ink transition-[border-color,transform] duration-150 hover:border-ink/25 active:scale-[0.98]"
+          >
+            Открыть сохранённую
+          </button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-2">
+      {status.kind === 'error' && status.login ? (
+        <p role="alert" className="text-center text-sm text-ink">
+          <a href={status.login} target="_blank" rel="noopener" className={draftLinkClass}>
+            Войти в новой вкладке
+          </a>
+          , затем нажмите «Сохранить черновик».
+        </p>
+      ) : null}
       <button
         type="button"
         onClick={onSave}
@@ -907,7 +1017,9 @@ function OrderStamp({
           role="status"
           aria-live="polite"
           className={`border-r border-ink/15 px-4 py-2.5 text-xs leading-5 ${
-            status?.kind === 'error' ? 'font-medium text-accent' : 'text-ink-soft'
+            status?.kind === 'error' || status?.kind === 'conflict'
+              ? 'font-medium text-accent'
+              : 'text-ink-soft'
           }`}
         >
           {status ? draftStatusText(status) : 'Изменения сохранятся после «Сохранить изменения»'}

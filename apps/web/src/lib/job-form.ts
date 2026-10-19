@@ -223,7 +223,36 @@ export function parseJobForm(form: FormData): ParsedJobForm {
     return { ok: false, error: checked.issues[0].message, issues: checked.issues, values };
   }
   const draftId = draftIdFrom(form);
-  return { ok: true, values, input: draftId ? { ...checked.input, draftId } : checked.input };
+  const requestId = requestIdFrom(form);
+  return {
+    ok: true,
+    values,
+    input: {
+      ...checked.input,
+      ...(draftId ? { draftId } : {}),
+      ...(requestId ? { requestId } : {}),
+    },
+  };
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Ключ публикации из скрытого поля (UUID формы нового заказа); null, если его нет. */
+export function requestIdFrom(form: FormData): string | null {
+  const value = form.get('requestId');
+  return typeof value === 'string' && UUID.test(value) ? value : null;
+}
+
+/**
+ * Версия (updatedAt) заказа или черновика, с которой работает форма: ISO 8601 из скрытого поля;
+ * null, если её нет или значение неверное.
+ */
+export function versionFrom(form: FormData): string | null {
+  const value = form.get('expectedUpdatedAt');
+  return typeof value === 'string' &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/.test(value)
+    ? value
+    : null;
 }
 
 /** id черновика из скрытого поля формы; null, если черновика нет или значение неверное. */

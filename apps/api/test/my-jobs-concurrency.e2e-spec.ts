@@ -113,7 +113,10 @@ describe('My jobs concurrency (e2e)', () => {
         expect(actions).toEqual(['JOB_CREATED', 'JOB_CLOSED']);
         expect(stored.title).toBe(baseJob.title);
       }
-      expect(audit.at(-1)?.changes).toEqual({ status: { from: 'OPEN', to: 'CLOSED' } });
+      expect(audit.at(-1)?.changes).toEqual({
+        status: { from: 'OPEN', to: 'CLOSED' },
+        closeOutcome: { from: null, to: 'CANCELLED' },
+      });
     }
   });
 

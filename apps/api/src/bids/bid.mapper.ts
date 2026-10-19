@@ -12,13 +12,20 @@ export function toBidDto(bid: Bid): BidDto {
     comment: bid.comment,
     createdAt: bid.createdAt.toISOString(),
     jobChangedAt: bid.jobChangedAt?.toISOString() ?? null,
+    rejectReason: bid.rejectReason,
   };
 }
 
 export function toMyBidDto(bid: Bid & { job: Job }): MyBidDto {
   return {
     ...toBidDto(bid),
-    job: { id: bid.job.id, title: bid.job.title, city: bid.job.city, status: bid.job.status },
+    job: {
+      id: bid.job.id,
+      title: bid.job.title,
+      city: bid.job.city,
+      status: bid.job.status,
+      closeOutcome: bid.job.closeOutcome,
+    },
   };
 }
 

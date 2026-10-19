@@ -40,6 +40,15 @@ export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   CLOSED: 'Закрыт',
 };
 
+/** Чем закончился закрытый заказ. */
+export const JOB_CLOSE_OUTCOMES = ['COMPLETED', 'CANCELLED'] as const;
+export type JobCloseOutcome = (typeof JOB_CLOSE_OUTCOMES)[number];
+
+export const JOB_CLOSE_OUTCOME_LABELS: Record<JobCloseOutcome, string> = {
+  COMPLETED: 'Выполнен',
+  CANCELLED: 'Отменён',
+};
+
 export const CURRENCIES = ['RUB'] as const;
 export type Currency = (typeof CURRENCIES)[number];
 
@@ -105,6 +114,17 @@ export interface JobInput {
   extraItems?: JobItemDto[];
   /** Только при создании: черновик, из которого опубликован заказ; удаляется вместе с ним. */
   draftId?: string;
+  /**
+   * Только при создании: ключ формы (UUID). Повтор того же запроса (двойной клик, обрыв связи)
+   * вернёт уже созданный заказ, а не создаст второй.
+   */
+  requestId?: string;
+}
+
+/** Правка заказа: изменённые поля и версия, с которой открыта форма. */
+export interface JobUpdateInput extends Partial<Omit<JobInput, 'draftId' | 'requestId'>> {
+  /** updatedAt заказа на момент открытия формы; заказ изменён с тех пор → 409. */
+  expectedUpdatedAt?: string;
 }
 
 /** Заказ в кабинете владельца. */
@@ -113,6 +133,8 @@ export interface OwnJobDto extends JobDto {
   updatedAt: string;
   /** Редактировать можно только открытый заказ. */
   editable: boolean;
+  /** Исход закрытого заказа; null — не закрыт или закрыт до появления поля. */
+  closeOutcome: JobCloseOutcome | null;
 }
 
 /** Черновики нового заказа: видны только владельцу, в каталог не попадают. */
@@ -134,6 +156,8 @@ export interface JobDraftInput {
   budgetMax?: number | null;
   details?: JobDetails;
   extraItems?: JobItemDto[];
+  /** Только при замене: updatedAt черновика из последнего сохранения этой формы; иначе 409. */
+  expectedUpdatedAt?: string;
 }
 
 export interface JobDraftDto {

@@ -239,7 +239,11 @@ describe('My jobs (e2e)', () => {
         .post(`/v1/me/jobs/${job.id}/close`)
         .set(customer.auth)
         .expect(200);
-      expect(closed.body).toMatchObject({ status: 'CLOSED', editable: false });
+      expect(closed.body).toMatchObject({
+        status: 'CLOSED',
+        editable: false,
+        closeOutcome: 'CANCELLED',
+      });
 
       await http().post(`/v1/me/jobs/${job.id}/close`).set(customer.auth).expect(409);
       await http()
@@ -252,7 +256,10 @@ describe('My jobs (e2e)', () => {
         where: { entityId: job.id, action: 'JOB_CLOSED' },
       });
       expect(audit).toHaveLength(1);
-      expect(audit[0].changes).toEqual({ status: { from: 'OPEN', to: 'CLOSED' } });
+      expect(audit[0].changes).toEqual({
+        status: { from: 'OPEN', to: 'CLOSED' },
+        closeOutcome: { from: null, to: 'CANCELLED' },
+      });
     });
 
     it('lists only own jobs, newest first', async () => {

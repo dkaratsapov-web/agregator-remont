@@ -45,6 +45,14 @@
         ],
         "type": "object"
       },
+      "BidRejectReason": {
+        "description": "Почему отклик отклонён (только у REJECTED)",
+        "enum": [
+          "OTHER_ACCEPTED",
+          "JOB_CLOSED"
+        ],
+        "type": "string"
+      },
       "BidStatus": {
         "enum": [
           "PENDING",
@@ -71,6 +79,20 @@
           "currentPassword",
           "newPassword"
         ],
+        "type": "object"
+      },
+      "CloseJobDto": {
+        "additionalProperties": false,
+        "properties": {
+          "outcome": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/JobCloseOutcome"
+              }
+            ],
+            "description": "Чем закончился заказ. Открытый заказ (исполнитель не выбран) можно только отменить, поле можно не передавать. Для заказа в работе поле обязательно"
+          }
+        },
         "type": "object"
       },
       "ContractorProfileDto": {
@@ -381,6 +403,15 @@
             "description": "Целые рубли",
             "type": "integer"
           },
+          "rejectReason": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BidRejectReason"
+              }
+            ],
+            "description": "Почему отклик отклонён (только у REJECTED)",
+            "nullable": true
+          },
           "status": {
             "allOf": [
               {
@@ -398,6 +429,7 @@
           "comment",
           "createdAt",
           "jobChangedAt",
+          "rejectReason",
           "contractor"
         ],
         "type": "object"
@@ -414,6 +446,14 @@
           "WINDOWS_DOORS",
           "DESIGN",
           "OTHER"
+        ],
+        "type": "string"
+      },
+      "JobCloseOutcome": {
+        "description": "Исход закрытого заказа; null — не закрыт или закрыт до появления поля",
+        "enum": [
+          "COMPLETED",
+          "CANCELLED"
         ],
         "type": "string"
       },
@@ -787,6 +827,15 @@
             "description": "Целые рубли",
             "type": "integer"
           },
+          "rejectReason": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BidRejectReason"
+              }
+            ],
+            "description": "Почему отклик отклонён (только у REJECTED)",
+            "nullable": true
+          },
           "status": {
             "allOf": [
               {
@@ -804,6 +853,7 @@
           "comment",
           "createdAt",
           "jobChangedAt",
+          "rejectReason",
           "job"
         ],
         "type": "object"
@@ -813,6 +863,14 @@
         "properties": {
           "city": {
             "type": "string"
+          },
+          "closeOutcome": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/JobCloseOutcome"
+              }
+            ],
+            "nullable": true
           },
           "id": {
             "type": "string"
@@ -832,7 +890,8 @@
           "id",
           "title",
           "city",
-          "status"
+          "status",
+          "closeOutcome"
         ],
         "type": "object"
       },
@@ -1032,6 +1091,15 @@
           "city": {
             "type": "string"
           },
+          "closeOutcome": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/JobCloseOutcome"
+              }
+            ],
+            "description": "Исход закрытого заказа; null — не закрыт или закрыт до появления поля",
+            "nullable": true
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -1112,7 +1180,8 @@
           "extraItems",
           "createdAt",
           "updatedAt",
-          "editable"
+          "editable",
+          "closeOutcome"
         ],
         "type": "object"
       },
@@ -3994,6 +4063,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseJobDto"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -4004,6 +4083,16 @@
               }
             },
             "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
           },
           "401": {
             "content": {

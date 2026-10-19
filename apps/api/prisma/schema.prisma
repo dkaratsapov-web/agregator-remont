@@ -28,6 +28,12 @@ enum JobStatus {
   CLOSED
 }
 
+// Синхронизировано с JOB_CLOSE_OUTCOMES в packages/shared/src/jobs.ts.
+enum JobCloseOutcome {
+  COMPLETED
+  CANCELLED
+}
+
 enum Currency {
   RUB
 }
@@ -57,6 +63,12 @@ enum BidStatus {
   WITHDRAWN
 }
 
+// Синхронизировано с BID_REJECT_REASONS в packages/shared/src/bids.ts.
+enum BidRejectReason {
+  OTHER_ACCEPTED
+  JOB_CLOSED
+}
+
 // Синхронизировано с USER_ROLES в packages/shared/src/auth.ts.
 enum UserRole {
   CUSTOMER
@@ -65,35 +77,38 @@ enum UserRole {
 }
 
 model Job {
-  id          String        @id @default(cuid())
-  title       String        @db.VarChar(160)
-  description String
-  category    JobCategory
-  city        String        @db.VarChar(100)
+  id           String           @id @default(cuid())
+  title        String           @db.VarChar(160)
+  description  String
+  category     JobCategory
+  city         String           @db.VarChar(100)
   /// Целые рубли; null — «по договорённости». Ограничения проверяются CHECK в миграции.
-  budgetMin   Int?          @map("budget_min")
-  budgetMax   Int?          @map("budget_max")
-  currency    Currency      @default(RUB)
-  status      JobStatus     @default(OPEN)
+  budgetMin    Int?             @map("budget_min")
+  budgetMax    Int?             @map("budget_max")
+  currency     Currency         @default(RUB)
+  status       JobStatus        @default(OPEN)
+  /// Чем закончился заказ: выполнен или отменён. Задаётся при закрытии; null — не закрыт или
+  /// закрыт до появления поля.
+  closeOutcome JobCloseOutcome? @map("close_outcome")
   /// Ответы анкеты категории ({ id вопроса: значение }); проверяются validateJobDetails из
   /// @agregator/shared. Объект и размер ограничены CHECK в миграции.
-  details     Json          @default("{}")
+  details      Json             @default("{}")
   /// Позиции других категорий: [{ category, details }], до 4 (job-items.ts). Проверяются
   /// validateJobItems; массив и размер ограничены CHECK в миграции.
-  extraItems  Json          @default("[]") @map("extra_items")
+  extraItems   Json             @default("[]") @map("extra_items")
   /// Все категории заказа: основная первой, затем дополнительные. Заполняет триггер базы из
   /// category и extraItems (писать не нужно); по ней ищет каталог (GIN-индекс).
-  categories  JobCategory[] @default([])
+  categories   JobCategory[]    @default([])
   /// Заказчик-владелец. null у демонстрационных заказов из сида.
-  ownerId     String?       @map("owner_id")
+  ownerId      String?          @map("owner_id")
   /// Restrict: удаление пользователя не должно молча удалять или «осиротить» его заказы.
-  owner       User?         @relation(fields: [ownerId], references: [id], onDelete: Restrict)
-  bids        Bid[]
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
+  owner        User?            @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  bids         Bid[]
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
   /// Ключ формы публикации (UUID): повтор того же запроса (двойной клик, обрыв связи) вернёт
   /// уже созданный заказ, а не создаст второй. Уникален в пределах владельца.
-  requestId   String?       @map("request_id") @db.Uuid
+  requestId    String?          @map("request_id") @db.Uuid
 
   @@unique([ownerId, requestId])
   @@index([createdAt(sort: Desc), id(sort: Desc)])
@@ -235,21 +250,23 @@ model ContractorProfile {
 
 /// Отклик подрядчика на заказ. Один отклик подрядчика на заказ (уникальный индекс).
 model Bid {
-  id           String    @id @default(cuid())
-  jobId        String    @map("job_id")
-  job          Job       @relation(fields: [jobId], references: [id], onDelete: Restrict)
-  contractorId String    @map("contractor_id")
-  contractor   User      @relation(fields: [contractorId], references: [id], onDelete: Restrict)
+  id           String           @id @default(cuid())
+  jobId        String           @map("job_id")
+  job          Job              @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  contractorId String           @map("contractor_id")
+  contractor   User             @relation(fields: [contractorId], references: [id], onDelete: Restrict)
   /// Целые рубли.
   price        Int
-  durationDays Int?      @map("duration_days")
+  durationDays Int?             @map("duration_days")
   comment      String
-  status       BidStatus @default(PENDING)
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  status       BidStatus        @default(PENDING)
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
   /// Когда заказчик изменил заказ после этого отклика (описание, бюджет, анкету…): подрядчик
   /// видит пометку «заказ изменён после вашего отклика». null — не менялся.
-  jobChangedAt DateTime? @map("job_changed_at")
+  jobChangedAt DateTime?        @map("job_changed_at")
+  /// Почему отклик отклонён: выбран другой исполнитель или заказ закрыт. null — не отклонён.
+  rejectReason BidRejectReason? @map("reject_reason")
 
   @@unique([jobId, contractorId])
   @@index([contractorId, createdAt(sort: Desc)])

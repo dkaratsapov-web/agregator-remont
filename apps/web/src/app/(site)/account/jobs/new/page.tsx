@@ -1,5 +1,6 @@
 import type { JobDraftDto } from '@agregator/shared';
 import type { Metadata } from 'next';
+import { randomUUID } from 'node:crypto';
 import Link from 'next/link';
 import { CustomersOnly } from '@/components/jobs/customers-only';
 import { JobForm } from '@/components/jobs/job-form';
@@ -79,6 +80,8 @@ export default async function NewJobPage({
           action={createJobAction}
           initial={draft ? draftValues(draft) : undefined}
           draftId={draft?.id ?? null}
+          draftVersion={draft?.updatedAt ?? null}
+          requestId={randomUUID()}
           submitLabel="Опубликовать заказ"
           pendingLabel="Публикуем…"
         />

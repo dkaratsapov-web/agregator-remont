@@ -2,10 +2,12 @@ import {
   findServiceCity,
   JOB_ITEM_LIMITS,
   JOB_CATEGORIES,
+  JOB_CLOSE_OUTCOMES,
   JOB_LIMITS,
   SERVICE_AREA_ERROR,
   SERVICE_CITY_NAMES,
   type JobCategory,
+  type JobCloseOutcome,
 } from '@agregator/shared';
 import { Transform } from 'class-transformer';
 import {
@@ -246,4 +248,16 @@ export class UpdateJobDto {
       'updatedAt заказа, с которым открыта форма. Если заказ с тех пор изменён (другая вкладка) — 409, правка не применяется',
   })
   expectedUpdatedAt?: string;
+}
+
+export class CloseJobDto {
+  @IsOptional()
+  @IsIn(JOB_CLOSE_OUTCOMES, { message: 'Укажите исход: выполнен или отменён' })
+  @ApiPropertyOptional({
+    enum: JOB_CLOSE_OUTCOMES,
+    enumName: 'JobCloseOutcome',
+    description:
+      'Чем закончился заказ. Открытый заказ (исполнитель не выбран) можно только отменить, поле можно не передавать. Для заказа в работе поле обязательно',
+  })
+  outcome?: JobCloseOutcome;
 }

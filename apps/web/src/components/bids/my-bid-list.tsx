@@ -1,8 +1,8 @@
-import { JOB_STATUS_LABELS, type MyBidDto } from '@agregator/shared';
+import { JOB_CLOSE_OUTCOME_LABELS, JOB_STATUS_LABELS, type MyBidDto } from '@agregator/shared';
 import Link from 'next/link';
 import { withdrawBidAction } from '@/app/(site)/account/bids/actions';
 import { formatAmount, formatDate } from '@/lib/format';
-import { BidStatusBadge } from './bid-status-badge';
+import { BidJobChangedNote, BidStatusBadge } from './bid-status-badge';
 import { ConfirmActionForm } from './confirm-action-form';
 
 export function MyBidList({ bids, returnTo }: { bids: MyBidDto[]; returnTo: string }) {
@@ -17,11 +17,15 @@ export function MyBidList({ bids, returnTo }: { bids: MyBidDto[]; returnTo: stri
             >
               {bid.job.title}
             </Link>
-            <BidStatusBadge status={bid.status} />
+            <BidStatusBadge status={bid.status} rejectReason={bid.rejectReason} />
           </div>
           <p className="mt-1 text-sm text-ink-soft">
-            {bid.job.city} · заказ {JOB_STATUS_LABELS[bid.job.status].toLowerCase()} · отклик от{' '}
-            <time dateTime={bid.createdAt}>{formatDate(bid.createdAt)}</time>
+            {bid.job.city} · заказ{' '}
+            {(bid.job.closeOutcome
+              ? JOB_CLOSE_OUTCOME_LABELS[bid.job.closeOutcome]
+              : JOB_STATUS_LABELS[bid.job.status]
+            ).toLowerCase()}{' '}
+            · отклик от <time dateTime={bid.createdAt}>{formatDate(bid.createdAt)}</time>
           </p>
           <p className="mt-2 font-display text-lg font-semibold tabular-nums tracking-[-0.02em]">
             {formatAmount(bid.price)}&nbsp;₽
@@ -31,6 +35,11 @@ export function MyBidList({ bids, returnTo }: { bids: MyBidDto[]; returnTo: stri
               </span>
             ) : null}
           </p>
+          <BidJobChangedNote
+            status={bid.status}
+            jobChangedAt={bid.jobChangedAt}
+            audience="contractor"
+          />
           {bid.status === 'PENDING' ? (
             <div className="mt-3">
               <ConfirmActionForm

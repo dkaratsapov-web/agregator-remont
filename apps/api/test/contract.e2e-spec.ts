@@ -268,6 +268,12 @@ describe('API contract (e2e)', () => {
         await check('post', CLOSE, http().post(closeUrl).set(other.auth), 404);
         await check('post', CLOSE, http().post(closeUrl), 401);
         await check('post', CLOSE, http().post(closeUrl).set(contractor.auth), 403);
+        await check(
+          'post',
+          CLOSE,
+          http().post(closeUrl).set(customer.auth).send({ outcome: 'DONE' }),
+          400,
+        );
         await check('post', CLOSE, http().post(closeUrl).set(customer.auth), 200);
         await check('post', CLOSE, http().post(closeUrl).set(customer.auth), 409);
         await check('patch', MY_JOB, patch(customer.auth, { city: 'Мытищи' }, second.body.id), 409);

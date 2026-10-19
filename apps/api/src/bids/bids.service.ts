@@ -1,4 +1,10 @@
-import { BID_LIMITS, type JobBidDto, type MyBidDto, type Paginated } from '@agregator/shared';
+import {
+  BID_LIMITS,
+  type BidRejectReason,
+  type JobBidDto,
+  type MyBidDto,
+  type Paginated,
+} from '@agregator/shared';
 import {
   ConflictException,
   HttpException,
@@ -189,7 +195,7 @@ export class BidsService {
         changes: { status: { from: 'PENDING', to: 'ACCEPTED' } },
       });
 
-      await this.rejectPending(tx, ownerId, jobId, bidId);
+      await this.rejectPending(tx, ownerId, jobId, bidId, 'OTHER_ACCEPTED');
 
       await tx.job.update({ where: { id: jobId }, data: { status: 'IN_PROGRESS' } });
       await writeAudit(tx, {
@@ -217,7 +223,8 @@ export class BidsService {
     tx: Prisma.TransactionClient,
     actorId: string,
     jobId: string,
-    exceptBidId: string | null = null,
+    exceptBidId: string | null,
+    reason: BidRejectReason,
   ): Promise<void> {
     const pending = await tx.$queryRaw<{ id: string }[]>`
       SELECT id FROM bids
@@ -228,7 +235,7 @@ export class BidsService {
     if (pending.length === 0) return;
     await tx.bid.updateMany({
       where: { id: { in: pending.map((b) => b.id) } },
-      data: { status: 'REJECTED' },
+      data: { status: 'REJECTED', rejectReason: reason },
     });
     for (const bid of pending) {
       await writeAudit(tx, {
@@ -236,7 +243,10 @@ export class BidsService {
         action: 'BID_REJECTED',
         entityType: 'bid',
         entityId: bid.id,
-        changes: { status: { from: 'PENDING', to: 'REJECTED' } },
+        changes: {
+          status: { from: 'PENDING', to: 'REJECTED' },
+          rejectReason: { from: null, to: reason },
+        },
       });
     }
   }

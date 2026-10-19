@@ -563,11 +563,20 @@ export interface components {
             name: string;
             profile: components["schemas"]["ContractorProfileDto"] | null;
         };
+        /**
+         * @description Почему отклик отклонён (только у REJECTED)
+         * @enum {string}
+         */
+        BidRejectReason: "OTHER_ACCEPTED" | "JOB_CLOSED";
         /** @enum {string} */
         BidStatus: "PENDING" | "ACCEPTED" | "REJECTED" | "WITHDRAWN";
         ChangePasswordDto: {
             currentPassword: string;
             newPassword: string;
+        };
+        CloseJobDto: {
+            /** @description Чем закончился заказ. Открытый заказ (исполнитель не выбран) можно только отменить, поле можно не передавать. Для заказа в работе поле обязательно */
+            outcome?: components["schemas"]["JobCloseOutcome"];
         };
         ContractorProfileDto: {
             about: string;
@@ -657,10 +666,17 @@ export interface components {
             jobId: string;
             /** @description Целые рубли */
             price: number;
+            /** @description Почему отклик отклонён (только у REJECTED) */
+            rejectReason: components["schemas"]["BidRejectReason"] | null;
             status: components["schemas"]["BidStatus"];
         };
         /** @enum {string} */
         JobCategory: "REPAIR_TURNKEY" | "PLUMBING" | "ELECTRICAL" | "TILING" | "FINISHING" | "FLOORING" | "ROOFING" | "WINDOWS_DOORS" | "DESIGN" | "OTHER";
+        /**
+         * @description Исход закрытого заказа; null — не закрыт или закрыт до появления поля
+         * @enum {string}
+         */
+        JobCloseOutcome: "COMPLETED" | "CANCELLED";
         JobDraftDto: {
             budgetMax: number | null;
             budgetMin: number | null;
@@ -755,10 +771,13 @@ export interface components {
             jobId: string;
             /** @description Целые рубли */
             price: number;
+            /** @description Почему отклик отклонён (только у REJECTED) */
+            rejectReason: components["schemas"]["BidRejectReason"] | null;
             status: components["schemas"]["BidStatus"];
         };
         MyBidJob: {
             city: string;
+            closeOutcome: components["schemas"]["JobCloseOutcome"] | null;
             id: string;
             status: components["schemas"]["JobStatus"];
             title: string;
@@ -812,6 +831,8 @@ export interface components {
             budgetMin: number | null;
             category: components["schemas"]["JobCategory"];
             city: string;
+            /** @description Исход закрытого заказа; null — не закрыт или закрыт до появления поля */
+            closeOutcome: components["schemas"]["JobCloseOutcome"] | null;
             /** Format: date-time */
             createdAt: string;
             currency: components["schemas"]["Currency"];
@@ -2667,7 +2688,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseJobDto"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -2675,6 +2700,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OwnJobDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Нет действующей сессии или неверные учётные данные */

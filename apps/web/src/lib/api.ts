@@ -7,11 +7,13 @@ import type {
   JobBidDto,
   MyBidDto,
   JobCategory,
+  JobCloseOutcome,
   JobDto,
   JobDraftDto,
   JobDraftInput,
   JobInput,
   JobStatus,
+  JobUpdateInput,
   LeadDto,
   LeadInput,
   OwnJobDto,
@@ -262,7 +264,7 @@ export async function deleteDraft(token: string, id: string, clientIp?: string):
 export async function updateMyJob(
   token: string,
   id: string,
-  input: Partial<JobInput>,
+  input: JobUpdateInput,
   clientIp?: string,
 ): Promise<OwnJobDto> {
   const res = await request(`/v1/me/jobs/${encodeURIComponent(id)}`, {
@@ -274,9 +276,15 @@ export async function updateMyJob(
   return expectJson<OwnJobDto>(res, 'PATCH /v1/me/jobs/:id');
 }
 
-export async function closeMyJob(token: string, id: string, clientIp?: string): Promise<OwnJobDto> {
+export async function closeMyJob(
+  token: string,
+  id: string,
+  outcome: JobCloseOutcome,
+  clientIp?: string,
+): Promise<OwnJobDto> {
   const res = await request(`/v1/me/jobs/${encodeURIComponent(id)}/close`, {
     method: 'POST',
+    body: { outcome },
     token,
     clientIp,
   });
