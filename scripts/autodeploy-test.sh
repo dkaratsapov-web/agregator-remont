@@ -84,6 +84,13 @@ case "$url" in
     [ "${API_FAIL:-0}" = 1 ] && { echo 'curl: (22) The requested URL returned error: 429' >&2; exit 22; }
     case "$url" in
       *actions/runs\?*) cat "$API_DIR/runs.json" ;;
+      # Связь коммита с PR: по умолчанию коммит — слияние PR #1 в main (как при слиянии кнопкой).
+      */commits/*/pulls)
+        [ "${PULLS_FAIL:-0}" = 1 ] && { echo 'curl: (22) The requested URL returned error: 403' >&2; exit 22; }
+        if [ -f "$API_DIR/pulls.json" ]; then cat "$API_DIR/pulls.json"; else
+          sha=${url%/pulls}; sha=${sha##*/}
+          printf '[{"number":1,"merged_at":"2026-10-19T00:00:00Z","merge_commit_sha":"%s","base":{"ref":"main"}}]' "$sha"
+        fi ;;
       */jobs\?*page=2*) cat "$API_DIR/jobs2.json" ;;
       */jobs\?*) cat "$API_DIR/jobs1.json" ;;
     esac
@@ -233,6 +240,42 @@ jobs_page jobs2.json 103 "$(job "$J2" completed '"success"')" "$(job "$J3" compl
 run
 check 'pagination: second page read' "$(grep -c 'page=2' "$CURL_LOG")" 1
 check 'pagination: deployed' "$(deployed)" "$(dev_head)"
+
+# 7a. Коммит попал в main не через слитый PR — не разворачивается даже при зелёном CI.
+pr() { # merged_at merge_commit_sha base
+  printf '[{"number":5,"merged_at":%s,"merge_commit_sha":"%s","base":{"ref":"%s"}}]' "$1" "$2" "$3" > "$API_DIR/pulls.json"
+}
+push_commit direct-push
+all_green
+echo '[]' > "$API_DIR/pulls.json"
+run
+check 'direct push: not deployed, marked failed' "$(deployed) $(failed)" "$(git -C "$WORK/dev" rev-parse HEAD~1) $(dev_head)"
+check 'direct push: docker not called, reason logged' "$(wc -l < "$STUB_LOG" | tr -d ' ') $(logged 'не через слитый PR')" '0 1'
+push_commit pr-middle
+all_green
+pr '"2026-10-19T00:00:00Z"' 0000000000000000000000000000000000000000 main
+run
+check 'commit from inside a PR: not deployed' "$(failed)" "$(dev_head)"
+push_commit pr-other-base
+all_green
+pr '"2026-10-19T00:00:00Z"' "$(dev_head)" develop
+run
+check 'PR merged into another branch: not deployed' "$(failed)" "$(dev_head)"
+push_commit pr-open
+all_green
+pr null "$(dev_head)" main
+run
+check 'PR not merged: not deployed' "$(failed)" "$(dev_head)"
+echo '{"message":"x"}' > "$API_DIR/pulls.json"
+push_commit pr-garbage
+all_green
+run
+check 'unexpected PR answer: waits, not marked' "$(failed) $(logged 'ответ о PR непонятен')" "$(git -C "$WORK/dev" rev-parse HEAD~1) 1"
+rm "$API_DIR/pulls.json"
+PULLS_FAIL=1 run
+check 'PR lookup 403: waits, not marked' "$(failed) $(logged 'связь коммита с PR недоступна')" "$(git -C "$WORK/dev" rev-parse HEAD~1) 1"
+run
+check 'merged PR: deployed' "$(deployed)" "$(dev_head)"
 
 # 8. Сборка падает: контейнеры не переключаются, коммит помечен, выход с ошибкой.
 push_commit eight
