@@ -63,8 +63,15 @@ def statements(sql):
             continue
         ch = sql[i]
         if ch in '\'"':
+            # E'…' — строка с экранированием обратной косой чертой (\' не закрывает её). В
+            # обычной строке и в идентификаторе кавычка экранируется только удвоением.
+            escapes = (ch == "'" and i > 0 and sql[i - 1] in 'Ee'
+                       and (i < 2 or not (sql[i - 2].isalnum() or sql[i - 2] in '_$')))
             j = i + 1
             while j < n:
+                if escapes and sql[j] == '\\':
+                    j += 2
+                    continue
                 if sql[j] == ch:
                     if j + 1 < n and sql[j + 1] == ch:
                         j += 2
@@ -74,8 +81,10 @@ def statements(sql):
             buf.append(sql[i:j + 1])
             i = j + 1
             continue
-        if ch == '$':
-            tag = re.match(r'\$[A-Za-z_]*\$', sql[i:])
+        # Метка $…$ как в Postgres: буква или _ в начале, дальше и цифры ($1 — параметр, не метка);
+        # $ внутри имени (a$x$) — часть имени, а не начало строки.
+        if ch == '$' and (i == 0 or not (sql[i - 1].isalnum() or sql[i - 1] in '_$')):
+            tag = re.match(r'\$(?:[^\W\d]\w*)?\$', sql[i:])
             if tag:
                 end = sql.find(tag.group(0), i + len(tag.group(0)))
                 end = n if end < 0 else end + len(tag.group(0))

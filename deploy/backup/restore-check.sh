@@ -8,6 +8,8 @@
 # Копия вне сервера (шифрованная, скачанная из хранилища ключом на чтение):
 #   AGE_IDENTITY=<приватный ключ age> bash deploy/backup/restore-check.sh копия.dump.age
 # — расшифровка во временный файл (права 600, удаляется после проверки) и та же проверка.
+# Скачать последнюю копию из хранилища и проверить её — offsite-restore-check.sh (он вызывает
+# этот скрипт с RESTORE_STATUS=offsite-restore-check, чтобы не смешивать итоги).
 set -euo pipefail
 
 REPO_DIR=${REPO_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}
@@ -19,11 +21,12 @@ dir=${BACKUP_DIR:-$(env_value BACKUP_DIR)}
 dir=${dir:-/var/backups/agregator}
 image=${RESTORE_IMAGE:-postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea}
 name="agregator-restore-check-$$"
+status_name=${RESTORE_STATUS:-restore-status}
 
 log() { echo "[agregator-restore] $*"; }
 die() {
   log "ОШИБКА: $1"
-  write_status restore-status result=failed "reason=$1"
+  write_status "$status_name" result=failed "reason=$1"
   notify "проверка восстановления не прошла: $1"
   exit 1
 }
@@ -75,8 +78,11 @@ log "миграций в копии: $applied, в репозитории: $expec
 if [ "$applied" -le 0 ] || [ "$applied" -gt "$expected" ]; then
   die "миграций в копии $applied, в репозитории $expected"
 fi
-write_status restore-status result=ok "file=$source_file" "seconds=$seconds" "migrations=$applied"
-heartbeat=$(env_value RESTORE_HEARTBEAT_URL)
+write_status "$status_name" result=ok "file=$source_file" "seconds=$seconds" "migrations=$applied"
+# Внешний монитор еженедельной проверки на сервере; разовые проверки (другой RESTORE_STATUS) его
+# не трогают.
+heartbeat=''
+[ "$status_name" != restore-status ] || heartbeat=$(env_value RESTORE_HEARTBEAT_URL)
 if [ -n "$heartbeat" ]; then
   printf 'url = "%s"\n' "$heartbeat" | curl -fsS --max-time 10 -K - > /dev/null || log 'heartbeat не отправлен'
 fi

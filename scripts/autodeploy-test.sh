@@ -38,7 +38,7 @@ cat > "$WORK/bin/docker" << 'STUB'
 #!/usr/bin/env bash
 echo "docker $*${IMAGE_TAG:+ tag=$IMAGE_TAG}" >> "$STUB_LOG"
 case "$1 $2" in
-  'info --format') echo /var/lib/docker; exit 0 ;;
+  'info --format') [ "${DOCKER_HANG:-0}" = 1 ] && sleep 30; echo /var/lib/docker; exit 0 ;;
   info\ *) [ "${DOCKER_DOWN:-0}" = 1 ] && exit 1; exit 0 ;;
   # Проверка восстановления: временная база отвечает числом миграций и строк.
   exec\ *) case "$*" in
@@ -84,6 +84,13 @@ case "$url" in
     [ "${API_FAIL:-0}" = 1 ] && { echo 'curl: (22) The requested URL returned error: 429' >&2; exit 22; }
     case "$url" in
       *actions/runs\?*) cat "$API_DIR/runs.json" ;;
+      # Связь коммита с PR: по умолчанию коммит — слияние PR #1 в main (как при слиянии кнопкой).
+      */commits/*/pulls)
+        [ "${PULLS_FAIL:-0}" = 1 ] && { echo 'curl: (22) The requested URL returned error: 403' >&2; exit 22; }
+        if [ -f "$API_DIR/pulls.json" ]; then cat "$API_DIR/pulls.json"; else
+          sha=${url%/pulls}; sha=${sha##*/}
+          printf '[{"number":1,"merged_at":"2026-10-19T00:00:00Z","merge_commit_sha":"%s","base":{"ref":"main"}}]' "$sha"
+        fi ;;
       */jobs\?*page=2*) cat "$API_DIR/jobs2.json" ;;
       */jobs\?*) cat "$API_DIR/jobs1.json" ;;
     esac
@@ -233,6 +240,42 @@ jobs_page jobs2.json 103 "$(job "$J2" completed '"success"')" "$(job "$J3" compl
 run
 check 'pagination: second page read' "$(grep -c 'page=2' "$CURL_LOG")" 1
 check 'pagination: deployed' "$(deployed)" "$(dev_head)"
+
+# 7a. Коммит попал в main не через слитый PR — не разворачивается даже при зелёном CI.
+pr() { # merged_at merge_commit_sha base
+  printf '[{"number":5,"merged_at":%s,"merge_commit_sha":"%s","base":{"ref":"%s"}}]' "$1" "$2" "$3" > "$API_DIR/pulls.json"
+}
+push_commit direct-push
+all_green
+echo '[]' > "$API_DIR/pulls.json"
+run
+check 'direct push: not deployed, marked failed' "$(deployed) $(failed)" "$(git -C "$WORK/dev" rev-parse HEAD~1) $(dev_head)"
+check 'direct push: docker not called, reason logged' "$(wc -l < "$STUB_LOG" | tr -d ' ') $(logged 'не через слитый PR')" '0 1'
+push_commit pr-middle
+all_green
+pr '"2026-10-19T00:00:00Z"' 0000000000000000000000000000000000000000 main
+run
+check 'commit from inside a PR: not deployed' "$(failed)" "$(dev_head)"
+push_commit pr-other-base
+all_green
+pr '"2026-10-19T00:00:00Z"' "$(dev_head)" develop
+run
+check 'PR merged into another branch: not deployed' "$(failed)" "$(dev_head)"
+push_commit pr-open
+all_green
+pr null "$(dev_head)" main
+run
+check 'PR not merged: not deployed' "$(failed)" "$(dev_head)"
+echo '{"message":"x"}' > "$API_DIR/pulls.json"
+push_commit pr-garbage
+all_green
+run
+check 'unexpected PR answer: waits, not marked' "$(failed) $(logged 'ответ о PR непонятен')" "$(git -C "$WORK/dev" rev-parse HEAD~1) 1"
+rm "$API_DIR/pulls.json"
+PULLS_FAIL=1 run
+check 'PR lookup 403: waits, not marked' "$(failed) $(logged 'связь коммита с PR недоступна')" "$(git -C "$WORK/dev" rev-parse HEAD~1) 1"
+run
+check 'merged PR: deployed' "$(deployed)" "$(dev_head)"
 
 # 8. Сборка падает: контейнеры не переключаются, коммит помечен, выход с ошибкой.
 push_commit eight
@@ -490,6 +533,27 @@ printf 'result=ok\nat=%s\n' "$(date +%s)" > "$WORK/state/restore-status"
 sed -i 's/^at=.*/at=1/' "$WORK/state/backup-status"
 monitor
 check 'monitor: stale backup is reported' "$(logged 'копия базы старше')" 1
+# Выгрузка копии вне сервера упала: копия только на сервере — проблема, внешнему монитору /fail.
+sed -i 's/^at=.*/at='"$(date +%s)"'/' "$WORK/state/backup-status"
+RCLONE_FAIL=1 backup
+monitor
+check 'monitor: failed offsite upload is a problem, heartbeat /fail' \
+  "$(logged 'только на сервере (failed)') $(grep -c 'hc.invalid/ping/abc/fail' "$CURL_LOG")" '1 1'
+backup
+# Каналы уведомлений не настроены: сообщить можно только внешнему монитору — /fail.
+printf 'MONITOR_HEARTBEAT_URL=https://hc.invalid/ping/abc\nBACKUP_RCLONE_REMOTE=store:bk\nBACKUP_AGE_RECIPIENT=age1test\n' > "$ENV_FILE"
+monitor
+check 'monitor: no notify channels is a problem, heartbeat /fail' \
+  "$(logged 'каналы уведомлений не настроены') $(grep -c 'hc.invalid/ping/abc/fail' "$CURL_LOG")" '1 1'
+# Сервер «лёг» (модель): monitor.sh завис или убит до конца проверок — «жив» не отправлен, и
+# внешний монитор поднимет тревогу по отсутствию сигнала. Никто, кроме monitor.sh, этот адрес не
+# дёргает: ни обновление, ни копия не могут подтвердить «жив» за упавший сервер.
+printf 'NOTIFY_WEBHOOK_URL=https://hooks.invalid/agregator\nMONITOR_HEARTBEAT_URL=https://hc.invalid/ping/abc\nBACKUP_RCLONE_REMOTE=store:bk\nBACKUP_AGE_RECIPIENT=age1test\n' > "$ENV_FILE"
+: > "$CURL_LOG"
+DOCKER_HANG=1 DISK_ALERT_PERCENT=101 timeout 3 bash "$ROOT/deploy/autodeploy/monitor.sh" > "$WORK/out.log" 2>&1 || true
+check 'server down (monitor killed mid-run): no heartbeat sent' "$(grep -c 'hc.invalid' "$CURL_LOG")" 0
+backup
+check 'backup never pings the external monitor' "$(grep -c 'hc.invalid/ping/abc' "$CURL_LOG")" 0
 sed -i '/^MONITOR_HEARTBEAT_URL=/d' "$ENV_FILE"
 monitor
 check 'monitor: missing external monitor is logged' "$(logged 'внешний монитор не настроен')" 1
