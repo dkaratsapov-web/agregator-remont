@@ -30,6 +30,24 @@ export function flightSources(layout: FlightLayout, direction: FlightDirection):
   ];
 }
 
+/**
+ * Когда грузить прямой ролик пролёта (ТЗ #42, п. 6; замеры — docs/PERFORMANCE_REPORT.md):
+ * - after-load — сразу после загрузки страницы (утверждённый вариант, по умолчанию);
+ * - on-intent — когда человек начал прокручивать или нажал клавишу: до этого виден постер
+ *   (первый кадр), видео не качается;
+ * - on-intent-save-data — on-intent только при «экономии трафика» в браузере, иначе after-load.
+ * Меняется одной строкой ниже — решение владельца.
+ */
+export type FlightLoad = 'after-load' | 'on-intent' | 'on-intent-save-data';
+export const FLIGHT_VIDEO_LOAD: FlightLoad = 'after-load';
+
+/** Грузить ли ролик сразу после загрузки страницы (иначе — по первой прокрутке). */
+export function flightLoadsAfterPageLoad(setting: FlightLoad, saveData: boolean): boolean {
+  if (setting === 'on-intent') return false;
+  if (setting === 'on-intent-save-data') return !saveData;
+  return true;
+}
+
 /** Первый кадр пролёта картинкой: виден сразу, пока грузится видео. */
 export function flightPoster(layout: FlightLayout): string {
   return `${FLIGHT_BASE}/${layout}-poster.avif`;
