@@ -149,7 +149,11 @@ try {
   );
   await customer.locator('summary', { hasText: 'Закрыть заказ' }).click();
   await customer.getByRole('radio', { name: /Работы выполнены/ }).check();
-  await customer.locator('details form button[type="submit"]').click();
+  // Кнопка именно этой формы: на странице заказа есть и другие раскрывающиеся формы.
+  await customer
+    .locator('details', { has: customer.locator('summary', { hasText: 'Закрыть заказ' }) })
+    .locator('button[type="submit"]')
+    .click();
   await customer.waitForURL(/\?closed=done/, { timeout: 15_000 });
   check(
     'job closed as completed',
