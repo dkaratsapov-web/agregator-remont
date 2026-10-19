@@ -31,8 +31,10 @@ write_status() {
   local name=$1
   shift
   mkdir -p "$STATE_DIR" 2> /dev/null || return 0
-  { printf '%s\n' "$@"; printf 'at=%s\n' "$(date +%s)"; } > "$STATE_DIR/$name.tmp" 2> /dev/null &&
-    mv "$STATE_DIR/$name.tmp" "$STATE_DIR/$name" || true
+  if { printf '%s\n' "$@"; printf 'at=%s\n' "$(date +%s)"; } > "$STATE_DIR/$name.tmp" 2> /dev/null; then
+    mv "$STATE_DIR/$name.tmp" "$STATE_DIR/$name" 2> /dev/null || true
+  fi
+  return 0
 }
 
 # Значение key из файла состояния (пусто, если файла или ключа нет).
