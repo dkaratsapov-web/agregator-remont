@@ -40,6 +40,14 @@ export function MyBidList({ bids, returnTo }: { bids: MyBidDto[]; returnTo: stri
             jobChangedAt={bid.jobChangedAt}
             audience="contractor"
           />
+          {bid.status === 'ACCEPTED' ? (
+            <Link
+              href={`/account/work/${bid.job.id}`}
+              className="mt-3 inline-flex min-h-11 items-center rounded-[10px] border border-line bg-surface px-4 text-sm font-semibold text-ink transition-colors duration-150 hover:border-ink/30"
+            >
+              Ход работ
+            </Link>
+          ) : null}
           {bid.status === 'PENDING' ? (
             <div className="mt-3">
               <ConfirmActionForm

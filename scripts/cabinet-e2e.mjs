@@ -151,7 +151,11 @@ try {
     );
     check(
       'customer sees the job in progress',
-      await page.getByText('Исполнитель выбран, заказ в работе.', { exact: true }).isVisible(),
+      await page
+        .getByText('Исполнитель выбран, заказ в работе. Составьте план работ вместе с ним.', {
+          exact: true,
+        })
+        .isVisible(),
     );
   }
 

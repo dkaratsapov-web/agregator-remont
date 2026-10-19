@@ -17,7 +17,9 @@ import { EmptyState, PageHeader, secondaryLinkClass } from '@/components/ui/page
 import { Sheet, SheetBody, SheetHeader } from '@/components/ui/sheet';
 import { Stamp } from '@/components/ui/stamp';
 import { JobBidList } from '@/components/bids/job-bid-list';
-import { getMyJob, listJobBids } from '@/lib/api';
+import { JobPlanPanel } from '@/components/plan/job-plan-panel';
+import { planNotice } from '@/components/plan/plan-notice';
+import { getMyJob, getPlan, listJobBids } from '@/lib/api';
 import { requireCustomerPage } from '@/lib/customer';
 import { formatAmount, formatBudget, formatDate } from '@/lib/format';
 import { closeJobAction, updateJobAction } from '../actions';
@@ -40,9 +42,16 @@ export default async function MyJobPage({
 
   let job: Awaited<ReturnType<typeof getMyJob>>;
   let bids: Awaited<ReturnType<typeof listJobBids>> = [];
+  let plan: Awaited<ReturnType<typeof getPlan>> = null;
   try {
     job = await getMyJob(token, id);
-    if (job) bids = await listJobBids(token, job.id);
+    if (job) {
+      [bids, plan] = await Promise.all([
+        listJobBids(token, job.id),
+        // План есть только у заказа с выбранным исполнителем.
+        job.status === 'OPEN' ? Promise.resolve(null) : getPlan(token, job.id),
+      ]);
+    }
   } catch (error) {
     console.error('My job: failed to load', error);
     return (
@@ -64,8 +73,8 @@ export default async function MyJobPage({
             ? 'Заказ отменён.'
             : 'Заказ закрыт.'
         : query.accepted
-          ? 'Исполнитель выбран, заказ в работе.'
-          : null;
+          ? 'Исполнитель выбран, заказ в работе. Составьте план работ вместе с ним.'
+          : planNotice(query.plan);
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 pb-16 pt-10 sm:px-6 md:pt-14 lg:px-10">
@@ -108,6 +117,13 @@ export default async function MyJobPage({
 
       <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="flex min-w-0 flex-col gap-8">
+          {plan ? (
+            <JobPlanPanel
+              plan={plan}
+              jobOpen={job.status === 'IN_PROGRESS'}
+              returnTo={`/account/jobs/${job.id}`}
+            />
+          ) : null}
           <Sheet labelledBy="bids-title">
             <SheetHeader
               id="bids-title"
