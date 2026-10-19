@@ -112,7 +112,7 @@ export function AvatarUploader({
             ref={input}
             type="file"
             accept={AVATAR_MIME_TYPES.join(',')}
-            className="sr-only"
+            className="peer sr-only"
             id="avatar-file"
             disabled={busy}
             onChange={(e) => {
@@ -122,7 +122,7 @@ export function AvatarUploader({
           />
           <label
             htmlFor="avatar-file"
-            className={`inline-flex min-h-11 cursor-pointer items-center rounded-[10px] bg-ink px-4 text-sm font-semibold text-canvas transition-[background-color,transform] duration-150 hover:bg-ink/85 active:scale-[0.97] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${busy ? 'pointer-events-none opacity-60' : ''}`}
+            className={`inline-flex min-h-11 cursor-pointer items-center rounded-[10px] bg-ink px-4 text-sm font-semibold text-canvas transition-[background-color,transform] duration-150 hover:bg-ink/85 active:scale-[0.97] peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent ${busy ? 'pointer-events-none opacity-60' : ''}`}
           >
             {avatarVersion ? 'Заменить фото' : 'Загрузить фото'}
           </label>

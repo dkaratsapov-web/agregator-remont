@@ -27,7 +27,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 const fetchMock = vi.fn();
-const { loginAction, logoutAction } = await import('./actions');
+const { loginAction, logoutAction, registerAction } = await import('./actions');
 
 const SESSION = 'ar_session';
 const sameOrigin = () => {
@@ -146,5 +146,39 @@ describe('loginAction', () => {
     ).rejects.toThrow('NEXT_REDIRECT');
     expect(state.cookies.get(SESSION)).toBe('new-token');
     expect(state.redirectedTo).toBe('/account');
+  });
+});
+
+describe('field errors (UX-5)', () => {
+  it('registration reports every invalid field at once without calling the API', async () => {
+    sameOrigin();
+    const result = await registerAction(
+      {},
+      form({ name: 'А', email: 'не-email', password: 'short', role: 'CUSTOMER' }),
+    );
+    expect(Object.keys(result.fields ?? {}).sort()).toEqual(['email', 'name', 'password']);
+    expect(result.values).toMatchObject({ name: 'А', email: 'не-email' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('a taken email is marked on the email field', async () => {
+    sameOrigin();
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ message: 'Email уже зарегистрирован' }), { status: 409 }),
+    );
+    const result = await registerAction(
+      {},
+      form({ name: 'Анна', email: 'a@b.ru', password: 'long-enough-1', role: 'CUSTOMER' }),
+    );
+    expect(result.fields?.email).toMatch(/уже зарегистрирован/);
+  });
+
+  it('wrong credentials mark the password field', async () => {
+    sameOrigin();
+    fetchMock.mockResolvedValue(new Response('{}', { status: 401 }));
+    const result = await loginAction({}, form({ email: 'a@b.ru', password: 'password-123' }));
+    expect(result.error).toMatch(/Неверный email или пароль/);
+    expect(result.fields?.password).toBeTruthy();
+    expect(result.values).toEqual({ email: 'a@b.ru' });
   });
 });

@@ -42,7 +42,7 @@ export function CatalogSearch({ filters }: { filters: JobsFilters }) {
             minLength={JOB_SEARCH.QUERY_MIN}
             maxLength={JOB_SEARCH.QUERY_MAX}
             autoComplete="off"
-            className="min-w-0 flex-1 bg-transparent text-base text-ink placeholder:text-ink-soft/70 focus:outline-none"
+            className="min-w-0 flex-1 bg-transparent text-base text-ink placeholder:text-ink-soft focus:outline-none"
           />
         </label>
         <div>

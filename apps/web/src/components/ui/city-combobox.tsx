@@ -235,7 +235,7 @@ export function CityCombobox({
           onClick={() => !open && openList('')}
           onBlur={onBlur}
           onKeyDown={onKeyDown}
-          className={`block min-h-12 w-full rounded-xl border bg-surface pl-11 pr-11 text-base text-ink placeholder:text-ink-soft/70 transition-[border-color,box-shadow] duration-150 focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-0 ${
+          className={`block min-h-12 w-full rounded-xl border bg-surface pl-11 pr-11 text-base text-ink placeholder:text-ink-soft transition-[border-color,box-shadow] duration-150 focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-0 ${
             invalid || outside ? 'border-accent' : 'border-line hover:border-ink-soft/40'
           } ${open ? 'border-accent' : ''}`}
         />
@@ -281,6 +281,9 @@ export function CityCombobox({
         role="listbox"
         aria-label="Подсказки"
         hidden={!open}
+        // Список с прокруткой браузер делает отдельной остановкой Tab; выбор идёт стрелками из
+        // поля, поэтому Tab из поля сразу ведёт к следующему элементу (AUDIT_FINDINGS UX-4).
+        tabIndex={-1}
         onMouseDown={(event) => event.preventDefault()}
         className="absolute inset-x-0 top-full z-40 mt-2 max-h-[min(22rem,60vh)] origin-top overflow-y-auto overscroll-contain rounded-2xl border border-line bg-surface p-1.5 shadow-[0_18px_44px_-18px_hsl(var(--shadow-color)/0.45),0_2px_6px_-2px_hsl(var(--shadow-color)/0.12)] transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none starting:-translate-y-1 starting:opacity-0"
       >

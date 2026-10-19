@@ -220,7 +220,8 @@ export function Features() {
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">
             Возможности
           </p>
-          <h2 className="font-display mt-4 text-[2.3rem] font-semibold leading-[1.02] tracking-[-0.045em] sm:text-6xl lg:text-[4.6rem]">
+          {/* На узких экранах размер от ширины: «преимущества» иначе шире 320 px (UX-1). */}
+          <h2 className="font-display mt-4 text-[min(2.3rem,9.4vw)] font-semibold leading-[1.02] tracking-[-0.045em] sm:text-6xl lg:text-[4.6rem]">
             Наши главные преимущества
           </h2>
         </motion.div>

@@ -69,7 +69,7 @@ export function RespondPanel({ job, viewerRole, myBid, notice }: Props) {
           ) : null}
           <Link
             href="/account/bids"
-            className="inline-block text-sm font-semibold text-accent hover:underline"
+            className="inline-flex min-h-6 items-center text-sm font-semibold text-accent hover:underline"
           >
             Все мои отклики
           </Link>

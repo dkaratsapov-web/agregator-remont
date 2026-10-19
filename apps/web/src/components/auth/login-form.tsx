@@ -1,12 +1,13 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useRef } from 'react';
 import { loginAction, type AuthFormState } from '@/app/(site)/(auth)/actions';
 import type { BankId } from '@/lib/api';
 import { BankButtons } from './bank-buttons';
 import { Field } from './field';
 import { FormError } from './form-error';
 import { SubmitButton } from './submit-button';
+import { useFocusInvalid } from './use-focus-invalid';
 
 export function LoginForm({
   next,
@@ -18,8 +19,10 @@ export function LoginForm({
   error?: string;
 }) {
   const [state, action] = useActionState<AuthFormState, FormData>(loginAction, {});
+  const formRef = useRef<HTMLFormElement>(null);
+  useFocusInvalid(formRef, state);
   return (
-    <form action={action} className="space-y-4 [@media(max-height:46rem)]:space-y-3">
+    <form ref={formRef} action={action} className="space-y-4 [@media(max-height:46rem)]:space-y-3">
       <FormError message={state.error ?? error} />
       {next ? <input type="hidden" name="next" value={next} /> : null}
       <Field
@@ -33,6 +36,7 @@ export function LoginForm({
         required
         maxLength={254}
         defaultValue={state.values?.email}
+        error={state.fields?.email}
       />
       <Field
         label="Пароль"
@@ -41,6 +45,7 @@ export function LoginForm({
         autoComplete="current-password"
         required
         maxLength={128}
+        error={state.fields?.password}
       />
       <SubmitButton pending="Входим…">Войти</SubmitButton>
       <BankButtons

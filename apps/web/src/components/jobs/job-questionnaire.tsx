@@ -582,7 +582,7 @@ function NumberStepper({
                 bump(event.key === 'ArrowUp' ? 1 : -1);
               }
             }}
-            className="w-[4.5rem] bg-transparent py-2 text-center text-lg font-semibold tabular-nums text-ink placeholder:font-normal placeholder:text-ink-soft/50 focus:outline-none"
+            className="w-[4.5rem] bg-transparent py-2 text-center text-lg font-semibold tabular-nums text-ink placeholder:font-normal placeholder:text-ink-soft focus:outline-none"
           />
           <span className="text-sm text-ink-soft">{question.unit}</span>
         </label>
@@ -631,7 +631,7 @@ function TextControl({
       placeholder={question.placeholder}
       value={typeof value === 'string' ? value : ''}
       onChange={(event) => onChange(event.target.value === '' ? undefined : event.target.value)}
-      className={`block min-h-12 w-full max-w-xl rounded-xl border bg-surface px-4 text-base text-ink placeholder:text-ink-soft/70 focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-0 ${
+      className={`block min-h-12 w-full max-w-xl rounded-xl border bg-surface px-4 text-base text-ink placeholder:text-ink-soft focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-0 ${
         invalid ? 'border-accent' : 'border-line'
       }`}
     />

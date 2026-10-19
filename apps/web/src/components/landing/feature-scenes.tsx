@@ -19,7 +19,7 @@ function Canvas({ children, className = '' }: { children: React.ReactNode; class
 function Avatar({ letter, tone = 'ink' }: { letter: string; tone?: 'ink' | 'accent' | 'soft' }) {
   const tones = {
     ink: 'bg-ink text-canvas',
-    accent: 'bg-accent text-white',
+    accent: 'bg-accent text-accent-ink',
     soft: 'bg-[#e6e1da] text-ink',
   };
   return (
@@ -118,7 +118,7 @@ export function SafeDealScene() {
             Проверьте и примите этап, чтобы мастер получил оплату.
           </p>
           <div className="mt-3 flex gap-2">
-            <span className="flex-1 rounded-lg bg-accent py-2 text-center text-[12px] font-semibold text-white">
+            <span className="flex-1 rounded-lg bg-accent py-2 text-center text-[12px] font-semibold text-accent-ink">
               Принять этап
             </span>
             <span className="rounded-lg bg-[#eceef1] px-3 py-2 text-[12px] font-semibold">
@@ -277,7 +277,9 @@ export function BidsScene() {
                 </span>
                 <span
                   className={`ml-1 rounded-lg px-3 py-1.5 text-[12px] font-semibold ${
-                    bid.chosen ? 'bg-accent text-white' : 'bg-surface text-ink ring-1 ring-line'
+                    bid.chosen
+                      ? 'bg-accent text-accent-ink'
+                      : 'bg-surface text-ink ring-1 ring-line'
                   }`}
                 >
                   {bid.chosen ? 'Выбран' : 'Выбрать'}
@@ -530,7 +532,7 @@ export function ChatScene() {
             <span className="flex-1 rounded-full bg-canvas px-3.5 py-2 text-[12px] text-ink-soft ring-1 ring-line/70">
               Сообщение
             </span>
-            <span className="grid size-8 place-items-center rounded-full bg-accent text-white">
+            <span className="grid size-8 place-items-center rounded-full bg-accent text-accent-ink">
               <svg
                 viewBox="0 0 16 16"
                 className="size-3.5"
@@ -607,7 +609,7 @@ export function AppsScene() {
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold">{job.title}</span>
                     {job.hot ? (
-                      <span className="rounded-full bg-accent px-1.5 text-[9px] font-semibold leading-4 text-white">
+                      <span className="rounded-full bg-accent px-1.5 text-[9px] font-semibold leading-4 text-accent-ink">
                         3
                       </span>
                     ) : null}
@@ -714,7 +716,7 @@ export function ProtectionScene() {
           className="chat-pop absolute right-0 top-[14px] flex w-[230px] items-start gap-3 rounded-2xl bg-ink p-3.5 text-canvas shadow-[0_30px_50px_-20px_rgb(13_19_32/0.6)]"
           style={{ '--d': '1000ms' } as React.CSSProperties}
         >
-          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-white">
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-accent-ink">
             <Lock className="size-4" />
           </span>
           <span>

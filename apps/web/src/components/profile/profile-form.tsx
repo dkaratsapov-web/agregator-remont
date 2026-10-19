@@ -1,11 +1,12 @@
 'use client';
 
 import { JOB_CATEGORIES, JOB_CATEGORY_LABELS, PROFILE_LIMITS } from '@agregator/shared';
-import { useActionState } from 'react';
+import { useActionState, useRef } from 'react';
 import type { ProfileFormState } from '@/app/(site)/account/profile/actions';
 import { Field } from '@/components/auth/field';
 import { FormError } from '@/components/auth/form-error';
 import { SubmitButton } from '@/components/auth/submit-button';
+import { useFocusInvalid } from '@/components/auth/use-focus-invalid';
 import type { ProfileFormValues } from '@/lib/bid-form';
 
 export function ProfileForm({
@@ -19,11 +20,23 @@ export function ProfileForm({
   const values = state.values ?? initial;
   // key: после ошибки React сбрасывает форму; чекбоксы пересоздаются с сохранёнными значениями.
   const formKey = values.categories.join(',');
+  const fields = state.fields ?? {};
+  const formRef = useRef<HTMLFormElement>(null);
+  useFocusInvalid(formRef, state);
   return (
-    <form action={formAction} className="space-y-6">
+    <form ref={formRef} action={formAction} className="space-y-6">
       <FormError message={state.error} />
-      <fieldset key={formKey}>
+      <fieldset
+        key={formKey}
+        aria-invalid={fields.categories ? true : undefined}
+        aria-describedby={fields.categories ? 'field-categories-error' : undefined}
+      >
         <legend className="text-sm font-medium text-ink">Категории работ</legend>
+        {fields.categories ? (
+          <p id="field-categories-error" className="mt-1 text-sm font-medium text-accent">
+            {fields.categories}
+          </p>
+        ) : null}
         <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {JOB_CATEGORIES.map((category) => (
             <label
@@ -47,6 +60,7 @@ export function ProfileForm({
         name="cities"
         autoComplete="off"
         defaultValue={values.cities}
+        error={fields.cities}
         hint={`Через запятую, до ${PROFILE_LIMITS.CITIES_MAX} городов`}
       />
       <Field
@@ -56,6 +70,7 @@ export function ProfileForm({
         autoComplete="off"
         maxLength={2}
         defaultValue={values.experienceYears}
+        error={fields.experienceYears}
       />
       <div>
         <label htmlFor="field-about" className="block text-sm font-medium text-ink">

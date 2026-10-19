@@ -21,7 +21,7 @@ export function Field({ label, name, hint, error, id, ...input }: FieldProps) {
         name={name}
         aria-describedby={describedBy}
         aria-invalid={error ? true : undefined}
-        className={`mt-1.5 block min-h-12 w-full rounded-xl border bg-surface px-4 text-base text-ink placeholder:text-ink-soft/70 focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-0 ${
+        className={`mt-1.5 block min-h-12 w-full rounded-xl border bg-surface px-4 text-base text-ink placeholder:text-ink-soft focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-0 ${
           error ? 'border-accent' : 'border-line'
         }`}
         {...input}

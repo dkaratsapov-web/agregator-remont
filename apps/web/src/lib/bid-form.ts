@@ -15,9 +15,22 @@ const text = (form: FormData, key: string, max: number): string => {
 
 export type BidFormValues = Record<'price' | 'durationDays' | 'comment', string>;
 
+/** Ошибки по полям формы: показываются под полем, первое поле с ошибкой получает фокус. */
+export type FieldErrors<K extends string = string> = Partial<Record<K, string>>;
+
 export type ParsedBidForm =
   | { ok: true; input: BidInput; values: BidFormValues }
-  | { ok: false; error: string; values: BidFormValues };
+  | {
+      ok: false;
+      error: string;
+      fields: FieldErrors<keyof BidFormValues>;
+      values: BidFormValues;
+    };
+
+/** Итог проверки: первая ошибка — общий текст над формой, все — у своих полей. */
+function failed<K extends string>(fields: FieldErrors<K>): string | null {
+  return Object.values<string | undefined>(fields).find(Boolean) ?? null;
+}
 
 /** Разбор формы отклика; окончательные правила проверяет API. */
 export function parseBidForm(form: FormData): ParsedBidForm {
@@ -26,26 +39,29 @@ export function parseBidForm(form: FormData): ParsedBidForm {
     durationDays: text(form, 'durationDays', 10),
     comment: text(form, 'comment', BID_LIMITS.COMMENT_MAX + 1),
   };
+  const fields: FieldErrors<keyof BidFormValues> = {};
   const price = parseBudget(values.price);
   if (price === null || price === 'invalid') {
-    return { ok: false, error: 'Укажите цену целым числом рублей, например 38 000.', values };
+    fields.price = 'Укажите цену целым числом рублей, например 38 000.';
   }
   const durationRaw = values.durationDays.trim();
-  let durationDays: number | null = null;
-  if (durationRaw !== '') {
-    if (
-      !/^\d{1,3}$/.test(durationRaw) ||
+  if (
+    durationRaw !== '' &&
+    (!/^\d{1,3}$/.test(durationRaw) ||
       Number(durationRaw) < 1 ||
-      Number(durationRaw) > BID_LIMITS.DURATION_MAX_DAYS
-    ) {
-      return {
-        ok: false,
-        error: `Срок укажите в днях: от 1 до ${BID_LIMITS.DURATION_MAX_DAYS}.`,
-        values,
-      };
-    }
-    durationDays = Number(durationRaw);
+      Number(durationRaw) > BID_LIMITS.DURATION_MAX_DAYS)
+  ) {
+    fields.durationDays = `Срок укажите в днях: от 1 до ${BID_LIMITS.DURATION_MAX_DAYS}.`;
   }
+  const commentLength = values.comment.trim().length;
+  if (commentLength < BID_LIMITS.COMMENT_MIN || commentLength > BID_LIMITS.COMMENT_MAX) {
+    fields.comment = `Комментарий: от ${BID_LIMITS.COMMENT_MIN} до ${BID_LIMITS.COMMENT_MAX} символов.`;
+  }
+  const error = failed(fields);
+  if (error || price === null || price === 'invalid') {
+    return { ok: false, error: error ?? '', fields, values };
+  }
+  const durationDays = durationRaw === '' ? null : Number(durationRaw);
   return { ok: true, values, input: { price, durationDays, comment: values.comment } };
 }
 
@@ -58,7 +74,12 @@ export interface ProfileFormValues {
 
 export type ParsedProfileForm =
   | { ok: true; input: ContractorProfileInput; values: ProfileFormValues }
-  | { ok: false; error: string; values: ProfileFormValues };
+  | {
+      ok: false;
+      error: string;
+      fields: FieldErrors<keyof ProfileFormValues>;
+      values: ProfileFormValues;
+    };
 
 /** Города вводятся через запятую или с новой строки. */
 export function splitCities(raw: string): string[] {
@@ -79,27 +100,33 @@ export function parseProfileForm(form: FormData): ParsedProfileForm {
     cities: text(form, 'cities', (PROFILE_LIMITS.CITY_MAX + 2) * PROFILE_LIMITS.CITIES_MAX),
     experienceYears: text(form, 'experienceYears', 5),
   };
-  if (!categories.every(isJobCategory)) {
-    return { ok: false, error: 'Выберите категории из списка.', values };
+  const fields: FieldErrors<keyof ProfileFormValues> = {};
+  if (!categories.every(isJobCategory)) fields.categories = 'Выберите категории из списка.';
+  const cities = splitCities(values.cities);
+  if (
+    cities.length > PROFILE_LIMITS.CITIES_MAX ||
+    cities.some((c) => c.length < PROFILE_LIMITS.CITY_MIN || c.length > PROFILE_LIMITS.CITY_MAX)
+  ) {
+    fields.cities = `До ${PROFILE_LIMITS.CITIES_MAX} городов, каждый от ${PROFILE_LIMITS.CITY_MIN} до ${PROFILE_LIMITS.CITY_MAX} символов.`;
   }
   const experienceRaw = values.experienceYears.trim();
-  let experienceYears: number | null = null;
-  if (experienceRaw !== '') {
-    if (
-      !/^\d{1,2}$/.test(experienceRaw) ||
-      Number(experienceRaw) > PROFILE_LIMITS.EXPERIENCE_MAX_YEARS
-    ) {
-      return { ok: false, error: 'Опыт укажите целым числом лет.', values };
-    }
-    experienceYears = Number(experienceRaw);
+  if (
+    experienceRaw !== '' &&
+    (!/^\d{1,2}$/.test(experienceRaw) ||
+      Number(experienceRaw) > PROFILE_LIMITS.EXPERIENCE_MAX_YEARS)
+  ) {
+    fields.experienceYears = 'Опыт укажите целым числом лет.';
   }
+  const error = failed(fields);
+  if (error) return { ok: false, error, fields, values };
+  const experienceYears = experienceRaw === '' ? null : Number(experienceRaw);
   return {
     ok: true,
     values,
     input: {
       about: values.about,
       categories: [...new Set(categories as JobCategory[])],
-      cities: splitCities(values.cities),
+      cities,
       experienceYears,
     },
   };
