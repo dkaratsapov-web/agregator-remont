@@ -3,7 +3,8 @@
 # Берёт последнюю копию из BACKUP_DIR (или указанный файл), разворачивает её во временный
 # контейнер postgres без сети и портов и сверяет: все миграции из репозитория применены, таблицы
 # users и jobs читаются. Печатает время восстановления (фактический RTO для этой базы).
-# Запускается таймером раз в неделю (deploy/autodeploy/install.sh). Сбой — уведомление.
+# Запускается таймером раз в неделю (deploy/autodeploy/install.sh). Сбой — уведомление; итог —
+# в STATE_DIR/restore-status (monitor.sh напоминает, если проверки давно не было или она упала).
 set -euo pipefail
 
 REPO_DIR=${REPO_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}
@@ -19,6 +20,7 @@ name="agregator-restore-check-$$"
 log() { echo "[agregator-restore] $*"; }
 die() {
   log "ОШИБКА: $1"
+  write_status restore-status result=failed "reason=$1"
   notify "проверка восстановления не прошла: $1"
   exit 1
 }
@@ -53,6 +55,7 @@ log "миграций в копии: $applied, в репозитории: $expec
 if [ "$applied" -le 0 ] || [ "$applied" -gt "$expected" ]; then
   die "миграций в копии $applied, в репозитории $expected"
 fi
+write_status restore-status result=ok "file=$file" "seconds=$seconds" "migrations=$applied"
 heartbeat=$(env_value RESTORE_HEARTBEAT_URL)
 if [ -n "$heartbeat" ]; then
   printf 'url = "%s"\n' "$heartbeat" | curl -fsS --max-time 10 -K - > /dev/null || log 'heartbeat не отправлен'

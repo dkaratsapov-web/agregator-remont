@@ -9,8 +9,13 @@
 #   BACKUP_AGE_RECIPIENT  публичный ключ age для копии вне сервера (приватный — офлайн у владельца)
 #   BACKUP_RCLONE_REMOTE  куда выгружать, например s3backup:agregator-backups (настройка rclone —
 #                         deploy/README.md, «Резервные копии»); ключ хранилища только на запись
+#   BACKUP_REQUIRE_OFFSITE  true — копия без проверенной выгрузки вне сервера считается сбоем
+#                         (публичный запуск); по умолчанию — предупреждение (закрытый тест)
 #   BACKUP_HEARTBEAT_URL  адрес, который дёргается после успешной копии (healthchecks.io и т. п.)
-# Сбой копии — выход с ошибкой и уведомление (notify.sh).
+# Итог — в STATE_DIR/backup-status: mode=offsite-verified (копия выгружена и найдена в хранилище
+# с тем же размером) или mode=local-only (только на сервере). monitor.sh напоминает о local-only.
+# Сбой копии — выход с ошибкой и уведомление (notify.sh). Локальная копия при сбое выгрузки
+# остаётся на сервере.
 set -euo pipefail
 
 REPO_DIR=${REPO_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}
@@ -52,14 +57,35 @@ log "копия: $file ($(du -h "$file" | cut -f1))"
 
 recipient=$(env_value BACKUP_AGE_RECIPIENT)
 remote=$(env_value BACKUP_RCLONE_REMOTE)
-if [ -n "$remote" ]; then
-  [ -n "$recipient" ] || die 'BACKUP_RCLONE_REMOTE задан без BACKUP_AGE_RECIPIENT: вне сервера только шифрованные копии'
-  command -v age > /dev/null || die 'не установлен age (apt install age)'
-  command -v rclone > /dev/null || die 'не установлен rclone (apt install rclone)'
-  age -r "$recipient" -o "$file.age" "$file" || die 'шифрование age не удалось'
-  rclone copy --immutable "$file.age" "$remote" || { rm -f "$file.age"; die "выгрузка в $remote не удалась"; }
+require_offsite=$(env_value BACKUP_REQUIRE_OFFSITE)
+# Сбой выгрузки: локальная копия есть, это фиксируется до выхода с ошибкой.
+offsite_failed() {
   rm -f "$file.age"
-  log "выгружено в $remote (шифровано)"
+  write_status backup-status mode=local-only "file=$file" "label=$label" "offsite=failed"
+  die "$1 (локальная копия сохранена: $file)"
+}
+if [ -n "$remote" ]; then
+  [ -n "$recipient" ] || offsite_failed 'BACKUP_RCLONE_REMOTE задан без BACKUP_AGE_RECIPIENT: вне сервера только шифрованные копии'
+  command -v age > /dev/null || offsite_failed 'не установлен age (apt install age)'
+  command -v rclone > /dev/null || offsite_failed 'не установлен rclone (apt install rclone)'
+  age -r "$recipient" -o "$file.age" "$file" || offsite_failed 'шифрование age не удалось'
+  rclone copy --immutable "$file.age" "$remote" || offsite_failed "выгрузка в $remote не удалась"
+  # Проверка: файл есть в хранилище и того же размера. Нужно только право на список, не на
+  # чтение содержимого (ключ хранилища — запись и список, без удаления).
+  name=$(basename "$file.age")
+  size=$(stat -c %s "$file.age")
+  stored=$(rclone lsjson --files-only --include "/$name" "$remote" 2> /dev/null |
+    python3 -c 'import json, sys; print(sum(f["Size"] for f in json.load(sys.stdin)))' 2> /dev/null || true)
+  [ "$stored" = "$size" ] || offsite_failed "в $remote нет $name нужного размера (ожидалось $size, найдено ${stored:-ничего})"
+  rm -f "$file.age"
+  write_status backup-status mode=offsite-verified "file=$file" "label=$label" "remote=$remote"
+  log "выгружено в $remote (шифровано), размер в хранилище проверен"
+else
+  write_status backup-status mode=local-only "file=$file" "label=$label" offsite=not-configured
+  # Публичный запуск: без копии вне сервера — сбой (fail closed); локальная копия остаётся.
+  [ "$require_offsite" != true ] ||
+    die "BACKUP_REQUIRE_OFFSITE=true, а выгрузка не настроена (BACKUP_RCLONE_REMOTE): копия только на сервере ($file)"
+  log 'ВНИМАНИЕ: копия только на сервере (BACKUP_RCLONE_REMOTE не задан): при потере сервера она потеряется'
 fi
 
 # На сервере хранятся копии за последние BACKUP_KEEP_DAYS дней; вне сервера — по правилам хранилища.

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Уведомление владельцу о событии на сервере: bash deploy/autodeploy/notify.sh "текст".
-# Каналы из deploy/.env (любой из них или оба; не задано ни одного — только запись в журнал):
+# Каналы из deploy/.env (любой из них или оба; не задано ни одного — запись в журнал и код 3):
 #   NOTIFY_TELEGRAM_TOKEN и NOTIFY_TELEGRAM_CHAT — бот Telegram и чат (личный или группа);
 #   NOTIFY_WEBHOOK_URL — POST с текстом (Slack/Mattermost-совместимый JSON {"text": "..."}).
 # Токены не попадают в командную строку процесса (curl читает адрес из stdin), в журнал не пишутся.
+# Коды выхода: 0 — отправлено во все настроенные каналы, 1 — хотя бы один не принял, 3 — каналов нет.
 set -uo pipefail
 
 REPO_DIR=${REPO_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}
@@ -39,7 +40,9 @@ if [ -n "$webhook" ]; then
 fi
 
 if [ "$sent" -eq 0 ] && [ "$failed" -eq 0 ]; then
-  echo '[agregator-notify] каналы не настроены (NOTIFY_* в deploy/.env), только журнал'
+  # Не настроено — не «всё хорошо»: код 3, monitor.sh сообщит об этом внешнему монитору.
+  echo '[agregator-notify] каналы не настроены (NOTIFY_* в deploy/.env), только журнал' >&2
+  exit 3
 elif [ "$failed" -gt 0 ]; then
   echo "[agregator-notify] не удалось отправить в $failed канал(а)" >&2
   exit 1

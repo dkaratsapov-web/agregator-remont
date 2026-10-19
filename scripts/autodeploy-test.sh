@@ -371,6 +371,96 @@ run
 check 'diverged: stopped' "$(logged 'fast-forward невозможен')" 1
 check 'diverged: docker not called' "$(docker_calls compose)" 0
 
+# 14. Резервные копии вне сервера (ТЗ #40, DEV-2): local-only и offsite-verified различаются,
+# сбой выгрузки и несовпадение размера — ошибка с сохранённой локальной копией, режим
+# BACKUP_REQUIRE_OFFSITE=true — без выгрузки сбой. Заглушки age и rclone; «хранилище» — каталог.
+cat > "$WORK/bin/age" << 'STUB'
+#!/usr/bin/env bash
+out=''
+while [ $# -gt 1 ]; do case "$1" in -o) out=$2; shift ;; -r) shift ;; esac; shift; done
+cp "$1" "$out"
+STUB
+cat > "$WORK/bin/rclone" << 'STUB'
+#!/usr/bin/env bash
+mkdir -p "$REMOTE_DIR"
+case "$1" in
+  copy) [ "${RCLONE_FAIL:-0}" = 1 ] && exit 1
+    cp "$3" "$REMOTE_DIR/"
+    [ "${RCLONE_TRUNCATE:-0}" = 1 ] && : > "$REMOTE_DIR/$(basename "$3")"
+    exit 0 ;;
+  lsjson) name=${4#/}
+    if [ -f "$REMOTE_DIR/$name" ]; then
+      printf '[{"Name":"%s","Size":%s}]' "$name" "$(stat -c %s "$REMOTE_DIR/$name")"
+    else echo '[]'; fi ;;
+esac
+STUB
+cat > "$WORK/bin/timedatectl" << 'STUB'
+#!/usr/bin/env bash
+echo yes
+STUB
+chmod +x "$WORK/bin/age" "$WORK/bin/rclone" "$WORK/bin/timedatectl"
+export REMOTE_DIR="$WORK/remote" ENV_FILE="$WORK/env.ops"
+backup() { : > "$CURL_LOG"; (cd "$WORK/server" && bash "$ROOT/deploy/backup/backup.sh" > "$WORK/out.log" 2>&1) || echo "exit $?" >> "$WORK/out.log"; }
+mode() { sed -n 's/^mode=//p' "$WORK/state/backup-status"; }
+kept() { [ -f "$(sed -n 's/^file=//p' "$WORK/state/backup-status")" ] && echo kept || echo lost; }
+rm -rf "$WORK/backups"
+
+echo 'NOTIFY_WEBHOOK_URL=https://hooks.invalid/agregator' > "$ENV_FILE"
+backup
+check 'backup without offsite: local-only, warned' "$(mode) $(logged '^exit') $(logged 'копия только на сервере')" 'local-only 0 1'
+echo 'BACKUP_REQUIRE_OFFSITE=true' >> "$ENV_FILE"
+backup
+check 'backup required offsite missing: fails, notifies, keeps dump' \
+  "$(logged '^exit 1') $(grep -c hooks.invalid "$CURL_LOG") $(mode) $(kept)" '1 1 local-only kept'
+printf 'BACKUP_RCLONE_REMOTE=store:bk\nBACKUP_AGE_RECIPIENT=age1test\n' >> "$ENV_FILE"
+backup
+check 'backup offsite: uploaded and verified' "$(logged '^exit') $(mode) $(find "$WORK/remote" -name '*.age' | wc -l | tr -d ' ')" '0 offsite-verified 1'
+check 'backup offsite: no plaintext dump uploaded' "$(find "$WORK/remote" -name '*.dump' | wc -l | tr -d ' ')" 0
+RCLONE_FAIL=1 backup
+check 'backup upload failure: error, local-only, dump kept' "$(logged '^exit 1') $(mode) $(kept)" '1 local-only kept'
+RCLONE_TRUNCATE=1 backup
+check 'backup size mismatch: error' "$(logged '^exit 1') $(logged 'нужного размера')" '1 1'
+sed -i '/^BACKUP_AGE_RECIPIENT=/d' "$ENV_FILE"
+backup
+check 'backup remote without age key: refused' "$(logged '^exit 1') $(logged 'без BACKUP_AGE_RECIPIENT')" '1 1'
+
+# 15. Уведомления и внешний монитор: нет каналов — код 3 и состояние unconfigured; канал не
+# принял — failed; monitor.sh отправляет «жив» только без проблем, иначе /fail.
+: > "$ENV_FILE"
+notify_run() { bash "$ROOT/deploy/autodeploy/notify.sh" test > "$WORK/out.log" 2>&1 || echo "exit $?" >> "$WORK/out.log"; }
+notify_run
+check 'notify without channels: exit 3' "$(logged '^exit 3')" 1
+(cd "$WORK/server" && . "$ROOT/deploy/autodeploy/lib.sh" && notify test > /dev/null 2>&1)
+check 'notify without channels: state unconfigured' "$(sed -n 's/^result=//p' "$WORK/state/notify-status")" unconfigured
+echo 'NOTIFY_WEBHOOK_URL=https://down.invalid/agregator' > "$ENV_FILE"
+monitor() { : > "$CURL_LOG"; DISK_ALERT_PERCENT=101 bash "$ROOT/deploy/autodeploy/monitor.sh" > "$WORK/out.log" 2>&1 || echo "exit $?" >> "$WORK/out.log"; }
+sed -i 's#^  \*hooks.invalid\*) exit 0 ;;#  *hooks.invalid*) exit 0 ;;\n  *down.invalid*) exit 22 ;;\n  *hc.invalid*) exit 0 ;;#' "$WORK/bin/curl"
+(cd "$WORK/server" && . "$ROOT/deploy/autodeploy/lib.sh" && notify test > /dev/null 2>&1)
+check 'notify channel down: state failed' "$(sed -n 's/^result=//p' "$WORK/state/notify-status")" failed
+printf 'NOTIFY_WEBHOOK_URL=https://down.invalid/agregator\nMONITOR_HEARTBEAT_URL=https://hc.invalid/ping/abc\n' > "$ENV_FILE"
+monitor
+check 'monitor: failed channel is a problem, heartbeat /fail' \
+  "$(logged 'не доставлено') $(grep -c 'hc.invalid/ping/abc/fail' "$CURL_LOG")" '1 1'
+# Всё в порядке: копия вне сервера свежая, восстановление проверено, канал работает.
+printf 'NOTIFY_WEBHOOK_URL=https://hooks.invalid/agregator\nMONITOR_HEARTBEAT_URL=https://hc.invalid/ping/abc\nBACKUP_RCLONE_REMOTE=store:bk\nBACKUP_AGE_RECIPIENT=age1test\n' > "$ENV_FILE"
+backup
+printf 'result=ok\nat=%s\n' "$(date +%s)" > "$WORK/state/restore-status"
+printf 'result=ok\nat=%s\n' "$(date +%s)" > "$WORK/state/notify-status"
+monitor
+check 'monitor: healthy server sends a plain heartbeat' \
+  "$(logged 'проверок с проблемами: 0') $(grep -c 'hc.invalid/ping/abc$' "$CURL_LOG") $(grep -c '/fail' "$CURL_LOG")" '1 1 0'
+printf 'result=failed\nreason=pg_restore\nat=%s\n' "$(date +%s)" > "$WORK/state/restore-status"
+monitor
+check 'monitor: failed restore check is reported' "$(logged 'восстановления не прошла') $(grep -c '/fail' "$CURL_LOG")" '1 1'
+printf 'result=ok\nat=%s\n' "$(date +%s)" > "$WORK/state/restore-status"
+sed -i 's/^at=.*/at=1/' "$WORK/state/backup-status"
+monitor
+check 'monitor: stale backup is reported' "$(logged 'копия базы старше')" 1
+sed -i '/^MONITOR_HEARTBEAT_URL=/d' "$ENV_FILE"
+monitor
+check 'monitor: missing external monitor is logged' "$(logged 'внешний монитор не настроен')" 1
+unset ENV_FILE
+
 # Секреты не попадают в журнал (в .env на сервере их нет, но проверяем, что .env не печатается).
 check 'no .env in log' "$(grep -c 'DOMAIN=' "$WORK/out.log" || true)" 0
 
