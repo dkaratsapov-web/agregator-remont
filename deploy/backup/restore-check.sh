@@ -34,11 +34,14 @@ cleanup() { docker rm -f "$name" > /dev/null 2>&1 || true; }
 trap cleanup EXIT
 docker run -d --rm --name "$name" --network none -e POSTGRES_PASSWORD=restore-check "$image" > /dev/null ||
   die "не запустился контейнер $image"
+# Готовность — по TCP: при первом запуске образ postgres поднимает временный сервер только на
+# сокете (initdb), затем останавливает его; проверка по сокету ловила этот сервер, и
+# pg_restore иногда попадал на остановку (учения CI, ТЗ #40).
 for _ in $(seq 1 60); do
-  docker exec "$name" pg_isready -U postgres > /dev/null 2>&1 && break
+  docker exec "$name" pg_isready -h 127.0.0.1 -U postgres > /dev/null 2>&1 && break
   sleep 1
 done
-docker exec "$name" pg_isready -U postgres > /dev/null 2>&1 || die 'временная база не поднялась'
+docker exec "$name" pg_isready -h 127.0.0.1 -U postgres > /dev/null 2>&1 || die 'временная база не поднялась'
 docker exec -i "$name" sh -c 'createdb -U postgres restore && pg_restore -U postgres -d restore --no-owner --exit-on-error' < "$file" ||
   die 'pg_restore не удался'
 

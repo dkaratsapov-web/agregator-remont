@@ -56,6 +56,13 @@ bash deploy/backup/restore-check.sh > "$WORK/restore.log" 2>&1 && code=0 || code
 check 'restore check: passed on a real Postgres' "$code $(status restore-status result)" '0 ok'
 grep -q "users: $users_before;" "$WORK/restore.log" && restored=same || restored=differs
 check 'restore check: same number of users as the live base' "$restored" same
+# Готовность временной базы: проверка по сокету ловила временный сервер initdb и примерно
+# в каждом пятом запуске падала (#40). Пять запусков подряд — все должны пройти.
+repeat_ok=0
+for _ in 1 2 3 4 5; do
+  bash deploy/backup/restore-check.sh "$dump" >> "$WORK/restore-repeat.log" 2>&1 && repeat_ok=$((repeat_ok + 1))
+done
+check 'restore check: 5 runs in a row pass' "$repeat_ok" 5
 head -c 4096 "$dump" > "$WORK/broken.dump"
 bash deploy/backup/restore-check.sh "$WORK/broken.dump" > "$WORK/restore.log" 2>&1 && code=0 || code=$?
 check 'restore check: truncated copy fails' "$code $(status restore-status result)" '1 failed'
