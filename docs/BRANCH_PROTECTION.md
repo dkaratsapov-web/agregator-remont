@@ -40,9 +40,11 @@ settings**.
 gh api repos/dkaratsapov-web/agregator-remont/rules/branches/main \
   --jq '.[] | .type + " " + ((.parameters.required_status_checks // []) | map(.context) | join(", "))'
 
-# Обход правил: у каждого ruleset список bypass_actors пуст.
-for id in $(gh api repos/dkaratsapov-web/agregator-remont/rulesets --jq '.[].id'); do
-  gh api "repos/dkaratsapov-web/agregator-remont/rulesets/$id" --jq '.name + ": bypass=" + (.bypass_actors | length | tostring)'
+# Обход правил: у каждого ruleset, который действует на main (а не у всех в репозитории),
+# список bypass_actors пуст и режим — active (не evaluate).
+for id in $(gh api repos/dkaratsapov-web/agregator-remont/rules/branches/main --jq '[.[].ruleset_id] | unique | .[]'); do
+  gh api "repos/dkaratsapov-web/agregator-remont/rulesets/$id" \
+    --jq '.name + ": enforcement=" + .enforcement + ", bypass=" + (.bypass_actors | length | tostring)'
 done
 ```
 
