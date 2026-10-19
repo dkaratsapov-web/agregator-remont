@@ -109,6 +109,25 @@ case_sql 'semicolon inside a dollar-quoted string is not a statement end' 0 'COM
 case_sql 'dangerous words in comments and strings are not operations' 0 "/* DROP TABLE \"jobs\"; */
 -- ALTER TABLE \"jobs\" DROP COLUMN \"title\";
 UPDATE \"jobs\" SET \"title\" = 'x; DROP TABLE y' WHERE \"id\" = '1';"
+# Строки и $-кавычки по правилам Postgres (ТЗ #42): разбор не должен «проглотить» опасный
+# оператор, который Postgres выполнит. E'…' — с экранированием обратной косой чертой.
+case_sql "E-string with an escaped quote does not hide a DROP" 2 "UPDATE \"jobs\" SET \"title\" = E'a\\'' WHERE \"id\" = '1';
+DROP TABLE \"jobs\";
+SELECT '';"
+case_sql "escaped backslash at the end of an E-string" 2 "UPDATE \"jobs\" SET \"title\" = E'a\\\\';
+DROP TABLE \"jobs\";"
+case_sql "doubled quote in an ordinary string is still one string" 0 "UPDATE \"jobs\" SET \"title\" = 'it''s; DROP TABLE y' WHERE \"id\" = '1';"
+# shellcheck disable=SC2016 # $a1$ — SQL, а не переменная shell
+case_sql 'dollar tag with digits does not hide a DROP' 2 'COMMENT ON TABLE "jobs" IS $a1$'"'"'$a1$;
+DROP TABLE "jobs";
+SELECT '"'"'x'"'"';'
+# shellcheck disable=SC2016
+case_sql '$ inside an identifier is not a dollar quote' 2 'CREATE TABLE "n" (a$x$ INTEGER);
+UPDATE "n" SET a$x$ = 1;
+DROP TABLE "jobs";
+UPDATE "n" SET a$x$ = 2;'
+# shellcheck disable=SC2016
+case_sql 'semicolon inside a dollar tag with digits' 0 'COMMENT ON TABLE "jobs" IS $a1$a; DROP TABLE "jobs"$a1$;'
 
 # Таблица, созданная внутри диапазона, неизвестна целевой версии: с ней можно всё. Если же
 # целевая версия её уже знает (создана до цели), удаление столбца опасно.
