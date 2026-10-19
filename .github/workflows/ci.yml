@@ -132,7 +132,7 @@ jobs:
           bash scripts/schema-compat-test.sh FETCH_HEAD
 
       - name: Install Chromium for browser checks
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium webkit
 
       - name: Smoke and integration tests (production build)
         env:
@@ -165,6 +165,8 @@ jobs:
           node scripts/cabinet-e2e.mjs
           # Доступность из аудита (UX-1…14), замеры LCP/CLS/INP и видео пролёта на главной.
           node scripts/ux-e2e.mjs
+          # Safari (WebKit, iPhone): поведение главной, видео, reduced motion, вход (ТЗ #40, п. 8).
+          node scripts/webkit-e2e.mjs
           # Главная за настоящим deploy/Caddyfile (http://localhost:8080, подходит для service
           # worker): публичность, отсутствие запросов в закрытую часть, клавиатура, reduced motion,
           # диалог пароля мимо SW и офлайн-страница при остановленном Caddy (scripts/landing-e2e.mjs).

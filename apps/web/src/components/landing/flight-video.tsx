@@ -265,7 +265,12 @@ export function FlightVideo({
 
     // Видео — после загрузки страницы: иначе на медленной сети оно задерживает событие load,
     // а первый кадр и так виден картинкой.
-    const start = () => load(forward, 'forward');
+    // Reduced motion: при гидратации компонент успевает смонтироваться до переключения на
+    // статичную версию — без этой проверки 15 МБ ролика грузились зря (ТЗ #40, п. 8).
+    const start = () => {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      load(forward, 'forward');
+    };
     if (document.readyState === 'complete') start();
     else window.addEventListener('load', start, { once: true });
 
@@ -280,8 +285,14 @@ export function FlightVideo({
       forward.removeEventListener('seeked', onSeeked);
       unsubscribe();
       cancelAnimationFrame(raf);
-      forward.pause();
-      reverse.pause();
+      // Снять адреса: иначе браузер докачивает ролики после ухода компонента.
+      for (const video of [forward, reverse]) {
+        video.pause();
+        if (video.getAttribute('src')) {
+          video.removeAttribute('src');
+          video.load();
+        }
+      }
     };
   }, [progress, player]);
 

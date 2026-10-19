@@ -401,6 +401,17 @@ try {
       sources.filter(Boolean).length === 1 && !sources.some((s) => s.includes('reverse')),
       sources.join(' | '),
     );
+
+    // Reduced motion: видео не грузится совсем, только картинка (ТЗ #40, п. 8).
+    const calm = await newPage({ reducedMotion: 'reduce' });
+    const media = [];
+    calm.on('request', (r) => {
+      if (/\.(mp4|webm)(\?|$)/.test(r.url())) media.push(r.url());
+    });
+    await calm.goto(`${WEB}/`, { waitUntil: 'load' });
+    await calm.waitForTimeout(4000);
+    check('flight: reduced motion downloads no video', media.length === 0, media.join(' | '));
+    await calm.context().close();
     await light.context().close();
   }
 } catch (error) {
