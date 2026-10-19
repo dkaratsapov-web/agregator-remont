@@ -90,7 +90,7 @@ jobs:
 
       - name: Autodeploy script (shellcheck and scenarios)
         run: |
-          shellcheck -x deploy/autodeploy/*.sh deploy/backup/*.sh scripts/autodeploy-test.sh scripts/perf/*.sh
+          shellcheck -x deploy/autodeploy/*.sh deploy/backup/*.sh scripts/autodeploy-test.sh scripts/perf/*.sh scripts/image-secrets-check.sh
           bash scripts/autodeploy-test.sh
 
       - name: Build
@@ -204,8 +204,29 @@ jobs:
             grep -q 'DEBIAN_MIRROR:' build.log || { echo "failed for another reason: $bad"; tail -20 build.log; exit 1; }
           done
 
+      # В контексте сборки как на сервере: deploy/.env, сертификат банка, дамп базы, локальный
+      # .env. Ни один из них не должен попасть в образы (проверка ниже, ТЗ #40, DEV-5).
+      - name: Plant secrets in the build context
+        run: |
+          mkdir -p deploy/secrets
+          echo planted > deploy/secrets/ci-planted.p12
+          echo planted > deploy/secrets/ci-planted.pem
+          echo planted > agregator-20260101T000000Z-ci.dump
+          echo 'PLANTED=1' > .env.local
+
       - name: Build images and start the stack
         run: $COMPOSE up -d --build
+
+      - name: No secrets in the built images
+        run: |
+          # Самопроверка: образ с .env внутри должен не пройти.
+          mkdir -p "$RUNNER_TEMP/bad" && echo 'PLANTED=1' > "$RUNNER_TEMP/bad/.env"
+          printf 'FROM scratch\nCOPY .env /repo/.env\n' > "$RUNNER_TEMP/bad/Dockerfile"
+          docker build -q -t secrets-selftest "$RUNNER_TEMP/bad" > /dev/null
+          if bash scripts/image-secrets-check.sh secrets-selftest; then
+            echo 'self-test: planted .env was not detected'; exit 1
+          fi
+          bash scripts/image-secrets-check.sh agregator-api:local agregator-web:local
 
       - name: Wait for web
         run: |

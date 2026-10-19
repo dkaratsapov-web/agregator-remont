@@ -16,11 +16,14 @@ api.pid
 **/.env
 **/.env.*
 !**/.env.example
+# В любом каталоге, не только в корне (шаблоны .dockerignore без ** — только корень).
 deploy/secrets
-*.p12
-*.pem
-*.key
-*.dump
-*.dump.age
+**/*.p12
+**/*.pfx
+**/*.pem
+**/*.key
+**/*.crt
+**/*.dump
+**/*.dump.age
 backups
 report.txt
