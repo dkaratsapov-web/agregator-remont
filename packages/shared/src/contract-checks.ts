@@ -3,10 +3,11 @@
  * с типами, сгенерированными из apps/api/openapi.json. Расхождение ломает `pnpm typecheck`.
  * После PR C интерфейсы станут псевдонимами сгенерированных типов и файл можно удалить.
  */
-import type { AuthSessionDto, UserDto } from './auth';
+import type { AuthSessionDto, SessionDto, UserDto } from './auth';
 import type { ContractorProfileDto, JobBidDto, MyBidDto } from './bids';
 import type { components } from './generated/openapi';
-import type { JobDto, OwnJobDto } from './jobs';
+import type { JobDraftDto, JobDto, JobItemDto, OwnJobDto } from './jobs';
+import type { LeadDto } from './leads';
 import type { Paginated } from './pagination';
 
 type Schemas = components['schemas'];
@@ -27,4 +28,10 @@ export type ContractChecks = [
   Expect<Equal<MyBidDto, Schemas['MyBidDto']>>,
   Expect<Equal<Paginated<MyBidDto>, Schemas['PaginatedMyBidDto']>>,
   Expect<Equal<JobBidDto, Schemas['JobBidDto']>>,
+  // AUDIT_FINDINGS ARCH-6: сеансы, черновики, позиции заказа и заявки тоже сверяются.
+  Expect<Equal<SessionDto, Schemas['SessionDto']>>,
+  Expect<Equal<JobDraftDto, Schemas['JobDraftDto']>>,
+  Expect<Equal<JobItemDto, Schemas['JobItemDto']>>,
+  Expect<Equal<LeadDto, Schemas['LeadDto']>>,
+  Expect<Equal<Paginated<LeadDto>, Schemas['PaginatedLeadDto']>>,
 ];

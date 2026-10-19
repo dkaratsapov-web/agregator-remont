@@ -1,6 +1,5 @@
 import { USER_ROLE_LABELS, type SessionDto } from '@agregator/shared';
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
 import { AppearanceForm } from '@/components/account/appearance-form';
 import { CopyId } from '@/components/account/copy-id';
 import { AvatarUploader } from '@/components/account/avatar-uploader';
@@ -12,7 +11,7 @@ import { Sheet, SheetBody, SheetHeader } from '@/components/ui/sheet';
 import { BankLinks } from '@/components/account/bank-links';
 import { getBankProviders, getLinkedBanks, listSessions } from '@/lib/api';
 import { bankErrorMessage, isBankId } from '@/lib/bank-login';
-import { getCurrentUser, getSessionToken } from '@/lib/session';
+import { requireUserPage } from '@/lib/customer';
 
 export const metadata: Metadata = { title: 'Настройки', robots: { index: false } };
 
@@ -50,13 +49,11 @@ export default async function SettingsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [user, token, query, banks] = await Promise.all([
-    getCurrentUser(),
-    getSessionToken(),
+  const [{ user, token }, query, banks] = await Promise.all([
+    requireUserPage('/account/settings'),
     searchParams,
     getBankProviders(),
   ]);
-  if (!user || !token) redirect('/login?next=/account/settings');
   const one = (key: string) => (Array.isArray(query[key]) ? query[key][0] : query[key]);
   const bank = one('bank');
   const bankError = bankErrorMessage(one('bank_error'), isBankId(bank) ? bank : undefined);

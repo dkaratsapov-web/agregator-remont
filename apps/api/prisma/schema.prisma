@@ -112,9 +112,14 @@ model Job {
 
   @@unique([ownerId, requestId])
   @@index([createdAt(sort: Desc), id(sort: Desc)])
-  @@index([category, createdAt(sort: Desc)])
   @@index([ownerId, createdAt(sort: Desc)])
   @@index([categories], type: Gin)
+  /// Поиск каталога ILIKE '%…%' и город без учёта регистра (расширение pg_trgm в миграции).
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "jobs_title_trgm_idx")
+  @@index([description(ops: raw("gin_trgm_ops"))], type: Gin, map: "jobs_description_trgm_idx")
+  @@index([city(ops: raw("gin_trgm_ops"))], type: Gin, map: "jobs_city_trgm_idx")
+  // Частичный индекс открытых заказов (jobs_open_created_at_idx) Prisma не описывает: он только
+  // в SQL миграции 20261019120000_catalog_search_indexes.
   @@map("jobs")
 }
 

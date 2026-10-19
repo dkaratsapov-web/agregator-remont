@@ -94,6 +94,16 @@ jobs:
           pnpm --filter @agregator/shared openapi:types
           git diff --exit-code -- apps/api/openapi.json packages/shared/src/generated
 
+      # ARCH-8: schema.prisma и миграции не расходятся (забытая миграция или правка SQL мимо
+      # схемы). Частичные индексы Prisma не видит; они перечислены в комментариях schema.prisma.
+      - name: Schema matches migrations
+        run: |
+          PGPASSWORD=agregator psql -h localhost -U agregator -d agregator_test \
+            -c 'CREATE DATABASE agregator_shadow'
+          pnpm --filter @agregator/api exec prisma migrate diff --exit-code \
+            --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url postgresql://agregator:agregator@localhost:5432/agregator_shadow
+
       - name: Migrations and seed apply cleanly
         run: |
           pnpm --filter @agregator/api exec prisma migrate deploy
