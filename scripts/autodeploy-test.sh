@@ -37,6 +37,7 @@ cat > "$WORK/bin/docker" << 'STUB'
 echo "docker $*${IMAGE_TAG:+ tag=$IMAGE_TAG}" >> "$STUB_LOG"
 case "$1 $2" in
   'info --format') echo /var/lib/docker; exit 0 ;;
+  info\ *) [ "${DOCKER_DOWN:-0}" = 1 ] && exit 1; exit 0 ;;
   # Проверка восстановления: временная база отвечает числом миграций и строк.
   exec\ *) case "$*" in
       *_prisma_migrations*) echo "${RESTORE_MIGRATIONS:-1}" ;;
@@ -460,6 +461,41 @@ sed -i '/^MONITOR_HEARTBEAT_URL=/d' "$ENV_FILE"
 monitor
 check 'monitor: missing external monitor is logged' "$(logged 'внешний монитор не настроен')" 1
 unset ENV_FILE
+
+# 16. Откат (ТЗ #40): правки на сервере, Docker не отвечает, нет сохранённого SHA, несовместимая
+# миграция между версиями — отказ без изменений; после восстановления базы — откат разрешён.
+git -C "$WORK/server" reset -q --hard origin/main
+rm -f "$WORK/state/failed"
+mkdir -p "$WORK/dev/apps/api/prisma/migrations/3" "$WORK/dev/apps/api/prisma/migrations/4"
+push_commit 'ALTER TABLE "jobs" DROP COLUMN "title";' apps/api/prisma/migrations/3/migration.sql
+all_green
+run
+check 'drop column migration deployed' "$(deployed)" "$(dev_head)"
+new=$(deployed)
+rollback() { : > "$STUB_LOG"; bash "$ROOT/deploy/autodeploy/rollback.sh" > "$WORK/out.log" 2>&1 || echo "exit $?" >> "$WORK/out.log"; }
+rollback
+check 'rollback over incompatible migration: refused' "$(logged 'несовместимы со старым кодом') $(deployed) $(docker_calls 'up -d')" "1 $new 0"
+check 'rollback refusal shows the runbook' "$(logged 'ROLLBACK_SCHEMA_RESTORED=yes')" 1
+echo dirty >> "$WORK/server/app.txt"
+ROLLBACK_SCHEMA_RESTORED=yes rollback
+check 'rollback with local changes: refused' "$(logged 'есть изменения') $(deployed)" "1 $new"
+git -C "$WORK/server" checkout -q -- app.txt
+DOCKER_DOWN=1 ROLLBACK_SCHEMA_RESTORED=yes rollback
+check 'rollback with Docker down: refused' "$(logged 'Docker не отвечает') $(deployed)" "1 $new"
+mv "$WORK/state/deployed" "$WORK/state/deployed.bak"
+ROLLBACK_SCHEMA_RESTORED=yes rollback
+check 'rollback without saved SHA: refused' "$(logged 'нет сохранённого')" 1
+mv "$WORK/state/deployed.bak" "$WORK/state/deployed"
+ROLLBACK_SCHEMA_RESTORED=yes rollback
+check 'rollback after database restore: done' "$(logged '^exit') $(failed)" "0 $new"
+# Совместимая миграция с пометкой rollback-safe не мешает откату.
+push_commit "$(printf -- '-- rollback-safe: значение enum только для записи в журнал\nALTER TYPE "AuditAction" ADD VALUE '"'"'X'"'"';')" apps/api/prisma/migrations/4/migration.sql
+all_green
+rm -f "$WORK/state/failed"
+run
+marked=$(deployed)
+rollback
+check 'rollback over rollback-safe migration: allowed' "$(logged '^exit') $(failed)" "0 $marked"
 
 # Секреты не попадают в журнал (в .env на сервере их нет, но проверяем, что .env не печатается).
 check 'no .env in log' "$(grep -c 'DOMAIN=' "$WORK/out.log" || true)" 0

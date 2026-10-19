@@ -78,6 +78,16 @@ jobs:
             apps/web/coverage/lcov.info
           if-no-files-found: ignore
 
+      # Новые миграции PR не ломают прежнюю версию API (откат и время между migrate и стартом
+      # нового API): опасные операции — только с пометкой rollback-safe (ТЗ #40, DEV-7).
+      - name: New migrations are compatible with the previous API
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          bash deploy/autodeploy/migration-check.sh FETCH_HEAD HEAD
+
       - name: Autodeploy script (shellcheck and scenarios)
         run: |
           shellcheck -x deploy/autodeploy/*.sh deploy/backup/*.sh scripts/autodeploy-test.sh scripts/perf/*.sh
