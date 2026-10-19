@@ -90,7 +90,7 @@ jobs:
 
       - name: Autodeploy script (shellcheck and scenarios)
         run: |
-          shellcheck -x deploy/autodeploy/*.sh deploy/backup/*.sh scripts/autodeploy-test.sh scripts/perf/*.sh scripts/image-secrets-check.sh
+          shellcheck -x deploy/autodeploy/*.sh deploy/backup/*.sh scripts/autodeploy-test.sh scripts/perf/*.sh scripts/image-secrets-check.sh scripts/drills.sh
           bash scripts/autodeploy-test.sh
 
       - name: Build
@@ -268,6 +268,53 @@ jobs:
       - name: Container logs on failure
         if: failure()
         run: $COMPOSE logs --tail 200
+
+      - name: Stop the stack
+        if: always()
+        run: $COMPOSE down -v
+
+  drills:
+    name: Disaster drills (backup, restore, broken release, rollback)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      COMPOSE: docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install age and rclone (offsite backup drill)
+        run: sudo apt-get update -q && sudo apt-get install -y -q age rclone
+
+      - name: Prepare deploy/.env
+        run: |
+          cp deploy/.env.example deploy/.env
+          HASH=$(docker run --rm caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f caddy hash-password --plaintext 'ci-password')
+          {
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
+            echo "DOMAIN=localhost"
+            echo "PUBLIC_ORIGIN=https://localhost"
+            echo "WEB_TRUST_PROXY_HOPS=1"
+            echo "BASIC_AUTH_USER=tester"
+            echo "BASIC_AUTH_HASH='$HASH'"
+          } >> deploy/.env
+
+      - name: Build images and start the stack
+        run: $COMPOSE up -d --build
+
+      # Одноразовый стек раннера: настоящие копия, восстановление, сломанный релиз и откат
+      # (scripts/drills.sh, ТЗ #40). На production не запускается.
+      - name: Drills
+        env:
+          DRILLS_DIR: ${{ runner.temp }}/drills
+        run: bash scripts/drills.sh
+
+      - name: Drill logs on failure
+        if: failure()
+        run: |
+          tail -n 50 "$RUNNER_TEMP"/drills/*.log || true
+          $COMPOSE ps
+          $COMPOSE logs --tail 100 api
 
       - name: Stop the stack
         if: always()
