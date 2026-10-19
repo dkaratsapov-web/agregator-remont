@@ -65,6 +65,15 @@ case_sql 'enum: renamed value' 2 "ALTER TYPE \"Status\" RENAME VALUE 'A' TO 'B';
 case_sql 'function' 2 'CREATE FUNCTION f() RETURNS trigger AS $$ BEGIN RETURN NEW; END; $$ LANGUAGE plpgsql;'
 case_sql 'several actions, one dangerous' 2 'ALTER TABLE "jobs" ADD COLUMN "city" TEXT, DROP COLUMN "title";'
 case_sql 'unknown statement' 2 'TRUNCATE "jobs";'
+case_sql 'DROP CONSTRAINT' 2 'ALTER TABLE "jobs" DROP CONSTRAINT "jobs_pkey";'
+case_sql 'RENAME TABLE' 2 'ALTER TABLE "jobs" RENAME TO "orders";'
+# Новая таблица ссылается на существующую: без CASCADE / SET NULL прежний код не удалит заказ,
+# на который появилась ссылка.
+case_sql 'new table: foreign key to an existing table, RESTRICT' 2 'CREATE TABLE "notes" ("id" TEXT NOT NULL, "job_id" TEXT NOT NULL);
+ALTER TABLE "notes" ADD CONSTRAINT "notes_job_id_fkey" FOREIGN KEY ("job_id") REFERENCES "jobs"("id") ON DELETE RESTRICT ON UPDATE CASCADE;'
+case_sql 'new table: foreign key without ON DELETE' 2 'CREATE TABLE "notes" ("id" TEXT NOT NULL, "job_id" TEXT REFERENCES "jobs"("id"));'
+case_sql 'new table: foreign key with SET NULL' 0 'CREATE TABLE "notes" ("id" TEXT NOT NULL, "job_id" TEXT);
+ALTER TABLE "notes" ADD CONSTRAINT "notes_job_id_fkey" FOREIGN KEY ("job_id") REFERENCES "jobs"("id") ON DELETE SET NULL ON UPDATE CASCADE;'
 
 # Пометка действует только на оператор сразу после неё.
 case_sql 'marker on a safe statement does not cover a dangerous one' 2 '-- rollback-safe: столбец новый
@@ -95,9 +104,26 @@ UPDATE \"jobs\" SET \"outcome\" = 'A' WHERE \"title\" = 'x';"
 case_sql 'new table with its own constraints' 0 'CREATE TABLE "bids" ("id" TEXT NOT NULL, "job_id" TEXT NOT NULL, CONSTRAINT "bids_pkey" PRIMARY KEY ("id"));
 CREATE UNIQUE INDEX "bids_job_id_key" ON "bids"("job_id");
 ALTER TABLE "bids" ADD CONSTRAINT "bids_job_id_fkey" FOREIGN KEY ("job_id") REFERENCES "jobs"("id") ON DELETE CASCADE;'
+# shellcheck disable=SC2016 # $body$ — SQL, а не переменная shell
+case_sql 'semicolon inside a dollar-quoted string is not a statement end' 0 'COMMENT ON TABLE "jobs" IS $body$a; DROP TABLE "jobs"$body$;'
 case_sql 'dangerous words in comments and strings are not operations' 0 "/* DROP TABLE \"jobs\"; */
 -- ALTER TABLE \"jobs\" DROP COLUMN \"title\";
 UPDATE \"jobs\" SET \"title\" = 'x; DROP TABLE y' WHERE \"id\" = '1';"
+
+# Таблица, созданная внутри диапазона, неизвестна целевой версии: с ней можно всё. Если же
+# целевая версия её уже знает (создана до цели), удаление столбца опасно.
+git checkout -q --detach "$base"
+mkdir -p "$dir/1_notes"
+printf 'CREATE TABLE "notes" ("id" TEXT NOT NULL, "text" TEXT);\n' > "$dir/1_notes/migration.sql"
+git add -A && git commit -qm 'create notes'
+with_notes=$(git rev-parse HEAD)
+mkdir -p "$dir/2_notes"
+printf 'ALTER TABLE "notes" DROP COLUMN "text";\n' > "$dir/2_notes/migration.sql"
+git add -A && git commit -qm 'drop notes column'
+verdict 'table created in the range: the target does not know it' 0
+base_saved=$base base=$with_notes
+verdict 'table created before the target: dropping its column is dangerous' 2
+base=$base_saved
 
 # Изменённая или удалённая уже существующая миграция — несовместимо при любых пометках.
 git checkout -q --detach "$base"

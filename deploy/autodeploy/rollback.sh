@@ -86,9 +86,16 @@ if ! bash "$(dirname "$0")/migration-check.sh" "$target" "$current"; then
 fi
 log "откат ${current:0:12} -> ${target:0:12}"
 git reset --quiet --hard "$target"
-"${compose[@]}" up -d --no-build --remove-orphans || die 'переключение контейнеров не удалось'
+# Сбой после переключения кода: рабочая копия возвращается на текущую версию, состояние
+# (deployed, failed) не меняется — ничего не помечается успешным; владелец получает уведомление.
+switch_failed() {
+  git reset --quiet --hard "$current"
+  notify "откат ${current:0:12} -> ${target:0:12} не удался: $1; контейнеры могли переключиться частично, docker compose ... ps"
+  die "$1; рабочая копия возвращена на ${current:0:12}, состояние не изменено. Проверьте docker compose ... ps и повторите откат или обновление"
+}
+"${compose[@]}" up -d --no-build --remove-orphans || switch_failed 'переключение контейнеров не удалось'
 if ! git diff --quiet "$target" "$current" -- deploy/Caddyfile; then
-  "${compose[@]}" restart caddy || die 'перезапуск Caddy не удался'
+  "${compose[@]}" restart caddy || switch_failed 'перезапуск Caddy не удался'
 fi
 echo "$current" > "$STATE_DIR/failed"
 echo "$target" > "$STATE_DIR/deployed"

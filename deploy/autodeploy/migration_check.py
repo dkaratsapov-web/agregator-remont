@@ -10,7 +10,9 @@
 - ALTER TABLE … ADD COLUMN: столбец допускает NULL или имеет DEFAULT, без CHECK и PRIMARY KEY;
 - ALTER TABLE … ALTER COLUMN … SET DEFAULT;
 - UPDATE и INSERT (заполнение данных, схема не меняется);
-- любые операции над таблицами, созданными в этом же наборе миграций (прежний код их не знает).
+- любые операции над таблицами, созданными в этом же наборе миграций (прежний код их не знает),
+  кроме внешнего ключа такой таблицы на существующую без ON DELETE CASCADE / SET NULL: прежний
+  код, удаляя строку существующей таблицы, получит ошибку, если на неё ссылается новая.
 
 Всё остальное (DROP, RENAME, смена типа, SET/DROP NOT NULL, новое значение enum, ограничения,
 уникальный индекс на существующей таблице, функции, триггеры, неизвестные операторы) — опасно.
@@ -125,11 +127,23 @@ def created_table(stmt):
     return name(found.group(1)) if found else None
 
 
+def blocking_reference(s, new_tables):
+    """Ссылка на существующую таблицу, которая помешает прежнему коду удалять её строки."""
+    for found in re.finditer(r'references (\S+?)\s*\(', s):
+        target = name(found.group(1))
+        rest = s[found.end():].split(' references ')[0]
+        on_delete = re.search(r'on delete (cascade|set null|set default|restrict|no action)', rest)
+        if target not in new_tables and (not on_delete or on_delete.group(1) in ('restrict', 'no action')):
+            return (f'внешний ключ на существующую таблицу {target} без ON DELETE CASCADE/SET NULL: '
+                    'прежний код не сможет удалить строку, на которую ссылается новая')
+    return None
+
+
 def danger(stmt, new_tables):
     """None — безопасно, иначе причина."""
     s = stmt.lower()
     if re.match(r'create (unlogged )?table ', s) and created_table(stmt):
-        return None
+        return blocking_reference(s, new_tables)
     if re.match(r'create type \S+ as enum\b', s) or re.match(r'create extension\b', s):
         return None
     if re.match(r'comment on\b', s) or re.match(r'(update|insert into)\b', s):
@@ -144,7 +158,7 @@ def danger(stmt, new_tables):
     alter = re.match(r'alter table (?:if exists )?(?:only )?(\S+)\s+(.*)', s)
     if alter:
         if name(alter.group(1)) in new_tables:
-            return None
+            return blocking_reference(s, new_tables)
         for action in split_top(alter.group(2)):
             if re.match(r'add (?:column )?(?!constraint\b|primary\b|unique\b|foreign\b|check\b|exclude\b)', action):
                 if 'not null' in action and 'default' not in action:

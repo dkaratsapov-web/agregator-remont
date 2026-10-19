@@ -526,6 +526,10 @@ echo dirty >> "$WORK/server/app.txt"
 rollback
 check 'rollback with local changes: refused' "$(logged 'есть изменения') $(deployed)" "1 $new"
 git -C "$WORK/server" checkout -q -- app.txt
+echo staged > "$WORK/server/staged.txt" && git -C "$WORK/server" add staged.txt
+rollback
+check 'rollback with staged changes (index): refused' "$(logged 'есть изменения') $(deployed)" "1 $new"
+git -C "$WORK/server" rm -q --cached staged.txt && rm "$WORK/server/staged.txt"
 # Аудит #40: неотслеживаемый файл по пути, который есть в прошлой версии, — reset его перезаписал бы.
 echo 'локальные данные' > "$WORK/server/old.txt"
 rollback
@@ -544,6 +548,14 @@ mv "$WORK/state/deployed" "$WORK/state/deployed.bak"
 rollback
 check 'rollback without saved SHA: refused' "$(logged 'нет сохранённого')" 1
 mv "$WORK/state/deployed.bak" "$WORK/state/deployed"
+# Неполное переключение: ничего не помечено успешным, код возвращён, уведомление ушло.
+head_before=$(git -C "$WORK/server" rev-parse HEAD)
+: > "$CURL_LOG"
+printf 'NOTIFY_WEBHOOK_URL=https://hooks.invalid/agregator\n' > "$WORK/env.rollback"
+UP_FAIL=1 ENV_FILE="$WORK/env.rollback" DB_MIGRATIONS='0_init' rollback
+check 'rollback: failed up — error, nothing marked, code restored' \
+  "$(logged '^exit 1') $(deployed) $(failed) $(git -C "$WORK/server" rev-parse HEAD)" "1 $new none $head_before"
+check 'rollback: failed up — owner notified' "$(grep -c hooks.invalid "$CURL_LOG")" 1
 DB_MIGRATIONS='0_init' rollback
 check 'rollback after database restore: done' "$(logged '^exit') $(logged 'опасных миграций в базе нет') $(failed)" "0 1 $new"
 # Опасный оператор с пометкой rollback-safe прямо перед ним не мешает откату.
