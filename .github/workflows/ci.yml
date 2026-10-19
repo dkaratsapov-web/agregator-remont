@@ -20,7 +20,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
         env:
           POSTGRES_USER: agregator
           POSTGRES_PASSWORD: agregator
@@ -41,11 +41,11 @@ jobs:
       NEXT_TELEMETRY_DISABLED: '1'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -70,7 +70,7 @@ jobs:
 
       - name: Coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: coverage
           path: |
@@ -125,7 +125,7 @@ jobs:
         run: |
           # Логин и пароль тестировщика (страница /gate) проверяет web: хеш тот же, что в deploy/.env.
           export BASIC_AUTH_USER=tester
-          export BASIC_AUTH_HASH=$(docker run --rm caddy:2-alpine caddy hash-password --plaintext 'ci-password')
+          export BASIC_AUTH_HASH=$(docker run --rm caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f caddy hash-password --plaintext 'ci-password')
           node apps/api/dist/main.js > api.log 2>&1 &
           echo $! > api.pid
           (cd apps/web && pnpm exec next start --port 3000 > ../../web.log 2>&1 &)
@@ -150,7 +150,7 @@ jobs:
           sed 's#web:3000#localhost:3000#g' deploy/Caddyfile > "$RUNNER_TEMP/Caddyfile"
           docker run -d --name e2e-caddy --network host \
             -e DOMAIN=http://localhost:8080 \
-            -v "$RUNNER_TEMP/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine
+            -v "$RUNNER_TEMP/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
           for i in $(seq 1 30); do curl -fs -o /dev/null http://localhost:8080/ && break; sleep 1; done
           STOP_PROXY_CMD='docker stop e2e-caddy' node scripts/landing-e2e.mjs
           # Последним: в конце останавливает API, чтобы проверить выход при сбое API.
@@ -168,9 +168,9 @@ jobs:
       COMPOSE: docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.local.yml -f deploy/docker-compose.ci.yml
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
 
@@ -250,16 +250,16 @@ jobs:
       COMPOSE: docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
 
       - name: Prepare deploy/.env for https://localhost (Caddy internal CA)
         run: |
           cp deploy/.env.example deploy/.env
-          HASH=$(docker run --rm caddy:2-alpine caddy hash-password --plaintext 'ci-password')
+          HASH=$(docker run --rm caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f caddy hash-password --plaintext 'ci-password')
           {
             echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
             echo "DOMAIN=localhost"

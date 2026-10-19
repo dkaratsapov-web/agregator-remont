@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Один Dockerfile на монорепозиторий, цели: `api` (API + миграции) и `web` (Next.js standalone).
 
-FROM node:22-slim AS base
+FROM node:22-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 AS base
 # Зеркало Debian для apt (например, http://mirror.yandex.ru), если deb.debian.org недоступен
 # с сервера сборки. Пусто — штатный deb.debian.org. Задаётся DEBIAN_MIRROR в deploy/.env.
 # Только http:// (как у штатных источников образа: ca-certificates для https ещё не
@@ -43,7 +43,7 @@ EXPOSE 4000
 CMD ["node", "dist/main.js"]
 
 # Web: минимальный образ из standalone-сборки Next.js.
-FROM node:22-slim AS web
+FROM node:22-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 AS web
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 WORKDIR /app
 COPY --from=build --chown=node:node /repo/apps/web/.next/standalone ./

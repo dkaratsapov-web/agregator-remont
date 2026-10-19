@@ -309,6 +309,19 @@ curl -s --resolve "$DOMAIN:443:127.0.0.1" https://$DOMAIN/login | grep -c 'Сб�
 только для чтения; без него API в интернет не ходит. Ошибка в настройке (нет сертификата, пустой
 секрет, http вместо https) не даёт API запуститься: смотреть `docker compose ... logs api`.
 
+## Закреплённые образы и действия CI
+
+Образы (`node`, `postgres`, `caddy`) и действия GitHub (`actions/*`, `pnpm/action-setup`)
+указаны по неизменяемому адресу: образ по digest (`postgres:16-alpine@sha256:…`), действие по
+коммиту (`actions/checkout@<sha> # v4.4.0`). Подмена тега у издателя не попадёт на сервер и
+в CI незаметно (AUDIT_FINDINGS SEC-6, DEV-14).
+
+Обновлять раз в месяц и при уязвимости в образе: получить digest нового тега (`docker buildx
+imagetools inspect postgres:16-alpine`, строка `Digest`), коммит тега действия (`git ls-remote
+https://github.com/actions/checkout 'refs/tags/v4.4.0^{}'`), заменить во всех файлах
+(`git grep -n '@sha256\|uses: '`), пройти CI. Новая мажорная версия Postgres — отдельная
+миграция данных, не замена digest.
+
 ## Перед появлением реальных пользовательских данных
 
 Сейчас стенд для закрытого теста. До реальных пользователей обязательно:
