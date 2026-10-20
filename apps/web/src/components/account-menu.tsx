@@ -31,6 +31,7 @@ const ROLE_LINKS: Record<UserRole, MenuLink[]> = {
     { href: '/jobs?open=1', label: 'Найти заказ' },
   ],
   ADMIN: [
+    { href: '/admin/reports', label: 'Жалобы' },
     { href: '/admin/leads', label: 'Заявки на тестирование' },
     { href: '/jobs', label: 'Каталог заказов' },
   ],

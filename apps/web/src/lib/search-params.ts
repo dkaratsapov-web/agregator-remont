@@ -69,3 +69,26 @@ export function historyCursor(raw: RawParam): string | undefined {
   const value = first(raw);
   return value && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? value : undefined;
 }
+
+/** Итог жалобы без JS (?report=…) → текст сверху страницы; null — нет итога. */
+export function reportNotice(raw: RawParam): { text: string; ok: boolean } | null {
+  switch (first(raw)) {
+    case 'sent':
+      return { text: 'Жалоба отправлена. Администратор разберёт её.', ok: true };
+    case 'duplicate':
+      return { text: 'Вы уже пожаловались: жалоба ждёт разбора.', ok: true };
+    case 'invalid':
+      return {
+        text: 'Жалоба не отправлена: выберите причину, для «Другое» — с пояснением.',
+        ok: false,
+      };
+    case 'gone':
+      return { text: 'Жалоба не отправлена: это уже недоступно.', ok: false };
+    case 'limit':
+      return { text: 'Жалоба не отправлена: слишком много жалоб за сутки.', ok: false };
+    case 'failed':
+      return { text: 'Жалоба не отправлена: попробуйте позже.', ok: false };
+    default:
+      return null;
+  }
+}

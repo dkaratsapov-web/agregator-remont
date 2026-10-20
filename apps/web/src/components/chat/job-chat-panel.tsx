@@ -2,6 +2,7 @@ import { PLAN_PARTY_LABELS, type JobMessagesDto } from '@agregator/shared';
 import Link from 'next/link';
 import { sendMessageAction } from '@/app/(site)/account/plan/actions';
 import { Sheet, SheetBody, SheetHeader } from '@/components/ui/sheet';
+import { ReportButton } from '@/components/moderation/report-button';
 import { formatDateTime } from '@/lib/format';
 import { AutoRefresh } from './auto-refresh';
 import { MessageForm } from './message-form';
@@ -73,12 +74,20 @@ export function JobChatPanel({
                   </span>{' '}
                   · <time dateTime={message.createdAt}>{formatDateTime(message.createdAt)}</time>
                 </p>
+                {message.hidden ? (
+                  <p className="mt-1 text-sm italic text-ink-soft">Сообщение скрыто модератором.</p>
+                ) : null}
                 {message.body ? (
                   <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-ink [overflow-wrap:anywhere]">
                     {message.body}
                   </p>
                 ) : null}
                 <PhotoGrid jobId={chat.jobId} photos={message.photos} label="Фото к сообщению" />
+                {!message.own && !message.hidden ? (
+                  <div className="mt-1">
+                    <ReportButton targetType="MESSAGE" targetId={message.id} returnTo={returnTo} />
+                  </div>
+                ) : null}
               </li>
             ))}
           </ol>

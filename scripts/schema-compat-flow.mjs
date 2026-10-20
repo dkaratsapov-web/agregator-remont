@@ -1,10 +1,11 @@
 // Сценарий для schema-compat-test.sh: node scripts/schema-compat-flow.mjs <old|new> <API_URL>
-// Описывает переход «базовый коммит → этот PR» (сейчас: уведомления поверх переписки).
+// Описывает переход «базовый коммит → этот PR» (сейчас: модерация поверх уведомлений).
 // old — прежний API работает на новой схеме: заказ, отклик, выбор исполнителя, план, сдача этапа,
 // сообщение, закрытие с исходом, отказ исполнителя (удаление плана); пишет id в COMPAT_STATE.
-// Прежний API уведомлений не пишет.
-// new — текущий API читает данные прежнего: этап и переписка на месте, уведомлений у этих
-// пользователей нет; новые события в сделке прежнего API дают уведомления другой стороне.
+// Прежний API жалоб, скрытия и блокировки не знает.
+// new — текущий API читает данные прежнего: заказы видны в каталоге (не скрыты), этап, переписка
+// и уведомления на месте, сессии прежнего API действуют (аккаунты не заблокированы); на заказ
+// прежнего API можно пожаловаться.
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const [mode, API] = process.argv.slice(2);
@@ -157,40 +158,33 @@ if (mode === 'old') {
     chat.status === 200 && chat.body.items.length === 1 && chat.body.canWrite === true,
     `got ${chat.status}`,
   );
-  for (const [who, token] of [
-    ['customer', state.customer],
-    ['contractor', state.contractor],
-  ]) {
-    const list = await call('/v1/me/notifications', { token });
-    check(
-      `${who}: no notifications from old API events`,
-      list.status === 200 && list.body.items.length === 0 && list.body.unread === 0,
-      `got ${list.status}`,
-    );
-  }
-  const accepted = await call(`/v1/jobs/${state.workJob}/stages/${state.stageId}/accept`, {
-    method: 'POST',
-    token: state.customer,
-  });
-  const sent = await call(`/v1/jobs/${state.workJob}/messages`, {
-    method: 'POST',
-    token: state.customer,
-    body: { body: 'Сообщение нового API' },
-  });
-  const after = await call('/v1/me/notifications', { token: state.contractor });
   check(
-    'new events in an old deal notify the other side',
-    accepted.status === 200 &&
-      sent.status === 200 &&
-      after.body?.items.map((n) => n.kind).join(',') === 'MESSAGE,STAGE_ACCEPTED',
-    after.body?.items.map((n) => n.kind).join(','),
+    'messages written by the old API are not hidden',
+    chat.body?.items.every((m) => m.hidden === false),
   );
-  const read = await call('/v1/me/notifications/read', {
+  const notifications = await call('/v1/me/notifications', { token: state.contractor });
+  check(
+    'notifications written by the old API are read',
+    notifications.status === 200 && notifications.body.items.length > 0,
+    `got ${notifications.status}`,
+  );
+  const visible = await call(`/v1/jobs/${state.workJob}`);
+  check(
+    'jobs of the old API are visible (not hidden)',
+    visible.status === 200,
+    `got ${visible.status}`,
+  );
+  const reporter = await register('CONTRACTOR');
+  const report = await call('/v1/reports', {
     method: 'POST',
-    token: state.contractor,
-    body: { jobId: state.workJob },
+    token: reporter,
+    body: { targetType: 'JOB', targetId: state.workJob, reason: 'FAKE' },
   });
-  check('marks them read', read.status === 200 && read.body.unread === 0, `got ${read.status}`);
+  check(
+    'a job of the old API can be reported',
+    report.status === 201 && report.body.duplicate === false,
+    `got ${report.status}`,
+  );
   const closedChat = await call(`/v1/jobs/${state.closedJob}/messages`, { token: state.customer });
   check(
     'a job closed by the old API: conversation read-only',

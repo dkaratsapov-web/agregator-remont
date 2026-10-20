@@ -9,7 +9,7 @@ import { JobPlanPanel } from '@/components/plan/job-plan-panel';
 import { planNotice } from '@/components/plan/plan-notice';
 import { StatusBadge } from '@/components/status-badge';
 import { PageHeader, secondaryLinkClass } from '@/components/ui/page-header';
-import { historyCursor } from '@/lib/search-params';
+import { historyCursor, reportNotice } from '@/lib/search-params';
 import { getMessages, getPlan, listMyBids } from '@/lib/api';
 import { requireContractorPage } from '@/lib/customer';
 import { MarkSeen } from '@/components/notifications/mark-seen';
@@ -59,6 +59,7 @@ export default async function WorkPage({
   }
   if (!plan || !job) notFound();
   const notice = planNotice(query.plan);
+  const reported = reportNotice(query.report);
   const summary = await getUnreadSummary();
 
   return (
@@ -81,6 +82,11 @@ export default async function WorkPage({
       {notice ? (
         <div className="mt-6">
           <Notice>{notice}</Notice>
+        </div>
+      ) : null}
+      {reported ? (
+        <div className="mt-6">
+          <Notice tone={reported.ok ? 'ok' : 'neutral'}>{reported.text}</Notice>
         </div>
       ) : null}
       <div className="mt-8 flex max-w-4xl flex-col gap-8">

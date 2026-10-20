@@ -64,9 +64,10 @@ export class BidsService {
 
         // FOR SHARE: отклики на один заказ создаются параллельно, но не во время выбора
         // исполнителя или закрытия заказа (они берут FOR UPDATE).
-        const locked = await tx.$queryRaw<{ status: string }[]>`
-          SELECT status::text AS status FROM jobs WHERE id = ${jobId} FOR SHARE`;
-        if (locked.length === 0) throw new NotFoundException(JOB_NOT_FOUND);
+        const locked = await tx.$queryRaw<{ status: string; hidden_at: Date | null }[]>`
+          SELECT status::text AS status, hidden_at FROM jobs WHERE id = ${jobId} FOR SHARE`;
+        // Скрытый модератором заказ для откликающегося — как несуществующий.
+        if (locked.length === 0 || locked[0].hidden_at) throw new NotFoundException(JOB_NOT_FOUND);
         if (locked[0].status !== 'OPEN') {
           throw new ConflictException('Заказ уже не принимает отклики');
         }
@@ -171,7 +172,8 @@ export class BidsService {
   async listForOwner(ownerId: string, jobId: string): Promise<JobBidDto[]> {
     await this.findOwnedJob(this.prisma, ownerId, jobId);
     const bids = await this.prisma.bid.findMany({
-      where: { jobId, status: { not: 'WITHDRAWN' } },
+      // Скрытые модератором отклики заказчик не видит.
+      where: { jobId, status: { not: 'WITHDRAWN' }, hiddenAt: null },
       include: { contractor: { include: { profile: true } } },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
@@ -197,6 +199,7 @@ export class BidsService {
         SELECT id FROM bids WHERE id = ${bidId} AND job_id = ${jobId} FOR UPDATE`;
       if (lockedBid.length === 0) throw new NotFoundException(BID_NOT_FOUND);
       const bid = await tx.bid.findUniqueOrThrow({ where: { id: bidId } });
+      if (bid.hiddenAt) throw new NotFoundException(BID_NOT_FOUND);
       if (bid.status !== 'PENDING') {
         throw new ConflictException('Этот отклик уже нельзя выбрать');
       }

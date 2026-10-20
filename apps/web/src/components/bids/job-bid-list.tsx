@@ -1,5 +1,6 @@
 import { JOB_CATEGORY_LABELS, type JobBidDto } from '@agregator/shared';
 import { acceptBidAction } from '@/app/(site)/account/jobs/actions';
+import { ReportButton } from '@/components/moderation/report-button';
 import { formatAmount, formatDate, formatYears } from '@/lib/format';
 import { BidJobChangedNote, BidStatusBadge } from './bid-status-badge';
 import { ConfirmActionForm } from './confirm-action-form';
@@ -65,9 +66,16 @@ export function JobBidList({
                 {profile.about}
               </p>
             ) : null}
-            <p className="mt-2 text-xs text-ink-soft">
-              Отклик от <time dateTime={bid.createdAt}>{formatDate(bid.createdAt)}</time>
-            </p>
+            <div className="mt-2 flex flex-wrap items-start justify-between gap-2">
+              <p className="text-xs text-ink-soft">
+                Отклик от <time dateTime={bid.createdAt}>{formatDate(bid.createdAt)}</time>
+              </p>
+              <ReportButton
+                targetType="BID"
+                targetId={bid.id}
+                returnTo={`/account/jobs/${jobId}`}
+              />
+            </div>
             {canAccept && bid.status === 'PENDING' ? (
               <div className="mt-4">
                 <ConfirmActionForm

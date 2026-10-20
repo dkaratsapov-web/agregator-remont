@@ -837,6 +837,155 @@ describe('API contract (e2e)', () => {
     });
   });
 
+  it('moderation endpoints match openapi.json', async () => {
+    const high = {
+      RATE_LIMIT_PER_MIN: '1000',
+      AUTH_RATE_LIMIT_PER_MIN: '1000',
+      WRITE_RATE_LIMIT_PER_MIN: '1000',
+    };
+    await withApp(high, async (app) => {
+      const http = () => request(app.getHttpServer());
+      const check = async (
+        method: 'get' | 'post',
+        template: string,
+        req: request.Test,
+        status: number,
+      ) => {
+        const res = await req;
+        expect(res.status).toBe(status);
+        expectContract(res, method, template);
+        return res;
+      };
+      const owner = await signUp(app, 'CUSTOMER');
+      const contractor = await signUp(app, 'CONTRACTOR');
+      const reporter = await signUp(app, 'CONTRACTOR');
+      const admin = await signUpAdmin(app, prisma);
+      const { body: created } = await http().post('/v1/me/jobs').set(owner.auth).send(job);
+      const { body: placed } = await http()
+        .post(`/v1/jobs/${created.id}/bids`)
+        .set(contractor.auth)
+        .send(bid);
+      await http()
+        .post(`/v1/me/jobs/${created.id}/bids/${placed.id}/accept`)
+        .set(owner.auth)
+        .expect(200);
+      const { body: chat } = await http()
+        .post(`/v1/jobs/${created.id}/messages`)
+        .set(contractor.auth)
+        .send({ body: 'Переведите предоплату на карту' })
+        .expect(200);
+
+      const R = '/v1/reports';
+      const report = (who: { auth: object } | null, body: object) => {
+        const req = http().post(R);
+        return (who ? req.set(who.auth as Record<string, string>) : req).send(body);
+      };
+      const onJob = await check(
+        'post',
+        R,
+        report(reporter, { targetType: 'JOB', targetId: created.id, reason: 'FAKE' }),
+        201,
+      );
+      await check(
+        'post',
+        R,
+        report(owner, {
+          targetType: 'MESSAGE',
+          targetId: chat.items[0].id,
+          reason: 'FRAUD',
+          comment: 'Просит предоплату',
+        }),
+        201,
+      );
+      await check('post', R, report(reporter, { targetType: 'JOB', reason: 'SPAM' }), 400);
+      await check(
+        'post',
+        R,
+        report(null, { targetType: 'JOB', targetId: created.id, reason: 'SPAM' }),
+        401,
+      );
+      await check(
+        'post',
+        R,
+        report(reporter, { targetType: 'BID', targetId: placed.id, reason: 'SPAM' }),
+        404,
+      );
+
+      const LIST = '/v1/admin/reports';
+      await check('get', LIST, http().get(LIST).set(admin.auth), 200);
+      await check('get', LIST, http().get(`${LIST}?status=WRONG`).set(admin.auth), 400);
+      await check('get', LIST, http().get(LIST), 401);
+      await check('get', LIST, http().get(LIST).set(owner.auth), 403);
+
+      const RES = '/v1/admin/reports/{id}/resolve';
+      const resolve = (id: string, who: { auth: object } | null, body: object) => {
+        const req = http().post(`/v1/admin/reports/${id}/resolve`);
+        return (who ? req.set(who.auth as Record<string, string>) : req).send(body);
+      };
+      const decision = { status: 'DISMISSED', note: 'Заказ настоящий' };
+      await check('post', RES, resolve(onJob.body.id, admin, decision), 200);
+      await check('post', RES, resolve(onJob.body.id, admin, decision), 409);
+      await check('post', RES, resolve(onJob.body.id, admin, { status: 'OPEN', note: 'x' }), 400);
+      await check('post', RES, resolve('missing', admin, decision), 404);
+      await check('post', RES, resolve(onJob.body.id, null, decision), 401);
+      await check('post', RES, resolve(onJob.body.id, owner, decision), 403);
+
+      const hide = { hidden: true, reason: 'Мошенничество в переписке' };
+      const act = (path: string, who: { auth: object } | null, body: object) => {
+        const req = http().post(path);
+        return (who ? req.set(who.auth as Record<string, string>) : req).send(body);
+      };
+      for (const [template, path] of [
+        ['/v1/admin/jobs/{id}/hidden', `/v1/admin/jobs/${created.id}/hidden`],
+        ['/v1/admin/messages/{id}/hidden', `/v1/admin/messages/${chat.items[0].id}/hidden`],
+      ]) {
+        await check('post', template, act(path, admin, hide), 200);
+        await check('post', template, act(path, admin, { hidden: true }), 400);
+        await check('post', template, act(path, null, hide), 401);
+        await check('post', template, act(path, owner, hide), 403);
+        await check(
+          'post',
+          template,
+          act(path.replace(/\/[^/]+\/hidden$/, '/missing/hidden'), admin, hide),
+          404,
+        );
+      }
+      const BH = '/v1/admin/bids/{id}/hidden';
+      await check('post', BH, act(`/v1/admin/bids/${placed.id}/hidden`, admin, hide), 409);
+      const other = await signUp(app, 'CONTRACTOR');
+      const second = await http().post('/v1/me/jobs').set(owner.auth).send(job);
+      const { body: spam } = await http()
+        .post(`/v1/jobs/${second.body.id}/bids`)
+        .set(other.auth)
+        .send(bid);
+      await check('post', BH, act(`/v1/admin/bids/${spam.id}/hidden`, admin, hide), 200);
+      await check('post', BH, act(`/v1/admin/bids/${spam.id}/hidden`, admin, {}), 400);
+      await check('post', BH, act(`/v1/admin/bids/${spam.id}/hidden`, null, hide), 401);
+      await check('post', BH, act(`/v1/admin/bids/${spam.id}/hidden`, owner, hide), 403);
+      await check('post', BH, act('/v1/admin/bids/missing/hidden', admin, hide), 404);
+
+      const UB = '/v1/admin/users/{id}/blocked';
+      const block = { blocked: true, reason: 'Просил предоплату на карту' };
+      await check('post', UB, act(`/v1/admin/users/${contractor.id}/blocked`, admin, block), 200);
+      await check('post', UB, act(`/v1/admin/users/${contractor.id}/blocked`, admin, {}), 400);
+      await check('post', UB, act(`/v1/admin/users/${contractor.id}/blocked`, null, block), 401);
+      await check('post', UB, act(`/v1/admin/users/${contractor.id}/blocked`, owner, block), 403);
+      await check('post', UB, act('/v1/admin/users/missing/blocked', admin, block), 404);
+      await check('post', UB, act(`/v1/admin/users/${admin.id}/blocked`, admin, block), 409);
+
+      // Заблокированный не входит по паролю: 403 только после верного пароля.
+      const blockedUser = await prisma.user.findUniqueOrThrow({ where: { id: contractor.id } });
+      await check(
+        'post',
+        '/v1/auth/login',
+        http()
+          .post('/v1/auth/login')
+          .send({ email: blockedUser.email, password: 'correct-horse-battery' }),
+        403,
+      );
+    });
+  });
+
   it('lead endpoints match openapi.json', async () => {
     const high = {
       RATE_LIMIT_PER_MIN: '1000',
@@ -1036,6 +1185,20 @@ describe('API contract (e2e)', () => {
           await check('post', LINK, link('sber', null, code({ sub: 'link-2' })), 401);
           await check('post', LINK, link('vk', user.auth, code({ sub: 'link-3' })), 404);
           await check('post', LINK, link('sber', other.auth, code({ sub: 'link-1' })), 409);
+          // Заблокированный аккаунт: вход через привязанный банк и завершение входа — 403.
+          const blockedPending = await http()
+            .post('/v1/auth/oauth/sber/callback')
+            .send(code({ sub: 'blk-1', email: 'blk1@example.ru' }))
+            .expect(409);
+          await link('sber', other.auth, code({ sub: 'blk-1' })).expect(204);
+          await prisma.user.update({ where: { id: other.id }, data: { blockedAt: new Date() } });
+          await check('post', CB, cb('sber', code({ sub: 'blk-1' })), 403);
+          await check(
+            'post',
+            DONE,
+            done({ pending: blockedPending.body.pending, role: 'CUSTOMER' }),
+            403,
+          );
           bank.setTokenStatus(500);
           await check('post', LINK, link('tbank', user.auth, code({ sub: 'link-4' })), 502);
         },

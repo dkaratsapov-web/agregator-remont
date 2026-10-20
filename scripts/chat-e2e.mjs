@@ -220,7 +220,7 @@ try {
   check(
     'closed job: conversation is read-only',
     (await workerPage.getByText('Заказ закрыт: переписка только для чтения.').isVisible()) &&
-      (await workerPage.locator('#chat textarea').count()) === 0,
+      (await workerPage.locator('#chat textarea[name="body"]').count()) === 0,
   );
 
   check('no JavaScript errors', errors.length === 0, errors.join(' | '));

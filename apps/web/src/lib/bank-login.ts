@@ -163,6 +163,8 @@ export function bankErrorMessage(code: string | undefined, bank?: BankId): strin
       return `Этот ${title} уже привязан к другому аккаунту.`;
     case 'rate-limited':
       return 'Слишком много попыток. Подождите минуту и попробуйте снова.';
+    case 'blocked':
+      return 'Аккаунт заблокирован администратором. Если это ошибка, напишите в поддержку.';
     default:
       return `Не удалось войти через ${title}. Попробуйте ещё раз или войдите по email.`;
   }
@@ -182,6 +184,8 @@ export function bankErrorCode(apiCode: string | undefined, status?: number): str
       return 'already-linked';
     case 'OAUTH_PENDING_EXPIRED':
       return 'expired';
+    case 'OAUTH_BLOCKED':
+      return 'blocked';
     default:
       return 'failed';
   }

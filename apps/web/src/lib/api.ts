@@ -25,6 +25,13 @@ import type {
   UserDto,
   JobMessagesDto,
   MarkNotificationsReadInput,
+  BlockedStateDto,
+  HiddenStateDto,
+  ReportDto,
+  ReportFilter,
+  ReportInput,
+  ReportReceivedDto,
+  ResolveReportInput,
   NotificationsPageDto,
   NotificationsSummaryDto,
   JobPlanDto,
@@ -820,4 +827,72 @@ export async function getLinkedBanks(
 ): Promise<{ provider: BankId; linkedAt: string }[]> {
   const res = await request('/v1/me/oauth', { token });
   return expectJson(res, 'GET /v1/me/oauth');
+}
+
+// --- Модерация: жалобы и действия администратора
+
+/** Жалоба на заказ, сообщение или отклик. */
+export async function createReport(
+  token: string,
+  input: ReportInput,
+  clientIp?: string,
+): Promise<ReportReceivedDto> {
+  const res = await request('/v1/reports', { method: 'POST', body: input, token, clientIp });
+  return expectJson<ReportReceivedDto>(res, 'POST /v1/reports');
+}
+
+export async function listReports(
+  token: string,
+  status: ReportFilter,
+  page: number,
+): Promise<Paginated<ReportDto>> {
+  const res = await request(`/v1/admin/reports?status=${status}&page=${page}`, { token });
+  return expectJson<Paginated<ReportDto>>(res, 'GET /v1/admin/reports');
+}
+
+export async function resolveReport(
+  token: string,
+  id: string,
+  input: ResolveReportInput,
+  clientIp?: string,
+): Promise<ReportDto> {
+  const res = await request(`/v1/admin/reports/${encodeURIComponent(id)}/resolve`, {
+    method: 'POST',
+    body: input,
+    token,
+    clientIp,
+  });
+  return expectJson<ReportDto>(res, 'POST /v1/admin/reports/:id/resolve');
+}
+
+/** Скрыть или вернуть заказ, сообщение или отклик. */
+export async function setContentHidden(
+  token: string,
+  kind: 'jobs' | 'messages' | 'bids',
+  id: string,
+  input: { hidden: boolean; reason: string },
+  clientIp?: string,
+): Promise<HiddenStateDto> {
+  const res = await request(`/v1/admin/${kind}/${encodeURIComponent(id)}/hidden`, {
+    method: 'POST',
+    body: input,
+    token,
+    clientIp,
+  });
+  return expectJson<HiddenStateDto>(res, `POST /v1/admin/${kind}/:id/hidden`);
+}
+
+export async function setUserBlocked(
+  token: string,
+  id: string,
+  input: { blocked: boolean; reason: string },
+  clientIp?: string,
+): Promise<BlockedStateDto> {
+  const res = await request(`/v1/admin/users/${encodeURIComponent(id)}/blocked`, {
+    method: 'POST',
+    body: input,
+    token,
+    clientIp,
+  });
+  return expectJson<BlockedStateDto>(res, 'POST /v1/admin/users/:id/blocked');
 }

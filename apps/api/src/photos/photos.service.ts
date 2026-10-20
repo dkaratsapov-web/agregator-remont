@@ -112,7 +112,12 @@ export class PhotosService {
     }
     const photo = await this.prisma.jobPhoto.findUnique({
       where: { id: photoId },
-      select: { jobId: true, contractorId: true, job: { select: { ownerId: true } } },
+      select: {
+        jobId: true,
+        contractorId: true,
+        job: { select: { ownerId: true } },
+        message: { select: { hiddenAt: true } },
+      },
     });
     const current =
       photo && photo.jobId === jobId && user.role !== 'ADMIN'
@@ -125,7 +130,9 @@ export class PhotosService {
       photo !== null &&
       photo.jobId === jobId &&
       (user.role === 'ADMIN' ||
-        (current?.contractorId === photo.contractorId &&
+        // Фото скрытого модератором сообщения сторонам не отдаётся.
+        (!photo.message?.hiddenAt &&
+          current?.contractorId === photo.contractorId &&
           (user.id === photo.job.ownerId || user.id === photo.contractorId)));
     if (!allowed) throw new NotFoundException(PHOTO_NOT_FOUND);
     const blob =

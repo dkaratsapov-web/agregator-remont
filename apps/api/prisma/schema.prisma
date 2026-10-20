@@ -62,6 +62,12 @@ enum AuditAction {
   STAGE_ACCEPTED
   STAGE_REWORK
   CONTRACTOR_QUIT
+  REPORT_CREATED
+  REPORT_RESOLVED
+  CONTENT_HIDDEN
+  CONTENT_RESTORED
+  USER_BLOCKED
+  USER_UNBLOCKED
 }
 
 // Синхронизировано с BID_STATUSES в packages/shared/src/bids.ts.
@@ -124,6 +130,9 @@ model Job {
   requestId     String?          @map("request_id") @db.Uuid
   /// SHA-256 содержимого публикации с этим ключом: повтор с другим содержимым — 409.
   requestHash   String?          @map("request_hash") @db.VarChar(64)
+  /// Скрыт модератором: не виден в каталоге и посторонним, откликаться нельзя. null — виден.
+  hiddenAt      DateTime?        @map("hidden_at")
+  reports       Report[]
 
   @@unique([ownerId, requestId])
   @@index([createdAt(sort: Desc), id(sort: Desc)])
@@ -181,6 +190,8 @@ model User {
   uiTheme          String             @default("light") @map("ui_theme") @db.VarChar(10)
   uiScale          String             @default("normal") @map("ui_scale") @db.VarChar(10)
   uiMotion         String             @default("system") @map("ui_motion") @db.VarChar(10)
+  /// Заблокирован администратором: вход запрещён, сессии отозваны. null — активен.
+  blockedAt        DateTime?          @map("blocked_at")
   createdAt        DateTime           @default(now()) @map("created_at")
   updatedAt        DateTime           @updatedAt @map("updated_at")
   avatar           UserAvatar?
@@ -197,6 +208,8 @@ model User {
   photosUploaded   JobPhoto[]         @relation("JobPhotoUploader")
   dealPhotos       JobPhoto[]         @relation("JobPhotoContractor")
   notifications    Notification[]
+  reportsFiled     Report[]           @relation("ReportReporter")
+  reportsResolved  Report[]           @relation("ReportResolver")
 
   @@map("users")
 }
@@ -292,6 +305,8 @@ model Bid {
   jobChangedAt DateTime?        @map("job_changed_at")
   /// Почему отклик отклонён: выбран другой исполнитель или заказ закрыт. null — не отклонён.
   rejectReason BidRejectReason? @map("reject_reason")
+  /// Скрыт модератором: заказчик его не видит и не может выбрать. null — виден.
+  hiddenAt     DateTime?        @map("hidden_at")
 
   @@unique([jobId, contractorId])
   @@index([contractorId, createdAt(sort: Desc)])
@@ -410,6 +425,8 @@ model JobMessage {
   requestId    String?    @map("request_id") @db.VarChar(64)
   /// SHA-256 текста и исходных файлов отправки с этим ключом: повтор с другим содержимым — 409.
   requestHash  String?    @map("request_hash") @db.VarChar(64)
+  /// Скрыто модератором: вместо текста и фото — пометка. null — видно.
+  hiddenAt     DateTime?  @map("hidden_at")
   photos       JobPhoto[]
   createdAt    DateTime   @default(now()) @map("created_at")
 
@@ -499,4 +516,55 @@ model Notification {
   // 20261022100000_notifications: notifications_unread_idx (непрочитанные по пользователю и
   // заказу) и notifications_message_unread_key (одна непрочитанная строка сообщений на заказ).
   @@map("notifications")
+}
+
+// Синхронизировано с REPORT_TARGETS, REPORT_REASONS, REPORT_STATUSES в packages/shared/src/moderation.ts.
+enum ReportTarget {
+  JOB
+  MESSAGE
+  BID
+}
+
+enum ReportReason {
+  SPAM
+  FRAUD
+  ABUSE
+  FAKE
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+/// Жалоба пользователя на заказ, сообщение или отклик. Одна открытая жалоба автора на один
+/// предмет (частичный уникальный индекс в миграции). Разбирает администратор.
+model Report {
+  id           String       @id @default(cuid())
+  reporterId   String       @map("reporter_id")
+  reporter     User         @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetType   ReportTarget @map("target_type")
+  /// id заказа, сообщения или отклика.
+  targetId     String       @map("target_id")
+  /// Заказ, к которому относится предмет жалобы.
+  jobId        String       @map("job_id")
+  job          Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  reason       ReportReason
+  comment      String       @default("")
+  status       ReportStatus @default(OPEN)
+  /// Решение администратора.
+  note         String?
+  resolvedById String?      @map("resolved_by_id")
+  resolvedBy   User?        @relation("ReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolvedAt   DateTime?    @map("resolved_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([reporterId, createdAt])
+  @@index([jobId])
+  // Частичный уникальный индекс reports_open_key (одна открытая жалоба автора на предмет) —
+  // только в SQL миграции 20261023100000_moderation.
+  @@map("reports")
 }
