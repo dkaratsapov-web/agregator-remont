@@ -2,7 +2,7 @@ import { type AuthSessionDto, type SelfServiceRole } from '@agregator/shared';
 import { HttpException, HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import { ExternalProvider, Prisma } from '@prisma/client';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { AuthService } from '../auth/auth.service';
+import { ACCOUNT_BLOCKED, AuthService } from '../auth/auth.service';
 import { hashPassword } from '../auth/password';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -26,7 +26,8 @@ export type OAuthErrorCode =
   | 'OAUTH_EMAIL_TAKEN'
   | 'OAUTH_NEED_ROLE'
   | 'OAUTH_PENDING_EXPIRED'
-  | 'OAUTH_ALREADY_LINKED';
+  | 'OAUTH_ALREADY_LINKED'
+  | 'OAUTH_BLOCKED';
 
 function oauthError(
   status: HttpStatus,
@@ -222,7 +223,11 @@ export class OAuthService {
       where: { provider_subject: { provider: DB_PROVIDER[provider], subject } },
       include: { user: true },
     });
-    return account ? this.auth.createSession(this.prisma, account.user, userAgent) : null;
+    if (!account) return null;
+    if (account.user.blockedAt) {
+      throw oauthError(HttpStatus.FORBIDDEN, 'OAUTH_BLOCKED', ACCOUNT_BLOCKED);
+    }
+    return this.auth.createSession(this.prisma, account.user, userAgent);
   }
 
   private async createAccount(

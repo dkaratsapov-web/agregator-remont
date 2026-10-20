@@ -25,6 +25,8 @@ export class JobsService {
     const city = query.city ? escapeLike(query.city) : undefined;
     const q = query.q ? escapeLike(query.q) : undefined;
     const where: Prisma.JobWhereInput = {
+      // Скрытые модератором заказы в каталоге не показываются.
+      hiddenAt: null,
       // Заказ находится по любой своей категории, не только по основной.
       ...(category ? { categories: { has: category } } : {}),
       ...(status ? { status } : {}),
@@ -56,7 +58,8 @@ export class JobsService {
     const job = JOB_ID_PATTERN.test(id)
       ? await this.prisma.job.findUnique({ where: { id } })
       : null;
-    if (!job) {
+    // Скрытый модератором заказ посторонним неотличим от удалённого; владелец видит его в кабинете.
+    if (!job || job.hiddenAt) {
       throw new NotFoundException('Заказ не найден');
     }
     return toJobDto(job);

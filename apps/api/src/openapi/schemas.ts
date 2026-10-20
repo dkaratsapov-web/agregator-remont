@@ -6,6 +6,9 @@ import {
   JOB_CLOSE_OUTCOMES,
   JOB_STATUSES,
   NOTIFICATION_KINDS,
+  REPORT_REASONS,
+  REPORT_STATUSES,
+  REPORT_TARGETS,
   PLAN_PARTIES,
   PLAN_STATUSES,
   STAGE_STATUSES,
@@ -29,11 +32,19 @@ import {
   type JobMessagesDto,
   type JobPlanDto,
   type JobStageDto,
+  type BlockedStateDto,
+  type HiddenStateDto,
   type NotificationData,
   type NotificationDto,
   type NotificationKind,
   type NotificationsPageDto,
   type NotificationsSummaryDto,
+  type ReportDto,
+  type ReportReason,
+  type ReportReceivedDto,
+  type ReportStatus,
+  type ReportSubjectDto,
+  type ReportTarget,
   type JobStatus,
   type LeadDto,
   type MyBidDto,
@@ -111,6 +122,8 @@ export class OwnJobSchema extends JobSchema implements OwnJobDto {
     description: 'Исход закрытого заказа; null — не закрыт или закрыт до появления поля',
   })
   closeOutcome!: JobCloseOutcome | null;
+  @ApiProperty({ description: 'Скрыт модератором: в каталоге не виден, откликаться нельзя' })
+  hidden!: boolean;
 }
 
 @ApiSchema({ name: 'JobDraftDto' })
@@ -405,6 +418,7 @@ export class JobMessageSchema implements JobMessageDto {
   @ApiProperty({ enum: PLAN_PARTIES, enumName: 'PlanParty', description: 'Чья реплика' })
   author!: PlanParty;
   @ApiProperty({ description: 'Своё ли сообщение для того, кто смотрит' }) own!: boolean;
+  @ApiProperty({ description: 'Скрыто модератором: текст пустой, фото нет' }) hidden!: boolean;
   @ApiProperty() body!: string;
   @ApiProperty({ type: [PhotoSchema] }) photos!: PhotoSchema[];
   @dateTime() createdAt!: string;
@@ -475,4 +489,66 @@ export class NotificationsSummarySchema implements NotificationsSummaryDto {
   @int({ description: 'Непрочитанных всего' }) unread!: number;
   @ApiProperty({ type: [NotificationsSummaryJobSchema], description: 'Заказы с непрочитанным' })
   jobs!: NotificationsSummaryJobSchema[];
+}
+
+@ApiSchema({ name: 'ReportReceivedDto' })
+export class ReportReceivedSchema implements ReportReceivedDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ description: 'true — такая жалоба от вас уже ждёт разбора' }) duplicate!: boolean;
+}
+
+export class ReportPersonSchema {
+  @ApiProperty() id!: string;
+  @int() publicId!: number;
+  @ApiProperty() name!: string;
+}
+
+export class ReportAuthorSchema extends ReportPersonSchema {
+  @ApiProperty() blocked!: boolean;
+}
+
+@ApiSchema({ name: 'ReportSubjectDto' })
+export class ReportSubjectSchema implements ReportSubjectDto {
+  @ApiProperty() jobId!: string;
+  @ApiProperty() jobTitle!: string;
+  @ApiProperty({ description: 'Название заказа, текст сообщения или отклика' }) excerpt!: string;
+  @ApiProperty({ description: 'Скрыт ли предмет жалобы' }) hidden!: boolean;
+  @ApiProperty({ type: ReportAuthorSchema, nullable: true, description: 'Автор предмета жалобы' })
+  author!: ReportAuthorSchema | null;
+}
+
+@ApiSchema({ name: 'ReportDto' })
+export class ReportSchema implements ReportDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ enum: REPORT_TARGETS, enumName: 'ReportTarget' }) targetType!: ReportTarget;
+  @ApiProperty() targetId!: string;
+  @ApiProperty({ enum: REPORT_REASONS, enumName: 'ReportReason' }) reason!: ReportReason;
+  @ApiProperty() comment!: string;
+  @ApiProperty({ enum: REPORT_STATUSES, enumName: 'ReportStatus' }) status!: ReportStatus;
+  @ApiProperty({ type: ReportPersonSchema }) reporter!: ReportPersonSchema;
+  @ApiProperty({ type: ReportSubjectSchema }) subject!: ReportSubjectSchema;
+  @ApiProperty({ type: String, nullable: true, description: 'Решение администратора' })
+  note!: string | null;
+  @dateTime() createdAt!: string;
+  @nullableDateTime() resolvedAt!: string | null;
+}
+
+@ApiSchema({ name: 'PaginatedReportDto' })
+export class PaginatedReportSchema implements Paginated<ReportDto> {
+  @ApiProperty({ type: [ReportSchema] }) items!: ReportSchema[];
+  @int() page!: number;
+  @int() limit!: number;
+  @int() total!: number;
+}
+
+@ApiSchema({ name: 'HiddenStateDto' })
+export class HiddenStateSchema implements HiddenStateDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() hidden!: boolean;
+}
+
+@ApiSchema({ name: 'BlockedStateDto' })
+export class BlockedStateSchema implements BlockedStateDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() blocked!: boolean;
 }

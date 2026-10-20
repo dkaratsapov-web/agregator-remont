@@ -133,6 +133,7 @@ export class MessagesService {
         id: true,
         authorId: true,
         body: true,
+        hiddenAt: true,
         createdAt: true,
         photos: { select: PHOTO_SELECT, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
       },
@@ -147,8 +148,10 @@ export class MessagesService {
         id: row.id,
         author: row.authorId === deal.contractorId ? 'CONTRACTOR' : 'OWNER',
         own: row.authorId === userId,
-        body: row.body,
-        photos: row.photos.map(toPhotoDto),
+        // Скрытое модератором: место в переписке остаётся, текста и фото нет.
+        hidden: row.hiddenAt !== null,
+        body: row.hiddenAt ? '' : row.body,
+        photos: row.hiddenAt ? [] : row.photos.map(toPhotoDto),
         createdAt: row.createdAt.toISOString(),
       })),
     };

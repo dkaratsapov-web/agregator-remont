@@ -135,6 +135,8 @@ export interface OwnJobDto extends JobDto {
   editable: boolean;
   /** Исход закрытого заказа; null — не закрыт или закрыт до появления поля. */
   closeOutcome: JobCloseOutcome | null;
+  /** Скрыт модератором: в каталоге не виден, откликаться нельзя. */
+  hidden: boolean;
 }
 
 /** Черновики нового заказа: видны только владельцу, в каталог не попадают. */

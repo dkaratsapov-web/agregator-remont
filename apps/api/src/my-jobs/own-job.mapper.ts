@@ -8,5 +8,6 @@ export function toOwnJobDto(job: Job): OwnJobDto {
     updatedAt: job.updatedAt.toISOString(),
     editable: job.status === 'OPEN',
     closeOutcome: job.closeOutcome,
+    hidden: job.hiddenAt !== null,
   };
 }

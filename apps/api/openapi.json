@@ -62,6 +62,42 @@
         ],
         "type": "string"
       },
+      "BlockDto": {
+        "additionalProperties": false,
+        "properties": {
+          "blocked": {
+            "description": "true — заблокировать, false — разблокировать",
+            "type": "boolean"
+          },
+          "reason": {
+            "description": "За что: попадает в журнал",
+            "maxLength": 500,
+            "minLength": 5,
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "blocked"
+        ],
+        "type": "object"
+      },
+      "BlockedStateDto": {
+        "additionalProperties": false,
+        "properties": {
+          "blocked": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "blocked"
+        ],
+        "type": "object"
+      },
       "ChangePasswordDto": {
         "additionalProperties": false,
         "properties": {
@@ -316,6 +352,40 @@
         ],
         "type": "object"
       },
+      "CreateReportDto": {
+        "additionalProperties": false,
+        "properties": {
+          "comment": {
+            "default": "",
+            "maxLength": 1000,
+            "type": "string"
+          },
+          "reason": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReportReason"
+              }
+            ]
+          },
+          "targetId": {
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "type": "string"
+          },
+          "targetType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReportTarget"
+              }
+            ]
+          }
+        },
+        "required": [
+          "targetType",
+          "targetId",
+          "reason"
+        ],
+        "type": "object"
+      },
       "Currency": {
         "enum": [
           "RUB"
@@ -367,6 +437,42 @@
         },
         "required": [
           "status"
+        ],
+        "type": "object"
+      },
+      "HiddenStateDto": {
+        "additionalProperties": false,
+        "properties": {
+          "hidden": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "hidden"
+        ],
+        "type": "object"
+      },
+      "HideDto": {
+        "additionalProperties": false,
+        "properties": {
+          "hidden": {
+            "description": "true — скрыть, false — вернуть",
+            "type": "boolean"
+          },
+          "reason": {
+            "description": "За что: попадает в журнал",
+            "maxLength": 500,
+            "minLength": 5,
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "hidden"
         ],
         "type": "object"
       },
@@ -714,6 +820,10 @@
             "format": "date-time",
             "type": "string"
           },
+          "hidden": {
+            "description": "Скрыто модератором: текст пустой, фото нет",
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
           },
@@ -732,6 +842,7 @@
           "id",
           "author",
           "own",
+          "hidden",
           "body",
           "photos",
           "createdAt"
@@ -1568,6 +1679,10 @@
             },
             "type": "array"
           },
+          "hidden": {
+            "description": "Скрыт модератором: в каталоге не виден, откликаться нельзя",
+            "type": "boolean"
+          },
           "id": {
             "type": "string"
           },
@@ -1601,7 +1716,8 @@
           "createdAt",
           "updatedAt",
           "editable",
-          "closeOutcome"
+          "closeOutcome",
+          "hidden"
         ],
         "type": "object"
       },
@@ -1692,6 +1808,33 @@
           "items": {
             "items": {
               "$ref": "#/components/schemas/OwnJobDto"
+            },
+            "type": "array"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total"
+        ],
+        "type": "object"
+      },
+      "PaginatedReportDto": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReportDto"
             },
             "type": "array"
           },
@@ -1849,6 +1992,221 @@
           "password",
           "name",
           "role"
+        ],
+        "type": "object"
+      },
+      "ReportAuthorSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "blocked": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "publicId": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "publicId",
+          "name",
+          "blocked"
+        ],
+        "type": "object"
+      },
+      "ReportDto": {
+        "additionalProperties": false,
+        "properties": {
+          "comment": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "note": {
+            "description": "Решение администратора",
+            "nullable": true,
+            "type": "string"
+          },
+          "reason": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReportReason"
+              }
+            ]
+          },
+          "reporter": {
+            "$ref": "#/components/schemas/ReportPersonSchema"
+          },
+          "resolvedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReportStatus"
+              }
+            ]
+          },
+          "subject": {
+            "$ref": "#/components/schemas/ReportSubjectDto"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "targetType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReportTarget"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "targetType",
+          "targetId",
+          "reason",
+          "comment",
+          "status",
+          "reporter",
+          "subject",
+          "note",
+          "createdAt",
+          "resolvedAt"
+        ],
+        "type": "object"
+      },
+      "ReportPersonSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "publicId": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "publicId",
+          "name"
+        ],
+        "type": "object"
+      },
+      "ReportReason": {
+        "enum": [
+          "SPAM",
+          "FRAUD",
+          "ABUSE",
+          "FAKE",
+          "OTHER"
+        ],
+        "type": "string"
+      },
+      "ReportReceivedDto": {
+        "additionalProperties": false,
+        "properties": {
+          "duplicate": {
+            "description": "true — такая жалоба от вас уже ждёт разбора",
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "duplicate"
+        ],
+        "type": "object"
+      },
+      "ReportStatus": {
+        "enum": [
+          "OPEN",
+          "RESOLVED",
+          "DISMISSED"
+        ],
+        "type": "string"
+      },
+      "ReportSubjectDto": {
+        "additionalProperties": false,
+        "properties": {
+          "author": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReportAuthorSchema"
+              }
+            ],
+            "description": "Автор предмета жалобы",
+            "nullable": true,
+            "type": "object"
+          },
+          "excerpt": {
+            "description": "Название заказа, текст сообщения или отклика",
+            "type": "string"
+          },
+          "hidden": {
+            "description": "Скрыт ли предмет жалобы",
+            "type": "boolean"
+          },
+          "jobId": {
+            "type": "string"
+          },
+          "jobTitle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "jobId",
+          "jobTitle",
+          "excerpt",
+          "hidden",
+          "author"
+        ],
+        "type": "object"
+      },
+      "ReportTarget": {
+        "enum": [
+          "JOB",
+          "MESSAGE",
+          "BID"
+        ],
+        "type": "string"
+      },
+      "ResolveReportDto": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "maxLength": 500,
+            "minLength": 5,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "RESOLVED",
+              "DISMISSED"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "note"
         ],
         "type": "object"
       },
@@ -2465,6 +2823,206 @@
         ]
       }
     },
+    "/v1/admin/bids/{id}/hidden": {
+      "post": {
+        "operationId": "AdminModeration_hideBid",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HideDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HiddenStateDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Конфликт с текущим состоянием ресурса"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/jobs/{id}/hidden": {
+      "post": {
+        "operationId": "AdminModeration_hideJob",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HideDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HiddenStateDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/v1/admin/leads": {
       "get": {
         "operationId": "AdminLeads_list",
@@ -2662,6 +3220,415 @@
         ]
       }
     },
+    "/v1/admin/messages/{id}/hidden": {
+      "post": {
+        "operationId": "AdminModeration_hideMessage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HideDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HiddenStateDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/reports": {
+      "get": {
+        "operationId": "AdminModeration_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 10000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 12,
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "OPEN",
+              "enum": [
+                "OPEN",
+                "RESOLVED",
+                "DISMISSED",
+                "ALL"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedReportDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/reports/{id}/resolve": {
+      "post": {
+        "operationId": "AdminModeration_resolve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveReportDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Конфликт с текущим состоянием ресурса"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/users/{id}/blocked": {
+      "post": {
+        "operationId": "AdminModeration_block",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlockedStateDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Конфликт с текущим состоянием ресурса"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/v1/auth/login": {
       "post": {
         "operationId": "Auth_login",
@@ -2715,6 +3682,16 @@
               }
             },
             "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
           },
           "429": {
             "content": {
@@ -2814,6 +3791,16 @@
               }
             },
             "description": "Ошибка валидации запроса"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
           },
           "409": {
             "content": {
@@ -3006,6 +3993,16 @@
               }
             },
             "description": "Ошибка валидации запроса"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
           },
           "404": {
             "content": {
@@ -7045,6 +8042,82 @@
         ],
         "tags": [
           "me"
+        ]
+      }
+    },
+    "/v1/reports": {
+      "post": {
+        "operationId": "Reports_create",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReportDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportReceivedDto"
+                }
+              }
+            },
+            "description": "Жалоба принята (duplicate — такая уже ждёт разбора)"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "reports"
         ]
       }
     }

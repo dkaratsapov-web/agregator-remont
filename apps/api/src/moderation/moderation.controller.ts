@@ -1,0 +1,148 @@
+import type {
+  BlockedStateDto,
+  HiddenStateDto,
+  Paginated,
+  ReportDto,
+  ReportReceivedDto,
+} from '@agregator/shared';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import type { AuthContext } from '../auth/auth.types';
+import { CurrentAuth } from '../auth/current-auth.decorator';
+import { WriteRateLimited } from '../auth/rate-limit';
+import { Roles, RolesGuard } from '../auth/roles';
+import { SessionGuard } from '../auth/session.guard';
+import { ApiErrors, ApiRole, ApiSession } from '../openapi/decorators';
+import {
+  BlockedStateSchema,
+  HiddenStateSchema,
+  PaginatedReportSchema,
+  ReportReceivedSchema,
+  ReportSchema,
+} from '../openapi/schemas';
+import {
+  BlockDto,
+  CreateReportDto,
+  HideDto,
+  ListReportsQuery,
+  ResolveReportDto,
+} from './dto/moderation.dto';
+import { ModerationService } from './moderation.service';
+import { ReportsService } from './reports.service';
+
+/** Жалоба пользователя на заказ, сообщение или отклик. */
+@ApiTags('reports')
+@ApiSession()
+@ApiErrors(429)
+@Controller('v1/reports')
+@UseGuards(SessionGuard)
+export class ReportsController {
+  constructor(private readonly reports: ReportsService) {}
+
+  @Post()
+  @WriteRateLimited()
+  @ApiCreatedResponse({
+    type: ReportReceivedSchema,
+    description: 'Жалоба принята (duplicate — такая уже ждёт разбора)',
+  })
+  @ApiErrors(400, 404)
+  create(
+    @CurrentAuth() auth: AuthContext,
+    @Body() dto: CreateReportDto,
+  ): Promise<ReportReceivedDto> {
+    return this.reports.create(auth.user, dto);
+  }
+}
+
+/** Модерация для администратора. Порядок guard'ов: сначала сессия, затем роль. */
+@ApiTags('admin')
+@ApiErrors(429)
+@ApiRole()
+@Controller('v1/admin')
+@UseGuards(SessionGuard, RolesGuard)
+@Roles('ADMIN')
+export class AdminModerationController {
+  constructor(private readonly moderation: ModerationService) {}
+
+  @Get('reports')
+  @ApiOkResponse({ type: PaginatedReportSchema })
+  @ApiErrors(400)
+  list(@Query() query: ListReportsQuery): Promise<Paginated<ReportDto>> {
+    return this.moderation.list(query);
+  }
+
+  @Post('reports/:id/resolve')
+  @HttpCode(HttpStatus.OK)
+  @WriteRateLimited()
+  @ApiOkResponse({ type: ReportSchema })
+  @ApiErrors(400, 404, 409)
+  resolve(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') id: string,
+    @Body() dto: ResolveReportDto,
+  ): Promise<ReportDto> {
+    return this.moderation.resolve(auth.user.id, id, dto);
+  }
+
+  @Post('jobs/:id/hidden')
+  @HttpCode(HttpStatus.OK)
+  @WriteRateLimited()
+  @ApiOkResponse({ type: HiddenStateSchema })
+  @ApiErrors(400, 404)
+  hideJob(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') id: string,
+    @Body() dto: HideDto,
+  ): Promise<HiddenStateDto> {
+    return this.moderation.setJobHidden(auth.user.id, id, dto);
+  }
+
+  @Post('messages/:id/hidden')
+  @HttpCode(HttpStatus.OK)
+  @WriteRateLimited()
+  @ApiOkResponse({ type: HiddenStateSchema })
+  @ApiErrors(400, 404)
+  hideMessage(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') id: string,
+    @Body() dto: HideDto,
+  ): Promise<HiddenStateDto> {
+    return this.moderation.setMessageHidden(auth.user.id, id, dto);
+  }
+
+  @Post('bids/:id/hidden')
+  @HttpCode(HttpStatus.OK)
+  @WriteRateLimited()
+  @ApiOkResponse({ type: HiddenStateSchema })
+  @ApiErrors(400, 404, 409)
+  hideBid(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') id: string,
+    @Body() dto: HideDto,
+  ): Promise<HiddenStateDto> {
+    return this.moderation.setBidHidden(auth.user.id, id, dto);
+  }
+
+  @Post('users/:id/blocked')
+  @HttpCode(HttpStatus.OK)
+  @WriteRateLimited()
+  @ApiOkResponse({ type: BlockedStateSchema })
+  @ApiErrors(400, 404, 409)
+  block(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') id: string,
+    @Body() dto: BlockDto,
+  ): Promise<BlockedStateDto> {
+    return this.moderation.setUserBlocked(auth.user.id, id, dto);
+  }
+}

@@ -38,7 +38,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @AuthRateLimited()
   @ApiOkResponse({ type: AuthSessionSchema })
-  @ApiErrors(400, 401)
+  @ApiErrors(400, 401, 403)
   login(
     @Body() dto: LoginDto,
     @Headers(CLIENT_UA_HEADER) userAgent?: string,

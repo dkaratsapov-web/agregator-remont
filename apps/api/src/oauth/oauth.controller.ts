@@ -69,7 +69,7 @@ export class OAuthController {
     type: OAuthNeedRoleSchema,
     description: 'OAUTH_NEED_ROLE: аккаунта нет, нужна роль; OAUTH_EMAIL_TAKEN: email уже занят',
   })
-  @ApiErrors(400, 404, 422, 502)
+  @ApiErrors(400, 403, 404, 422, 502)
   callback(
     @Param('provider') provider: string,
     @Body() dto: OAuthSignInDto,
@@ -81,7 +81,7 @@ export class OAuthController {
   @Post('complete')
   @AuthRateLimited()
   @ApiCreatedResponse({ type: AuthSessionSchema })
-  @ApiErrors(400, 409, 410)
+  @ApiErrors(400, 403, 409, 410)
   complete(
     @Body() dto: OAuthCompleteDto,
     @Headers(CLIENT_UA_HEADER) userAgent?: string,

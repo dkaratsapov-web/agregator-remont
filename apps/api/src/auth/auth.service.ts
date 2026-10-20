@@ -1,5 +1,10 @@
 import type { AuthSessionDto } from '@agregator/shared';
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Prisma, User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { toUserDto } from '../users/user.mapper';
@@ -16,6 +21,8 @@ import {
 } from './session-token';
 
 const INVALID_CREDENTIALS = 'Неверный email или пароль';
+export const ACCOUNT_BLOCKED =
+  'Аккаунт заблокирован администратором. Если это ошибка, напишите в поддержку.';
 /** Время активности сеанса обновляется не чаще раза в час, а не на каждый запрос. */
 const LAST_SEEN_STEP_MS = 60 * 60 * 1000;
 
@@ -52,6 +59,9 @@ export class AuthService {
     if (!user || !valid) {
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
+    // О блокировке говорим только после верного пароля: иначе по ответу можно было бы
+    // узнавать заблокированные адреса.
+    if (user.blockedAt) throw new ForbiddenException(ACCOUNT_BLOCKED);
     // Сессия создаётся под блокировкой строки пользователя и только если хеш пароля не сменился
     // после проверки: вход по старому паролю в момент смены не переживёт её (SEC-5).
     return this.prisma.$transaction(async (tx) => {
@@ -77,7 +87,8 @@ export class AuthService {
       include: { user: true },
     });
     const now = new Date();
-    if (!session || session.expiresAt <= now) return null;
+    // Заблокированный аккаунт: сессии удаляются при блокировке, проверка — на случай гонки.
+    if (!session || session.expiresAt <= now || session.user.blockedAt) return null;
     if (!session.lastSeenAt || now.getTime() - session.lastSeenAt.getTime() > LAST_SEEN_STEP_MS) {
       // Не ждём и не роняем запрос: это только отметка для списка устройств.
       void this.prisma.session

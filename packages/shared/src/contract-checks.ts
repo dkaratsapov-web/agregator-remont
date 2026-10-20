@@ -15,6 +15,13 @@ import type {
   NotificationsPageDto,
   NotificationsSummaryDto,
 } from './notifications';
+import type {
+  BlockedStateDto,
+  HiddenStateDto,
+  ReportDto,
+  ReportReceivedDto,
+  ReportSubjectDto,
+} from './moderation';
 import type { Paginated } from './pagination';
 import type { JobPlanDto, JobStageDto } from './plans';
 
@@ -45,6 +52,12 @@ export type ContractChecks = [
   Expect<Equal<NotificationDto, Schemas['NotificationDto']>>,
   Expect<Equal<NotificationsPageDto, Schemas['NotificationsPageDto']>>,
   Expect<Equal<NotificationsSummaryDto, Schemas['NotificationsSummaryDto']>>,
+  Expect<Equal<ReportReceivedDto, Schemas['ReportReceivedDto']>>,
+  Expect<Equal<ReportSubjectDto, Schemas['ReportSubjectDto']>>,
+  Expect<Equal<ReportDto, Schemas['ReportDto']>>,
+  Expect<Equal<Paginated<ReportDto>, Schemas['PaginatedReportDto']>>,
+  Expect<Equal<HiddenStateDto, Schemas['HiddenStateDto']>>,
+  Expect<Equal<BlockedStateDto, Schemas['BlockedStateDto']>>,
   // AUDIT_FINDINGS ARCH-6: сеансы, черновики, позиции заказа и заявки тоже сверяются.
   Expect<Equal<SessionDto, Schemas['SessionDto']>>,
   Expect<Equal<JobDraftDto, Schemas['JobDraftDto']>>,

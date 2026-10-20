@@ -50,6 +50,8 @@ export interface JobMessageDto {
   author: PlanParty;
   /** Своё ли сообщение для того, кто смотрит. */
   own: boolean;
+  /** Скрыто модератором: текст пустой, фото нет — показывается пометка. */
+  hidden: boolean;
   body: string;
   photos: PhotoDto[];
   /** ISO 8601 */
