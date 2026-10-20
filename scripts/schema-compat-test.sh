@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Обновление схемы на живых данных и совместимость версий (ТЗ #40, п. 6):
+# Обновление схемы на живых данных и совместимость версий (ТЗ #40, п. 6). Проверки раздела 1 и
+# сценарии schema-compat-flow.mjs описывают переход «базовый коммит → этот PR»: PR, который
+# меняет схему или контракт, обновляет их под свой переход.
 #   bash scripts/schema-compat-test.sh [базовый коммит, по умолчанию origin/main]
 # 1. База на схеме базового коммита с данными прежнего формата (открытый, в работе и закрытый
 #    заказы, ожидающие, выбранные и отклонённые отклики) → новые миграции: новые поля заполнены
@@ -20,6 +22,8 @@ WORK=$(mktemp -d)
 pids=()
 cleanup() {
   for pid in "${pids[@]}"; do kill "$pid" 2> /dev/null || true; done
+  # API закрывает соединения с базой не мгновенно: ждём, чтобы база проверки освободилась.
+  for pid in "${pids[@]}"; do wait "$pid" 2> /dev/null || true; done
   git -C "$ROOT" worktree remove --force "$WORK/base" 2> /dev/null || true
   rm -rf "$WORK"
 }
@@ -39,7 +43,7 @@ git -C "$ROOT" worktree add -q --detach "$WORK/base" "$base"
   pnpm --filter @agregator/api build > /dev/null
 )
 
-psql "$PG/postgres" -Xqc "DROP DATABASE IF EXISTS $DB_NAME" -c "CREATE DATABASE $DB_NAME"
+psql "$PG/postgres" -Xqc "DROP DATABASE IF EXISTS $DB_NAME WITH (FORCE)" -c "CREATE DATABASE $DB_NAME"
 (cd "$WORK/base/apps/api" && DATABASE_URL=$DB pnpm exec prisma migrate deploy > /dev/null)
 
 # --- 1. Данные прежнего формата.
@@ -60,21 +64,24 @@ before=$(q "select count(*) from jobs")/$(q "select count(*) from bids")
 
 (cd "$ROOT/apps/api" && DATABASE_URL=$DB pnpm exec prisma migrate deploy > /dev/null)
 check 'upgrade: rows kept' "$(q "select count(*) from jobs")/$(q "select count(*) from bids")" "$before"
-check 'upgrade: rejected next to an accepted bid → OTHER_ACCEPTED' "$(q "select reject_reason from bids where id = 'b-lost'")" OTHER_ACCEPTED
-check 'upgrade: rejected on a closed job → JOB_CLOSED' "$(q "select reject_reason from bids where id = 'b-closed'")" JOB_CLOSED
-check 'upgrade: pending and accepted bids have no reason' "$(q "select count(*) from bids where id in ('b-pending', 'b-accepted') and reject_reason is null")" 2
-check 'upgrade: old closed job has no outcome' "$(q "select coalesce(close_outcome::text, 'null') from jobs where id = 'j-closed'")" null
-check 'upgrade: old jobs have no publish key' "$(q "select count(*) from jobs where request_id is null and request_hash is null")" 3
-check 'upgrade: old bids have no job-changed mark' "$(q "select count(*) from bids where job_changed_at is null")" 4
-check 'upgrade: pg_trgm installed' "$(q "select count(*) from pg_extension where extname = 'pg_trgm'")" 1
-check 'upgrade: catalog indexes created' "$(q "select count(*) from pg_indexes where indexname in ('jobs_title_trgm_idx', 'jobs_description_trgm_idx', 'jobs_city_trgm_idx', 'jobs_open_created_at_idx')")" 4
-check 'upgrade: unused index dropped' "$(q "select count(*) from pg_indexes where indexname = 'jobs_category_created_at_idx'")" 0
+# Проверки обновления — для миграций этого PR (меняются в каждом PR, который меняет схему).
+check 'upgrade: plan and stage tables created' "$(q "select count(*) from information_schema.tables where table_name in ('job_plans', 'job_stages')")" 2
+check 'upgrade: old jobs in progress have no plan' "$(q "select count(*) from job_plans")" 0
+check 'upgrade: journal knows plan and stage actions' "$(q "select count(*) from pg_enum e join pg_type t on t.oid = e.enumtypid where t.typname = 'AuditAction' and e.enumlabel in ('PLAN_SAVED', 'PLAN_AUTHOR_CHANGED', 'PLAN_PROPOSED', 'PLAN_APPROVED', 'PLAN_RETURNED', 'STAGE_SUBMITTED', 'STAGE_ACCEPTED', 'STAGE_REWORK', 'CONTRACTOR_QUIT')")" 9
+# Прежний код может удалить заказ: план не должен этому мешать (ON DELETE CASCADE).
+q "insert into jobs (id, title, description, category, city, status, owner_id, updated_at) values
+   ('j-gone', 'Удаляемый', 'Заказ, который удалит прежний код', 'TILING', 'Москва', 'IN_PROGRESS', 'u-c', now());
+   insert into job_plans (id, job_id, updated_at) values ('p-gone', 'j-gone', now());
+   insert into job_stages (id, plan_id, position, title, updated_at) values ('s-gone', 'p-gone', 1, 'Этап', now())" > /dev/null
+q "delete from jobs where id = 'j-gone'" > /dev/null
+check 'upgrade: deleting a job removes its plan and stages' "$(q "select count(*) from job_plans where id = 'p-gone'")/$(q "select count(*) from job_stages where id = 's-gone'")" 0/0
 
 # --- 2 и 3. Прежний API на новой схеме, затем новый API на тех же данных.
 start_api() { # каталог порт
+  # exec: в pids — сам процесс node, а не subshell, иначе после проверки API остаётся жить.
   (cd "$1/apps/api" && DATABASE_URL=$DB API_PORT=$2 NODE_ENV=production \
     CORS_ORIGINS=https://remont.example TRUST_PROXY=loopback AUTH_RATE_LIMIT_PER_MIN=1000 \
-    WRITE_RATE_LIMIT_PER_MIN=1000 node dist/main.js > "$WORK/api-$2.log" 2>&1) &
+    WRITE_RATE_LIMIT_PER_MIN=1000 exec node dist/main.js > "$WORK/api-$2.log" 2>&1) &
   pids+=($!)
   for _ in $(seq 1 60); do
     curl -fs -o /dev/null "http://127.0.0.1:$2/health" && return 0

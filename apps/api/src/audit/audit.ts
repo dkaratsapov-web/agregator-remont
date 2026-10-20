@@ -23,7 +23,7 @@ export function writeAudit(
   entry: {
     actorId: string;
     action: AuditAction;
-    entityType: 'job' | 'bid' | 'contractor_profile' | 'lead' | 'user';
+    entityType: 'job' | 'bid' | 'job_stage' | 'contractor_profile' | 'lead' | 'user';
     entityId: string;
     changes: FieldChanges;
   },

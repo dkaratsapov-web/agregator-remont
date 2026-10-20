@@ -270,7 +270,11 @@ try {
     await page.goto(`${WEB}/account/jobs/${done.id}`, { waitUntil: 'networkidle' });
     await page.locator('summary', { hasText: 'Закрыть заказ' }).click();
     await page.getByRole('radio', { name: /Работы выполнены/ }).check();
-    await page.locator('details form button[type="submit"]').click();
+    // Только форма закрытия: на странице заказа в работе есть и формы «Хода работ».
+    await page
+      .locator('details', { has: page.locator('summary', { hasText: 'Закрыть заказ' }) })
+      .locator('form button[type="submit"]')
+      .click();
     await page.waitForURL(/\?closed=done/);
     check(
       'job in progress is closed as completed',

@@ -16,6 +16,7 @@ import { ContractorsModule } from './contractors/contractors.module';
 import { LeadsModule } from './leads/leads.module';
 import { MyJobsModule } from './my-jobs/my-jobs.module';
 import { OAuthModule } from './oauth/oauth.module';
+import { PlansModule } from './plans/plans.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
@@ -50,6 +51,7 @@ import { PrismaModule } from './prisma/prisma.module';
     ContractorsModule,
     LeadsModule,
     OAuthModule,
+    PlansModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

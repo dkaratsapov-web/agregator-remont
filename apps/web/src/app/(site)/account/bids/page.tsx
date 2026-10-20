@@ -56,6 +56,13 @@ export default async function MyBidsPage({
           <Notice>Отклик отозван.</Notice>
         </div>
       ) : null}
+      {query.quit ? (
+        <div className="mt-6">
+          <Notice>
+            Вы отказались от заказа. Заказчик увидит причину и сможет выбрать другого исполнителя.
+          </Notice>
+        </div>
+      ) : null}
       <div className="mt-8 max-w-5xl">
         {data === null ? (
           <ApiUnavailable />

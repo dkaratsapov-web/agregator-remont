@@ -23,6 +23,9 @@ import type {
   SessionDto,
   UiPreferences,
   UserDto,
+  JobPlanDto,
+  PlanInput,
+  PlanParty,
 } from '@agregator/shared';
 
 export class ApiError extends Error {
@@ -366,6 +369,98 @@ export async function acceptBid(
     { method: 'POST', token, clientIp },
   );
   return expectJson<JobBidDto>(res, 'POST /v1/me/jobs/:id/bids/:bidId/accept');
+}
+
+// --- План работ и этапы (заказчик-владелец и выбранный исполнитель)
+
+const planPath = (jobId: string, rest = '') => `/v1/jobs/${encodeURIComponent(jobId)}${rest}`;
+
+/** null — плана нет для этого пользователя (не сторона сделки или исполнитель не выбран). */
+export async function getPlan(token: string, jobId: string): Promise<JobPlanDto | null> {
+  const res = await request(planPath(jobId, '/plan'), { token });
+  if (res.status === 404) return null;
+  return expectJson<JobPlanDto>(res, 'GET /v1/jobs/:id/plan');
+}
+
+async function planCall(
+  token: string,
+  jobId: string,
+  rest: string,
+  body: object,
+  clientIp?: string,
+  method: 'POST' | 'PUT' = 'POST',
+): Promise<JobPlanDto> {
+  const res = await request(planPath(jobId, rest), { method, body, token, clientIp });
+  return expectJson<JobPlanDto>(
+    res,
+    `${method} /v1/jobs/:id${rest.replace(/stages\/[^/]+/, 'stages/:id')}`,
+  );
+}
+
+export const savePlan = (token: string, jobId: string, input: PlanInput, clientIp?: string) =>
+  planCall(token, jobId, '/plan', input, clientIp, 'PUT');
+
+export const setPlanAuthor = (
+  token: string,
+  jobId: string,
+  version: number,
+  author: PlanParty,
+  clientIp?: string,
+) => planCall(token, jobId, '/plan/author', { version, author }, clientIp);
+
+export const proposePlan = (token: string, jobId: string, version: number, clientIp?: string) =>
+  planCall(token, jobId, '/plan/propose', { version }, clientIp);
+
+export const approvePlan = (token: string, jobId: string, version: number, clientIp?: string) =>
+  planCall(token, jobId, '/plan/approve', { version }, clientIp);
+
+export const returnPlan = (
+  token: string,
+  jobId: string,
+  version: number,
+  reason: string,
+  clientIp?: string,
+) => planCall(token, jobId, '/plan/return', { version, reason }, clientIp);
+
+export const submitStage = (
+  token: string,
+  jobId: string,
+  stageId: string,
+  comment: string,
+  clientIp?: string,
+) => planCall(token, jobId, `/stages/${encodeURIComponent(stageId)}/submit`, { comment }, clientIp);
+
+export const acceptStage = (token: string, jobId: string, stageId: string, clientIp?: string) =>
+  planCall(token, jobId, `/stages/${encodeURIComponent(stageId)}/accept`, {}, clientIp);
+
+export const reworkStage = (
+  token: string,
+  jobId: string,
+  stageId: string,
+  comment: string,
+  clientIp?: string,
+) => planCall(token, jobId, `/stages/${encodeURIComponent(stageId)}/rework`, { comment }, clientIp);
+
+/** Отказ выбранного исполнителя от заказа: заказ снова открыт. */
+export async function quitJob(
+  token: string,
+  jobId: string,
+  reason: string,
+  clientIp?: string,
+): Promise<void> {
+  const res = await request(planPath(jobId, '/quit'), {
+    method: 'POST',
+    body: { reason },
+    token,
+    clientIp,
+  });
+  if (!res.ok) {
+    throw new ApiError(
+      `POST /v1/jobs/:id/quit responded ${res.status}`,
+      res.status,
+      await userMessageOf(res),
+    );
+  }
 }
 
 // --- Заявки на закрытое тестирование

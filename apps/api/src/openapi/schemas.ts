@@ -5,6 +5,9 @@ import {
   JOB_CATEGORIES,
   JOB_CLOSE_OUTCOMES,
   JOB_STATUSES,
+  PLAN_PARTIES,
+  PLAN_STATUSES,
+  STAGE_STATUSES,
   UI_MOTIONS,
   UI_SCALES,
   UI_THEMES,
@@ -21,12 +24,17 @@ import {
   type JobDraftDto,
   type JobDto,
   type JobItemDto,
+  type JobPlanDto,
+  type JobStageDto,
   type JobStatus,
   type LeadDto,
   type MyBidDto,
   type OwnJobDto,
   type Paginated,
+  type PlanParty,
+  type PlanStatus,
   type SessionDto,
+  type StageStatus,
   type UiMotion,
   type UiPreferences,
   type UiScale,
@@ -334,4 +342,40 @@ export class OAuthAuthorizeUrlSchema {
 export class LinkedBankSchema {
   @ApiProperty({ enum: ['sber', 'tbank'] }) provider!: string;
   @dateTime() linkedAt!: string;
+}
+
+const nullableDateTime = (description?: string) =>
+  ApiProperty({ type: String, format: 'date-time', nullable: true, description });
+
+@ApiSchema({ name: 'JobStageDto' })
+export class JobStageSchema implements JobStageDto {
+  @ApiProperty() id!: string;
+  @int({ description: 'С 1, порядок сдачи' }) position!: number;
+  @ApiProperty() title!: string;
+  @ApiProperty() description!: string;
+  @int({ nullable: true }) durationDays!: number | null;
+  @ApiProperty({ enum: STAGE_STATUSES, enumName: 'StageStatus' }) status!: StageStatus;
+  @ApiProperty({ type: String, nullable: true, description: 'Комментарий к последней сдаче' })
+  submitComment!: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Что доработать' })
+  reworkComment!: string | null;
+  @nullableDateTime() submittedAt!: string | null;
+  @nullableDateTime() acceptedAt!: string | null;
+}
+
+@ApiSchema({ name: 'JobPlanDto' })
+export class JobPlanSchema implements JobPlanDto {
+  @ApiProperty() jobId!: string;
+  @ApiProperty({ enum: PLAN_STATUSES, enumName: 'PlanStatus' }) status!: PlanStatus;
+  @int({ description: 'Растёт при каждом изменении; 0 — плана ещё нет' }) version!: number;
+  @ApiProperty({ enum: PLAN_PARTIES, enumName: 'PlanParty', description: 'Кто составляет план' })
+  author!: PlanParty;
+  @ApiProperty({ description: 'true — этапы сдаются строго по порядку' }) sequential!: boolean;
+  @ApiProperty({ type: String, nullable: true, description: 'Почему план вернули' })
+  returnReason!: string | null;
+  @nullableDateTime() proposedAt!: string | null;
+  @nullableDateTime() approvedAt!: string | null;
+  @ApiProperty({ type: [JobStageSchema] }) stages!: JobStageSchema[];
+  @ApiProperty({ enum: PLAN_PARTIES, enumName: 'PlanParty', description: 'Кто смотрит' })
+  viewer!: PlanParty;
 }
