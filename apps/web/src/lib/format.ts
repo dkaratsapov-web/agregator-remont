@@ -30,6 +30,19 @@ export function formatDate(iso: string): string {
   return dateFormat.format(new Date(iso));
 }
 
+const dateTimeFormat = new Intl.DateTimeFormat('ru-RU', {
+  day: 'numeric',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: 'Europe/Moscow',
+});
+
+/** «21 окт., 14:05» по московскому времени (время сообщений). */
+export function formatDateTime(iso: string): string {
+  return dateTimeFormat.format(new Date(iso));
+}
+
 /** «1 год», «3 года», «12 лет». */
 export function formatYears(n: number): string {
   const mod10 = n % 10;

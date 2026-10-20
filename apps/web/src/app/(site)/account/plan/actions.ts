@@ -1,6 +1,6 @@
 'use server';
 
-import { PLAN_LIMITS, QUIT_REASON_LIMITS, type PlanParty } from '@agregator/shared';
+import { MESSAGE_LIMITS, PLAN_LIMITS, QUIT_REASON_LIMITS, type PlanParty } from '@agregator/shared';
 import { redirect } from 'next/navigation';
 import { FOREIGN_ORIGIN, isTrustedOrigin } from '@/lib/action-guard';
 import {
@@ -19,9 +19,11 @@ import {
   returnPlan,
   reworkStage,
   savePlan,
+  sendMessage,
   setPlanAuthor,
   submitStage,
 } from '@/lib/api';
+import { photosOf } from '@/lib/photo-files';
 import { parsePlanForm, type PlanFieldErrors, type PlanFormValues } from '@/lib/plan-form';
 import { safeRedirectPath } from '@/lib/redirect';
 import { getClientIp } from '@/lib/session';
@@ -37,7 +39,7 @@ export interface PlanActionState {
 }
 
 const NOT_FOUND = 'Заказ не найден или вы больше не участник сделки.';
-const ERRORS = { 404: NOT_FOUND };
+const ERRORS = { 404: NOT_FOUND, 413: 'Фото слишком большое: каждое — не больше 8 МБ.' };
 
 const withNotice = (path: string, notice: string) =>
   `${path}${path.includes('?') ? '&' : '?'}plan=${notice}`;
@@ -163,8 +165,10 @@ export async function submitStageAction(
     PLAN_LIMITS.COMMENT_MAX,
   );
   if (invalid) return { error: invalid, comment };
+  const files = photosOf(form);
+  if ('error' in files) return { error: files.error, comment };
   try {
-    await submitStage(ready.token, jobId, stageId, comment.trim(), ready.clientIp);
+    await submitStage(ready.token, jobId, stageId, comment.trim(), files.photos, ready.clientIp);
   } catch (error) {
     if (isUnauthorized(error)) return { ...sessionExpired(ready.back), comment };
     return { error: apiErrorMessage(error, ERRORS), comment };
@@ -233,4 +237,44 @@ export async function quitJobAction(
     return { error: apiErrorMessage(error, ERRORS), comment: reason };
   }
   redirect('/account/bids?quit=1');
+}
+
+/**
+ * Сообщение в переписке по заказу: текст и/или фото. `requestId` — ключ этой формы (выдаётся
+ * при показе страницы): повтор той же отправки не создаёт копию. Введённое остаётся после ошибки.
+ */
+export async function sendMessageAction(
+  jobId: string,
+  requestId: string,
+  returnTo: string,
+  _prev: PlanActionState,
+  form: FormData,
+): Promise<PlanActionState> {
+  const raw = form.get('body');
+  const body = typeof raw === 'string' ? raw.slice(0, MESSAGE_LIMITS.BODY_MAX + 1) : '';
+  const ready = await prepare(jobId, returnTo);
+  if ('error' in ready) return { error: ready.error, comment: body };
+  if (body.trim().length > MESSAGE_LIMITS.BODY_MAX) {
+    return { error: `Сообщение: не больше ${MESSAGE_LIMITS.BODY_MAX} символов.`, comment: body };
+  }
+  const files = photosOf(form);
+  if ('error' in files) return { error: files.error, comment: body };
+  if (!body.trim() && files.photos.length === 0) {
+    return { error: 'Напишите сообщение или приложите фото.', comment: body };
+  }
+  try {
+    await sendMessage(
+      ready.token,
+      jobId,
+      { body: body.trim(), requestId, photos: files.photos },
+      ready.clientIp,
+    );
+  } catch (error) {
+    if (isUnauthorized(error)) return { ...sessionExpired(ready.back), comment: body };
+    return {
+      error: apiErrorMessage(error, ERRORS),
+      comment: body,
+    };
+  }
+  redirect(`${ready.back.split('#')[0]}#chat`);
 }

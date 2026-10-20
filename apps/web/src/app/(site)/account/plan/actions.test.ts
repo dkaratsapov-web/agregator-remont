@@ -290,3 +290,85 @@ describe('quitJobAction', () => {
     });
   });
 });
+
+describe('photos and messages', () => {
+  const photo = (size = 10, type = 'image/jpeg') =>
+    new File([new Uint8Array(size)], 'IMG_1.jpg', { type });
+  const multipart = (index = 0) => {
+    const [url, init] = fetchMock.mock.calls[index];
+    return { url, method: init.method, body: init.body as FormData };
+  };
+
+  it('stage submission with photos is sent as multipart', async () => {
+    fetchMock.mockResolvedValue(json(200, plan(3)));
+    const fd = form({ comment: 'Плитка уложена полностью' });
+    fd.append('photos', photo());
+    fd.append('photos', photo(20, 'image/png'));
+    await expect(actions.submitStageAction('job1', 's1', BACK, {}, fd)).rejects.toThrow(
+      'NEXT_REDIRECT',
+    );
+    const sent = multipart();
+    expect(sent.url).toBe('http://api.test/v1/jobs/job1/stages/s1/submit');
+    expect(sent.body.get('comment')).toBe('Плитка уложена полностью');
+    expect(sent.body.getAll('photos')).toHaveLength(2);
+    expect(state.redirectedTo).toBe(`${BACK}?plan=submitted`);
+  });
+
+  it('too many photos: error, comment kept, no API call', async () => {
+    const fd = form({ comment: 'Плитка уложена полностью' });
+    for (let i = 0; i < 6; i += 1) fd.append('photos', photo());
+    expect(await actions.submitStageAction('job1', 's1', BACK, {}, fd)).toEqual({
+      error: 'Не больше 5 фото за раз.',
+      comment: 'Плитка уложена полностью',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('sends a message with its form key and photos, then returns to the conversation', async () => {
+    fetchMock.mockResolvedValue(json(200, { jobId: 'job1', items: [] }));
+    const fd = form({ body: '  Когда начнёте?  ' });
+    fd.append('photos', photo());
+    await expect(
+      actions.sendMessageAction('job1', 'key-0001', `${BACK}?plan=approved`, {}, fd),
+    ).rejects.toThrow('NEXT_REDIRECT');
+    const sent = multipart();
+    expect(sent.url).toBe('http://api.test/v1/jobs/job1/messages');
+    expect(sent.method).toBe('POST');
+    expect(sent.body.get('body')).toBe('Когда начнёте?');
+    expect(sent.body.get('requestId')).toBe('key-0001');
+    expect(sent.body.getAll('photos')).toHaveLength(1);
+    expect(state.redirectedTo).toBe(`${BACK}?plan=approved#chat`);
+  });
+
+  it('empty or too long message: error without an API call, text kept', async () => {
+    expect(
+      await actions.sendMessageAction('job1', 'key-0001', BACK, {}, form({ body: '  ' })),
+    ).toEqual({ error: 'Напишите сообщение или приложите фото.', comment: '  ' });
+    const long = 'я'.repeat(2001);
+    expect(
+      (await actions.sendMessageAction('job1', 'key-0001', BACK, {}, form({ body: long }))).error,
+    ).toContain('не больше 2000');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('closed job, expired session and a foreign origin keep the text', async () => {
+    fetchMock.mockResolvedValueOnce(
+      json(409, { message: 'Переписка открыта, пока заказ в работе' }),
+    );
+    expect(
+      await actions.sendMessageAction('job1', 'key-0001', BACK, {}, form({ body: 'Спасибо' })),
+    ).toEqual({ error: 'Переписка открыта, пока заказ в работе', comment: 'Спасибо' });
+    fetchMock.mockResolvedValueOnce(json(401, {}));
+    expect(
+      await actions.sendMessageAction('job1', 'key-0001', BACK, {}, form({ body: 'Спасибо' })),
+    ).toMatchObject({ comment: 'Спасибо', login: expect.stringContaining('/login') });
+    fetchMock.mockResolvedValueOnce(json(413, { message: 'File too large' }));
+    expect(
+      (await actions.sendMessageAction('job1', 'key-0001', BACK, {}, form({ body: 'Фото' }))).error,
+    ).toContain('не больше 8 МБ');
+    state.headers.set('origin', 'https://evil.example');
+    expect(
+      await actions.sendMessageAction('job1', 'key-0001', BACK, {}, form({ body: 'Спасибо' })),
+    ).toMatchObject({ error: expect.stringMatching(/Запрос отклонён/), comment: 'Спасибо' });
+  });
+});

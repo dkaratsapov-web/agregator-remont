@@ -17,9 +17,10 @@ import { EmptyState, PageHeader, secondaryLinkClass } from '@/components/ui/page
 import { Sheet, SheetBody, SheetHeader } from '@/components/ui/sheet';
 import { Stamp } from '@/components/ui/stamp';
 import { JobBidList } from '@/components/bids/job-bid-list';
+import { JobChatPanel } from '@/components/chat/job-chat-panel';
 import { JobPlanPanel } from '@/components/plan/job-plan-panel';
 import { planNotice } from '@/components/plan/plan-notice';
-import { getMyJob, getPlan, listJobBids } from '@/lib/api';
+import { getMessages, getMyJob, getPlan, listJobBids } from '@/lib/api';
 import { requireCustomerPage } from '@/lib/customer';
 import { formatAmount, formatBudget, formatDate } from '@/lib/format';
 import { closeJobAction, updateJobAction } from '../actions';
@@ -43,13 +44,15 @@ export default async function MyJobPage({
   let job: Awaited<ReturnType<typeof getMyJob>>;
   let bids: Awaited<ReturnType<typeof listJobBids>> = [];
   let plan: Awaited<ReturnType<typeof getPlan>> = null;
+  let chat: Awaited<ReturnType<typeof getMessages>> = null;
   try {
     job = await getMyJob(token, id);
     if (job) {
-      [bids, plan] = await Promise.all([
+      [bids, plan, chat] = await Promise.all([
         listJobBids(token, job.id),
-        // План есть только у заказа с выбранным исполнителем.
+        // План и переписка есть только у заказа с выбранным исполнителем.
         job.status === 'OPEN' ? Promise.resolve(null) : getPlan(token, job.id),
+        job.status === 'OPEN' ? Promise.resolve(null) : getMessages(token, job.id),
       ]);
     }
   } catch (error) {
@@ -121,6 +124,13 @@ export default async function MyJobPage({
             <JobPlanPanel
               plan={plan}
               jobOpen={job.status === 'IN_PROGRESS'}
+              returnTo={`/account/jobs/${job.id}`}
+            />
+          ) : null}
+          {chat ? (
+            <JobChatPanel
+              chat={chat}
+              requestId={crypto.randomUUID()}
               returnTo={`/account/jobs/${job.id}`}
             />
           ) : null}

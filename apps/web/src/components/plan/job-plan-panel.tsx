@@ -16,6 +16,7 @@ import {
   submitStageAction,
 } from '@/app/(site)/account/plan/actions';
 import { ConfirmActionForm } from '@/components/bids/confirm-action-form';
+import { PhotoGrid } from '@/components/chat/photo-grid';
 import { Sheet, SheetBody, SheetHeader } from '@/components/ui/sheet';
 import { formatDate } from '@/lib/format';
 import { CommentActionForm } from './comment-action-form';
@@ -141,6 +142,11 @@ export function JobPlanPanel({
                     ) : null}
                   </p>
                 ) : null}
+                <PhotoGrid
+                  jobId={jobId}
+                  photos={stage.photos}
+                  label={`Фото-отчёт: этап ${stage.position}`}
+                />
                 {stage.status === 'REWORK' && stage.reworkComment ? (
                   <p className="mt-2 rounded-[10px] border border-accent/40 bg-accent-tint px-3 py-2 text-sm text-ink">
                     <span className="font-semibold">Доработать:</span>{' '}
@@ -154,9 +160,10 @@ export function JobPlanPanel({
                       action={submitStageAction.bind(null, jobId, stage.id, returnTo)}
                       summary={stage.status === 'REWORK' ? 'Сдать после доработки' : 'Этап сдан'}
                       label="Что сделано"
-                      hint="Заказчик увидит комментарий и примет этап или вернёт на доработку."
+                      hint="Заказчик увидит комментарий и фото и примет этап или вернёт на доработку."
                       submitLabel="Сдать этап"
                       pendingLabel="Отправляем…"
+                      photos
                     />
                   </div>
                 ) : null}
