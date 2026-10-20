@@ -21,7 +21,11 @@ export function CatalogSearch({ filters }: { filters: JobsFilters }) {
       <p className="px-1 pb-2.5 pt-1 text-sm font-semibold text-ink">Поиск и фильтры</p>
       {filters.category ? <input type="hidden" name="category" value={filters.category} /> : null}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-        <label className="flex min-h-12 items-center gap-3 rounded-2xl bg-canvas px-4 ring-1 ring-transparent focus-within:ring-accent">
+        {/* Кольцо фокуса рисует «таблетка» (focus-within), у самого поля второго контура нет. */}
+        <label
+          data-focus-ring="within"
+          className="flex min-h-12 items-center gap-3 rounded-2xl bg-canvas px-4 ring-1 ring-transparent focus-within:ring-accent"
+        >
           <svg
             viewBox="0 0 20 20"
             className="size-4 shrink-0 text-ink-soft"
@@ -38,7 +42,7 @@ export function CatalogSearch({ filters }: { filters: JobsFilters }) {
             type="search"
             name="q"
             defaultValue={filters.q}
-            placeholder="Что сделать: плитка, электрика…"
+            placeholder="Например, плитка"
             minLength={JOB_SEARCH.QUERY_MIN}
             maxLength={JOB_SEARCH.QUERY_MAX}
             autoComplete="off"

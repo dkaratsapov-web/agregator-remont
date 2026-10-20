@@ -7,12 +7,15 @@ import {
 } from '@agregator/shared';
 import { describe, expect, it } from 'vitest';
 import {
+  buildRows,
   filterOptions,
   findOptionByLabel,
   foldText,
   groupItems,
+  isBrowsing,
   moveActiveIndex,
   normalizeQuery,
+  rowStates,
   splitHighlight,
   typeaheadIndex,
   type ListOption,
@@ -199,5 +202,63 @@ describe('service areas', () => {
 
   it('has no em dashes in names', () => {
     expect(SERVICE_CITY_NAMES.join(' ')).not.toContain(String.fromCharCode(0x2014));
+  });
+});
+
+describe('buildRows', () => {
+  const groups = [
+    { id: 'MOW', label: 'Москва и Московская область' },
+    { id: 'SPE', label: 'Санкт-Петербург и Ленинградская область' },
+  ];
+  const labels = (rows: ReturnType<typeof buildRows>) =>
+    rows.map((row) => (row.kind === 'group' ? `[${row.group.id}]` : row.option.label));
+
+  it('without a query shows only collapsed group headers with their sizes', () => {
+    const rows = buildRows(cities, groups, '  ', new Set());
+    expect(rows).toEqual([
+      { kind: 'group', group: groups[0], expanded: false, size: 5 },
+      { kind: 'group', group: groups[1], expanded: false, size: 3 },
+    ]);
+    expect(isBrowsing(groups, '')).toBe(true);
+  });
+
+  it('an expanded group shows its options right after its header', () => {
+    expect(labels(buildRows(cities, groups, '', new Set(['SPE'])))).toEqual([
+      '[MOW]',
+      '[SPE]',
+      'Санкт-Петербург',
+      'Новое Девяткино',
+      'Янино-1',
+    ]);
+  });
+
+  it('with a query lists all matches across groups, no header rows', () => {
+    expect(labels(buildRows(cities, groups, 'посад', new Set()))).toEqual([
+      'Сергиев Посад',
+      'Павловский Посад',
+    ]);
+    expect(isBrowsing(groups, 'посад')).toBe(false);
+  });
+
+  it('options without a group stay visible; no groups means a plain list', () => {
+    const loose = [{ value: 'Другой', label: 'Другой' }, ...cities];
+    expect(labels(buildRows(loose, groups, '', new Set()))).toEqual(['Другой', '[MOW]', '[SPE]']);
+    expect(labels(buildRows(cities.slice(0, 2), undefined, '', new Set()))).toEqual([
+      'Москва',
+      'Королёв',
+    ]);
+  });
+
+  it('headers are always navigable, disabled options are skipped', () => {
+    const rows = buildRows(
+      [{ value: 'x', label: 'X', group: 'MOW', disabled: true }, ...cities],
+      groups,
+      '',
+      new Set(['MOW']),
+    );
+    const states = rowStates(rows);
+    expect(states[0]).toEqual({ disabled: false });
+    expect(states[1]).toEqual({ disabled: true });
+    expect(moveActiveIndex(states, 0, 'next')).toBe(2);
   });
 });
