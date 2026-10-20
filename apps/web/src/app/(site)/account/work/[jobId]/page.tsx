@@ -9,6 +9,7 @@ import { JobPlanPanel } from '@/components/plan/job-plan-panel';
 import { planNotice } from '@/components/plan/plan-notice';
 import { StatusBadge } from '@/components/status-badge';
 import { PageHeader, secondaryLinkClass } from '@/components/ui/page-header';
+import { historyCursor } from '@/lib/search-params';
 import { getMessages, getPlan, listMyBids } from '@/lib/api';
 import { requireContractorPage } from '@/lib/customer';
 import { MarkSeen } from '@/components/notifications/mark-seen';
@@ -30,6 +31,7 @@ export default async function WorkPage({
   const [{ jobId }, query] = await Promise.all([params, searchParams]);
   const path = `/account/work/${jobId}`;
   const { token } = await requireContractorPage(path);
+  const before = historyCursor(query.before);
   if (!token) return <ContractorsOnly />;
 
   let plan: Awaited<ReturnType<typeof getPlan>>;
@@ -42,7 +44,7 @@ export default async function WorkPage({
     if (plan) {
       const [bids, messages] = await Promise.all([
         listMyBids(token, 1, { jobId, limit: 1 }),
-        getMessages(token, jobId),
+        getMessages(token, jobId, before),
       ]);
       job = bids.items[0]?.job;
       chat = messages;
@@ -83,7 +85,14 @@ export default async function WorkPage({
       ) : null}
       <div className="mt-8 flex max-w-4xl flex-col gap-8">
         <JobPlanPanel plan={plan} jobOpen={job.status === 'IN_PROGRESS'} returnTo={path} />
-        {chat ? <JobChatPanel chat={chat} requestId={crypto.randomUUID()} returnTo={path} /> : null}
+        {chat ? (
+          <JobChatPanel
+            chat={chat}
+            requestId={crypto.randomUUID()}
+            returnTo={path}
+            earlier={before !== undefined}
+          />
+        ) : null}
       </div>
     </div>
   );

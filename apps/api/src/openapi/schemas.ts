@@ -416,8 +416,13 @@ export class JobMessagesSchema implements JobMessagesDto {
   @ApiProperty({ enum: PLAN_PARTIES, enumName: 'PlanParty', description: 'Кто смотрит' })
   viewer!: PlanParty;
   @ApiProperty({ description: 'Можно ли писать: заказ в работе' }) canWrite!: boolean;
-  @ApiProperty({ type: [JobMessageSchema], description: 'Последние сообщения, от старых к новым' })
+  @ApiProperty({
+    type: [JobMessageSchema],
+    description: 'Сообщения страницы, от старых к новым (без курсора — последние)',
+  })
   items!: JobMessageSchema[];
+  @ApiProperty({ description: 'Есть ли сообщения раньше первого на странице (?before=<id>)' })
+  hasEarlier!: boolean;
 }
 
 /** Подробности события: только поля, относящиеся к его виду (остальных нет). */

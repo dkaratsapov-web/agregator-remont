@@ -11,6 +11,7 @@ CREATE TABLE "job_messages" (
     "author_id" TEXT NOT NULL,
     "body" TEXT NOT NULL DEFAULT '',
     "request_id" VARCHAR(64),
+    "request_hash" VARCHAR(64),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "job_messages_pkey" PRIMARY KEY ("id"),

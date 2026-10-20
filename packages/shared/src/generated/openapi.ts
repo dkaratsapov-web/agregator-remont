@@ -964,7 +964,9 @@ export interface components {
         JobMessagesDto: {
             /** @description Можно ли писать: заказ в работе */
             canWrite: boolean;
-            /** @description Последние сообщения, от старых к новым */
+            /** @description Есть ли сообщения раньше первого на странице (?before=<id>) */
+            hasEarlier: boolean;
+            /** @description Сообщения страницы, от старых к новым (без курсора — последние) */
             items: components["schemas"]["JobMessageDto"][];
             jobId: string;
             /** @description Кто смотрит */
@@ -2098,7 +2100,9 @@ export interface operations {
     };
     Messages_list: {
         parameters: {
-            query?: never;
+            query?: {
+                before?: string;
+            };
             header?: never;
             path: {
                 jobId: string;
@@ -2113,6 +2117,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobMessagesDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Нет действующей сессии или неверные учётные данные */

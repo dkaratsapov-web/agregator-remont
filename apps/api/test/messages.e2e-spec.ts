@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import sharp from 'sharp';
 import request from 'supertest';
 import { createTestApp } from './create-app';
+import { MESSAGE_LIMITS, PHOTO_LIMITS } from '@agregator/shared';
 import { requiredAnswers, signUp } from './helpers';
 
 const prisma = new PrismaClient();
@@ -104,7 +105,13 @@ describe('Job messages and photos (e2e)', () => {
       const d = await deal();
       const stranger = await signUp(app, 'CUSTOMER');
       const owner = await http().get(`${d.base}/messages`).set(d.owner.auth).expect(200);
-      expect(owner.body).toEqual({ jobId: d.jobId, viewer: 'OWNER', canWrite: true, items: [] });
+      expect(owner.body).toEqual({
+        jobId: d.jobId,
+        viewer: 'OWNER',
+        canWrite: true,
+        items: [],
+        hasEarlier: false,
+      });
       const contractor = await http().get(`${d.base}/messages`).set(d.contractor.auth).expect(200);
       expect(contractor.body.viewer).toBe('CONTRACTOR');
       for (const who of [d.other, stranger]) {
@@ -163,6 +170,64 @@ describe('Job messages and photos (e2e)', () => {
       await bidAndAccept(d.owner, jobId2, contractor2);
       await send(`/v1/jobs/${jobId2}`, d.owner, 'Другой заказ', key).expect(409);
       expect(await prisma.jobMessage.count()).toBe(1);
+    });
+
+    it('the same key with another text or other photos is rejected, nothing is added or lost', async () => {
+      const d = await deal();
+      const key = 'form-key-0002';
+      const photo = await phonePhoto();
+      const withPhoto = (body: string, file: Buffer) =>
+        http()
+          .post(`${d.base}/messages`)
+          .set(d.owner.auth)
+          .field('body', body)
+          .field('requestId', key)
+          .attach('photos', file, { filename: 'a.jpg', contentType: 'image/jpeg' });
+      await withPhoto('Вот стена', photo).expect(200);
+      // Повтор той же формы — без копий.
+      const again = await withPhoto('Вот стена', photo).expect(200);
+      expect(again.body.items).toHaveLength(1);
+      // Тот же ключ: другой текст, другое фото, без фото — 409.
+      await withPhoto('Другой текст', photo).expect(409);
+      await withPhoto('Вот стена', await phonePhoto(640, 480)).expect(409);
+      await send(d.base, d.owner, 'Вот стена', key).expect(409);
+      expect(await prisma.jobMessage.count()).toBe(1);
+      expect(await prisma.jobPhoto.count()).toBe(1);
+      const [stored] = (await http().get(`${d.base}/messages`).set(d.owner.auth)).body.items;
+      expect(stored.body).toBe('Вот стена');
+    });
+
+    it('long conversations page backwards with a cursor', async () => {
+      const d = await deal();
+      const total = MESSAGE_LIMITS.PAGE + 7;
+      await prisma.jobMessage.createMany({
+        data: Array.from({ length: total }, (_, i) => ({
+          jobId: d.jobId,
+          contractorId: d.contractor.id,
+          authorId: i % 2 ? d.owner.id : d.contractor.id,
+          body: `Сообщение ${i + 1}`,
+          createdAt: new Date(Date.UTC(2026, 9, 1, 0, 0, i)),
+        })),
+      });
+      const latest = (await http().get(`${d.base}/messages`).set(d.owner.auth).expect(200)).body;
+      expect(latest.items).toHaveLength(MESSAGE_LIMITS.PAGE);
+      expect(latest.hasEarlier).toBe(true);
+      expect(latest.items.at(-1).body).toBe(`Сообщение ${total}`);
+      const earlier = (
+        await http()
+          .get(`${d.base}/messages?before=${latest.items[0].id}`)
+          .set(d.contractor.auth)
+          .expect(200)
+      ).body;
+      expect(earlier.items.map((m: { body: string }) => m.body)).toEqual(
+        Array.from({ length: 7 }, (_, i) => `Сообщение ${i + 1}`),
+      );
+      expect(earlier.hasEarlier).toBe(false);
+      // Курсор из чужой сделки или неверный — 400.
+      const other = await deal();
+      const [foreign] = (await send(other.base, other.owner, 'Чужое').expect(200)).body.items;
+      await http().get(`${d.base}/messages?before=${foreign.id}`).set(d.owner.auth).expect(400);
+      await http().get(`${d.base}/messages?before=a%20b`).set(d.owner.auth).expect(400);
     });
 
     it('after the job is closed the conversation stays readable but closed for writing', async () => {
@@ -272,6 +337,103 @@ describe('Job messages and photos (e2e)', () => {
       // Администратор видит фото (разбор спора); роль выдаётся только миграцией или вручную.
       await prisma.user.update({ where: { id: stranger.id }, data: { role: 'ADMIN' } });
       await http().get(`${d.base}/photos/${id}`).set(stranger.auth).expect(200);
+    });
+
+    it('photos of a deal the contractor left are closed to everyone but the admin', async () => {
+      const d = await deal();
+      const res = await http()
+        .post(`${d.base}/messages`)
+        .set(d.contractor.auth)
+        .attach('photos', await phonePhoto(), { filename: 'a.jpg', contentType: 'image/jpeg' })
+        .expect(200);
+      const id = res.body.items[0].photos[0].id as string;
+      await http().get(`${d.base}/photos/${id}`).set(d.owner.auth).expect(200);
+      await http()
+        .post(`${d.base}/quit`)
+        .set(d.contractor.auth)
+        .send({ reason: 'Не успеваю по срокам' })
+        .expect(204);
+      // Сделки нет: прежний исполнитель и заказчик не видят фото, как и переписку.
+      await http().get(`${d.base}/photos/${id}`).set(d.contractor.auth).expect(404);
+      await http().get(`${d.base}/photos/${id}`).set(d.owner.auth).expect(404);
+      const pending = await prisma.bid.findFirstOrThrow({
+        where: { jobId: d.jobId, contractorId: d.other.id },
+      });
+      await http()
+        .post(`/v1/me/jobs/${d.jobId}/bids/${pending.id}/accept`)
+        .set(d.owner.auth)
+        .expect(200);
+      // Новая сделка: новый исполнитель, прежний и заказчик старые фото не видят.
+      for (const who of [d.other, d.contractor, d.owner]) {
+        await http().get(`${d.base}/photos/${id}`).set(who.auth).expect(404);
+      }
+      const admin = await signUp(app, 'CUSTOMER');
+      await prisma.user.update({ where: { id: admin.id }, data: { role: 'ADMIN' } });
+      await http().get(`${d.base}/photos/${id}`).set(admin.auth).expect(200);
+    });
+
+    it('a closed deal keeps its photos for both sides', async () => {
+      const d = await deal();
+      const res = await http()
+        .post(`${d.base}/messages`)
+        .set(d.owner.auth)
+        .attach('photos', await phonePhoto(), { filename: 'a.jpg', contentType: 'image/jpeg' })
+        .expect(200);
+      const id = res.body.items[0].photos[0].id as string;
+      await http()
+        .post(`/v1/me/jobs/${d.jobId}/close`)
+        .set(d.owner.auth)
+        .send({ outcome: 'COMPLETED' })
+        .expect(200);
+      await http().get(`${d.base}/photos/${id}`).set(d.contractor.auth).expect(200);
+      await http().get(`${d.base}/photos/${id}`).set(d.owner.auth).expect(200);
+    });
+
+    it('a deal holds at most PER_DEAL photos, also under parallel uploads', async () => {
+      const d = await deal();
+      // Уже почти полная сделка (строки без байтов: подсчёт идёт по job_photos).
+      const filled = PHOTO_LIMITS.PER_DEAL - 5;
+      const message = await prisma.jobMessage.create({
+        data: { jobId: d.jobId, contractorId: d.contractor.id, authorId: d.owner.id, body: 'Фото' },
+      });
+      await prisma.jobPhoto.createMany({
+        data: Array.from({ length: filled }, () => ({
+          jobId: d.jobId,
+          contractorId: d.contractor.id,
+          uploaderId: d.owner.id,
+          messageId: message.id,
+          width: 10,
+          height: 10,
+          bytes: 1,
+        })),
+      });
+      const photo = await phonePhoto(200, 100);
+      const upload = (who: Auth) =>
+        http()
+          .post(`${d.base}/messages`)
+          .set(who.auth)
+          .attach('photos', photo, { filename: 'a.jpg', contentType: 'image/jpeg' })
+          .attach('photos', photo, { filename: 'b.jpg', contentType: 'image/jpeg' });
+      // Шесть параллельных загрузок по 2 фото при свободных 5 местах: проходят ровно две.
+      const results = await Promise.all(
+        Array.from({ length: 6 }, (_, i) => upload(i % 2 ? d.owner : d.contractor)),
+      );
+      const statuses = results.map((r) => r.status).sort();
+      expect(statuses).toEqual([200, 200, 409, 409, 409, 409]);
+      expect(results.find((r) => r.status === 409)!.body.message).toMatch(/можно добавить ещё 1/);
+      expect(await prisma.jobPhoto.count({ where: { jobId: d.jobId } })).toBe(filled + 4);
+      // Одно оставшееся место занимается, дальше — 409 и для фото-отчёта к этапу.
+      await http()
+        .post(`${d.base}/messages`)
+        .set(d.owner.auth)
+        .attach('photos', photo, { filename: 'c.jpg', contentType: 'image/jpeg' })
+        .expect(200);
+      await upload(d.owner).expect(409);
+      expect(await prisma.jobPhoto.count({ where: { jobId: d.jobId } })).toBe(
+        PHOTO_LIMITS.PER_DEAL,
+      );
+      // Сообщение без фото по-прежнему можно отправить.
+      await send(d.base, d.owner, 'Без фото').expect(200);
     });
 
     it('rejects non-images, too many and too large files without saving anything', async () => {

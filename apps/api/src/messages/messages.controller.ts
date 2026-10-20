@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Query,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
@@ -20,7 +21,7 @@ import { ApiErrors, ApiSession } from '../openapi/decorators';
 import { JobMessagesSchema } from '../openapi/schemas';
 import { photoUpload } from '../photos/photo-upload';
 import type { UploadedPhoto } from '../photos/photos.service';
-import { SendMessageDto } from './dto/message.dto';
+import { ListMessagesQuery, SendMessageDto } from './dto/message.dto';
 import { MessagesService } from './messages.service';
 
 /** Переписка по заказу: заказчик-владелец и выбранный исполнитель; остальным — 404. */
@@ -34,9 +35,13 @@ export class MessagesController {
 
   @Get()
   @ApiOkResponse({ type: JobMessagesSchema })
-  @ApiErrors(404)
-  list(@CurrentAuth() auth: AuthContext, @Param('jobId') jobId: string): Promise<JobMessagesDto> {
-    return this.messages.list(auth.user.id, jobId);
+  @ApiErrors(400, 404)
+  list(
+    @CurrentAuth() auth: AuthContext,
+    @Param('jobId') jobId: string,
+    @Query() query: ListMessagesQuery,
+  ): Promise<JobMessagesDto> {
+    return this.messages.list(auth.user.id, jobId, query.before);
   }
 
   @Post()
