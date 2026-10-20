@@ -20,6 +20,7 @@ import { JobBidList } from '@/components/bids/job-bid-list';
 import { JobChatPanel } from '@/components/chat/job-chat-panel';
 import { JobPlanPanel } from '@/components/plan/job-plan-panel';
 import { planNotice } from '@/components/plan/plan-notice';
+import { historyCursor } from '@/lib/search-params';
 import { getMessages, getMyJob, getPlan, listJobBids } from '@/lib/api';
 import { requireCustomerPage } from '@/lib/customer';
 import { formatAmount, formatBudget, formatDate } from '@/lib/format';
@@ -39,6 +40,7 @@ export default async function MyJobPage({
 }) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const { token } = await requireCustomerPage(`/account/jobs/${id}`);
+  const before = historyCursor(query.before);
   if (!token) return <CustomersOnly />;
 
   let job: Awaited<ReturnType<typeof getMyJob>>;
@@ -52,7 +54,7 @@ export default async function MyJobPage({
         listJobBids(token, job.id),
         // План и переписка есть только у заказа с выбранным исполнителем.
         job.status === 'OPEN' ? Promise.resolve(null) : getPlan(token, job.id),
-        job.status === 'OPEN' ? Promise.resolve(null) : getMessages(token, job.id),
+        job.status === 'OPEN' ? Promise.resolve(null) : getMessages(token, job.id, before),
       ]);
     }
   } catch (error) {
@@ -131,6 +133,7 @@ export default async function MyJobPage({
             <JobChatPanel
               chat={chat}
               requestId={crypto.randomUUID()}
+              earlier={before !== undefined}
               returnTo={`/account/jobs/${job.id}`}
             />
           ) : null}

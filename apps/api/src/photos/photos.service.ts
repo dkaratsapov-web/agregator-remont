@@ -1,5 +1,10 @@
 import { PHOTO_LIMITS, type PhotoDto, type PhotoSize } from '@agregator/shared';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type { Prisma, User } from '@prisma/client';
 import { ENTITY_ID_PATTERN } from '../common/text';
 import { PrismaService } from '../prisma/prisma.service';
@@ -56,11 +61,25 @@ export class PhotosService {
     return processed;
   }
 
+  /**
+   * Сохраняет фото. Вызывается под блокировкой строки заказа (FOR UPDATE), поэтому подсчёт
+   * фото сделки и запись идут по очереди и параллельные загрузки не превысят предел сделки.
+   */
   async attach(
     tx: Prisma.TransactionClient,
     target: PhotoTarget,
     photos: ProcessedPhoto[],
   ): Promise<void> {
+    if (photos.length === 0) return;
+    const stored = await tx.jobPhoto.count({
+      where: { jobId: target.jobId, contractorId: target.contractorId },
+    });
+    if (stored + photos.length > PHOTO_LIMITS.PER_DEAL) {
+      throw new ConflictException(
+        `В сделке уже ${stored} фото из ${PHOTO_LIMITS.PER_DEAL} возможных: ` +
+          `можно добавить ещё ${Math.max(0, PHOTO_LIMITS.PER_DEAL - stored)}`,
+      );
+    }
     for (const photo of photos) {
       await tx.jobPhoto.create({
         data: {
@@ -82,8 +101,10 @@ export class PhotosService {
   }
 
   /**
-   * Байты фото для сторон сделки (заказчик-владелец, исполнитель этой сделки) и
-   * администратора; остальным фото неотличимо от несуществующего (404).
+   * Байты фото для сторон текущей сделки (заказчик-владелец и выбранный исполнитель — тот, чей
+   * отклик сейчас принят; после закрытия заказа он остаётся принятым) и администратора. Фото
+   * прежней сделки (исполнитель отказался) недоступны ни ему, ни новому исполнителю, ни
+   * заказчику — как и её переписка. Остальным фото неотличимо от несуществующего (404).
    */
   async read(user: User, jobId: string, photoId: string, size: PhotoSize): Promise<Buffer> {
     if (!ENTITY_ID_PATTERN.test(jobId) || !ENTITY_ID_PATTERN.test(photoId)) {
@@ -93,10 +114,19 @@ export class PhotosService {
       where: { id: photoId },
       select: { jobId: true, contractorId: true, job: { select: { ownerId: true } } },
     });
+    const current =
+      photo && photo.jobId === jobId && user.role !== 'ADMIN'
+        ? await this.prisma.bid.findFirst({
+            where: { jobId, status: 'ACCEPTED' },
+            select: { contractorId: true },
+          })
+        : null;
     const allowed =
       photo !== null &&
       photo.jobId === jobId &&
-      (user.role === 'ADMIN' || user.id === photo.job.ownerId || user.id === photo.contractorId);
+      (user.role === 'ADMIN' ||
+        (current?.contractorId === photo.contractorId &&
+          (user.id === photo.job.ownerId || user.id === photo.contractorId)));
     if (!allowed) throw new NotFoundException(PHOTO_NOT_FOUND);
     const blob =
       size === 'thumb'

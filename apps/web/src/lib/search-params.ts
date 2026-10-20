@@ -63,3 +63,9 @@ export function jobsHref(params: JobsFilters & { page?: number }): string {
   const qs = query.toString();
   return qs ? `/jobs?${qs}` : '/jobs';
 }
+
+/** Курсор истории переписки (?before=<id сообщения>); иначе — последние сообщения. */
+export function historyCursor(raw: RawParam): string | undefined {
+  const value = first(raw);
+  return value && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? value : undefined;
+}

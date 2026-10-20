@@ -731,6 +731,7 @@ describe('API contract (e2e)', () => {
       await check('get', M, http().get(`${base}/messages`).set(owner.auth), 200);
       await check('get', M, http().get(`${base}/messages`), 401);
       await check('get', M, http().get(`${base}/messages`).set(stranger.auth), 404);
+      await check('get', M, http().get(`${base}/messages?before=a%20b`).set(owner.auth), 400);
 
       const sent = await check(
         'post',

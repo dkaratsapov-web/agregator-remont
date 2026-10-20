@@ -745,8 +745,12 @@
             "description": "Можно ли писать: заказ в работе",
             "type": "boolean"
           },
+          "hasEarlier": {
+            "description": "Есть ли сообщения раньше первого на странице (?before=<id>)",
+            "type": "boolean"
+          },
           "items": {
-            "description": "Последние сообщения, от старых к новым",
+            "description": "Сообщения страницы, от старых к новым (без курсора — последние)",
             "items": {
               "$ref": "#/components/schemas/JobMessageDto"
             },
@@ -768,7 +772,8 @@
           "jobId",
           "viewer",
           "canWrite",
-          "items"
+          "items",
+          "hasEarlier"
         ],
         "type": "object"
       },
@@ -3200,6 +3205,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3212,6 +3226,16 @@
               }
             },
             "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
           },
           "401": {
             "content": {

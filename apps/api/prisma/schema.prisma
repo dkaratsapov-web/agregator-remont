@@ -406,6 +406,8 @@ model JobMessage {
   body         String     @default("")
   /// Ключ отправки из формы: повтор той же отправки (двойной клик, обрыв связи) не создаёт копию.
   requestId    String?    @map("request_id") @db.VarChar(64)
+  /// SHA-256 текста и исходных файлов отправки с этим ключом: повтор с другим содержимым — 409.
+  requestHash  String?    @map("request_hash") @db.VarChar(64)
   photos       JobPhoto[]
   createdAt    DateTime   @default(now()) @map("created_at")
 

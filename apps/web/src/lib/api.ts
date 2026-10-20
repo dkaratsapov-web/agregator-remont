@@ -489,10 +489,19 @@ export async function quitJob(
 
 // --- Переписка по заказу и фото
 
-/** Переписка сделки; null — сделки нет (исполнитель не выбран) или нет доступа. */
-export async function getMessages(token: string, jobId: string): Promise<JobMessagesDto | null> {
-  const res = await request(planPath(jobId, '/messages'), { token });
+/**
+ * Переписка сделки: последние сообщения или, с before, более ранние. null — сделки нет
+ * (исполнитель не выбран) или нет доступа. Устаревший курсор (400) — последние сообщения.
+ */
+export async function getMessages(
+  token: string,
+  jobId: string,
+  before?: string,
+): Promise<JobMessagesDto | null> {
+  const query = before ? `?before=${encodeURIComponent(before)}` : '';
+  const res = await request(planPath(jobId, `/messages${query}`), { token });
   if (res.status === 404) return null;
+  if (res.status === 400 && before) return getMessages(token, jobId);
   return expectJson<JobMessagesDto>(res, 'GET /v1/jobs/:id/messages');
 }
 
