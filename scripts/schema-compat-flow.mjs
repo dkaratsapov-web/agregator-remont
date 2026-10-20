@@ -1,9 +1,9 @@
 // Сценарий для schema-compat-test.sh: node scripts/schema-compat-flow.mjs <old|new> <API_URL>
-// Описывает переход «базовый коммит → этот PR» (сейчас: этапы заказа поверх PR #39).
-// old — прежний API работает на новой схеме: регистрация, заказ, отклик, правка, выбор
-// исполнителя, закрытие с исходом, поиск; пишет созданные id в COMPAT_STATE (JSON).
-// new — текущий API читает данные прежнего и работает с ними: заказы и отклики видны, у
-// заказа в работе, начатого прежним API, план пустой, его можно составить и согласовать.
+// Описывает переход «базовый коммит → этот PR» (сейчас: переписка и фото поверх этапов).
+// old — прежний API работает на новой схеме: заказ, отклик, выбор исполнителя, план, сдача этапа
+// (без фото), закрытие с исходом, отказ исполнителя (удаление плана); пишет id в COMPAT_STATE.
+// new — текущий API читает данные прежнего: этап, сданный прежним API, без фото; переписка у
+// сделки, начатой прежним API, пустая, в неё можно писать с фото; закрытый заказ — только чтение.
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const [mode, API] = process.argv.slice(2);
@@ -76,10 +76,49 @@ async function startWork(customer, contractor, edit) {
   return created.body.id;
 }
 
+/** Согласованный план из одного этапа через тот API, на котором запущен сценарий. */
+async function approvedPlan(customer, contractor, jobId) {
+  const draft = await call(`/v1/jobs/${jobId}/plan`, {
+    method: 'PUT',
+    token: contractor,
+    body: { version: 0, sequential: true, stages: [{ title: 'Укладка', description: '' }] },
+  });
+  const proposed = await call(`/v1/jobs/${jobId}/plan/propose`, {
+    method: 'POST',
+    token: contractor,
+    body: { version: draft.body?.version },
+  });
+  const approved = await call(`/v1/jobs/${jobId}/plan/approve`, {
+    method: 'POST',
+    token: customer,
+    body: { version: proposed.body?.version },
+  });
+  return approved.body;
+}
+
 if (mode === 'old') {
   const customer = await register('CUSTOMER');
   const contractor = await register('CONTRACTOR');
   const workJob = await startWork(customer, contractor, true);
+  const plan = await approvedPlan(customer, contractor, workJob);
+  const submitted = await call(`/v1/jobs/${workJob}/stages/${plan.stages[0].id}/submit`, {
+    method: 'POST',
+    token: contractor,
+    body: { comment: 'Сдано прежним API' },
+  });
+  check('submits a stage on the new schema', submitted.status === 200, `got ${submitted.status}`);
+  const quitJob = await startWork(customer, contractor, false);
+  await approvedPlan(customer, contractor, quitJob);
+  const quit = await call(`/v1/jobs/${quitJob}/quit`, {
+    method: 'POST',
+    token: contractor,
+    body: { reason: 'Не успеваю по срокам' },
+  });
+  check(
+    'contractor quits (plan deleted) on the new schema',
+    quit.status === 204,
+    `got ${quit.status}`,
+  );
   const closedJob = await startWork(customer, contractor, false);
   const closed = await call(`/v1/me/jobs/${closedJob}/close`, {
     method: 'POST',
@@ -87,53 +126,60 @@ if (mode === 'old') {
     body: { outcome: 'COMPLETED' },
   });
   check('closes a job in progress with an outcome', closed.status === 200, `got ${closed.status}`);
-  const search = await call(`/v1/jobs?q=${encodeURIComponent('ламинат в спальне')}&city=Москва`);
-  check(
-    'catalog search works on the new schema',
-    search.status === 200 && search.body.items.length >= 0,
-  );
   writeFileSync(STATE, JSON.stringify({ customer, contractor, workJob, closedJob }));
 } else {
   const state = JSON.parse(readFileSync(STATE, 'utf8'));
   const mine = await call('/v1/me/jobs?limit=50', { token: state.customer });
   const ids = new Set((mine.body?.items ?? []).map((j) => j.id));
   check('sees jobs created by the old API', ids.has(state.workJob) && ids.has(state.closedJob));
-  const closed = mine.body.items.find((j) => j.id === state.closedJob);
-  check('old closed job keeps its outcome', closed?.closeOutcome === 'COMPLETED');
-  const bids = await call('/v1/me/bids', { token: state.contractor });
+  const plan = await call(`/v1/jobs/${state.workJob}/plan`, { token: state.customer });
   check(
-    'contractor bids from the old API are readable',
-    bids.status === 200 && bids.body.items.every((b) => b.status === 'ACCEPTED'),
-  );
-  const plan = await call(`/v1/jobs/${state.workJob}/plan`, { token: state.contractor });
-  check(
-    'a job started by the old API has an empty plan',
-    plan.status === 200 && plan.body.version === 0 && plan.body.stages.length === 0,
+    'a stage submitted by the old API is read without photos',
+    plan.status === 200 &&
+      plan.body.stages[0]?.status === 'SUBMITTED' &&
+      Array.isArray(plan.body.stages[0]?.photos) &&
+      plan.body.stages[0].photos.length === 0,
     `got ${plan.status}`,
   );
-  const draft = await call(`/v1/jobs/${state.workJob}/plan`, {
-    method: 'PUT',
-    token: state.contractor,
-    body: {
-      version: 0,
-      sequential: true,
-      stages: [{ title: 'Укладка ламината', description: '', durationDays: 2 }],
-    },
-  });
-  const proposed = await call(`/v1/jobs/${state.workJob}/plan/propose`, {
-    method: 'POST',
-    token: state.contractor,
-    body: { version: draft.body?.version },
-  });
-  const approved = await call(`/v1/jobs/${state.workJob}/plan/approve`, {
-    method: 'POST',
-    token: state.customer,
-    body: { version: proposed.body?.version },
-  });
+  const chat = await call(`/v1/jobs/${state.workJob}/messages`, { token: state.contractor });
   check(
-    'plan for that job is drafted, proposed and approved',
-    approved.status === 200 && approved.body.status === 'APPROVED',
-    `got ${draft.status}/${proposed.status}/${approved.status}`,
+    'a deal started by the old API has an empty conversation open for writing',
+    chat.status === 200 && chat.body.items.length === 0 && chat.body.canWrite === true,
+    `got ${chat.status}`,
+  );
+  // PNG 1×1 — фото к сообщению через новый API.
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  const form = new FormData();
+  form.append('body', 'Сообщение в сделке прежнего API');
+  form.append('photos', new Blob([png], { type: 'image/png' }), 'dot.png');
+  ip += 1;
+  const sent = await fetch(`${API}/v1/jobs/${state.workJob}/messages`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${state.customer}`,
+      'X-Forwarded-For': `10.78.${process.pid % 250}.${ip % 250}`,
+    },
+    body: form,
+  });
+  const sentBody = await sent.json().catch(() => null);
+  const photoId = sentBody?.items?.[0]?.photos?.[0]?.id;
+  check(
+    'sends a message with a photo',
+    sent.status === 200 && Boolean(photoId),
+    `got ${sent.status}`,
+  );
+  const photo = await fetch(`${API}/v1/jobs/${state.workJob}/photos/${photoId}?size=thumb`, {
+    headers: { Authorization: `Bearer ${state.contractor}` },
+  });
+  check('the other side reads the photo', photo.status === 200, `got ${photo.status}`);
+  const closedChat = await call(`/v1/jobs/${state.closedJob}/messages`, { token: state.customer });
+  check(
+    'a job closed by the old API: conversation read-only',
+    closedChat.status === 200 && closedChat.body.canWrite === false,
+    `got ${closedChat.status}`,
   );
 }
 

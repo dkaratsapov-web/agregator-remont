@@ -696,6 +696,87 @@
         ],
         "type": "object"
       },
+      "JobMessageDto": {
+        "additionalProperties": false,
+        "properties": {
+          "author": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlanParty"
+              }
+            ],
+            "description": "Чья реплика"
+          },
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "own": {
+            "description": "Своё ли сообщение для того, кто смотрит",
+            "type": "boolean"
+          },
+          "photos": {
+            "items": {
+              "$ref": "#/components/schemas/PhotoDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "author",
+          "own",
+          "body",
+          "photos",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "JobMessagesDto": {
+        "additionalProperties": false,
+        "properties": {
+          "canWrite": {
+            "description": "Можно ли писать: заказ в работе",
+            "type": "boolean"
+          },
+          "hasEarlier": {
+            "description": "Есть ли сообщения раньше первого на странице (?before=<id>)",
+            "type": "boolean"
+          },
+          "items": {
+            "description": "Сообщения страницы, от старых к новым (без курсора — последние)",
+            "items": {
+              "$ref": "#/components/schemas/JobMessageDto"
+            },
+            "type": "array"
+          },
+          "jobId": {
+            "type": "string"
+          },
+          "viewer": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlanParty"
+              }
+            ],
+            "description": "Кто смотрит"
+          }
+        },
+        "required": [
+          "jobId",
+          "viewer",
+          "canWrite",
+          "items",
+          "hasEarlier"
+        ],
+        "type": "object"
+      },
       "JobPlanDto": {
         "additionalProperties": false,
         "properties": {
@@ -787,6 +868,13 @@
           "id": {
             "type": "string"
           },
+          "photos": {
+            "description": "Фото-отчёт к сдачам этапа",
+            "items": {
+              "$ref": "#/components/schemas/PhotoDto"
+            },
+            "type": "array"
+          },
           "position": {
             "description": "С 1, порядок сдачи",
             "type": "integer"
@@ -827,7 +915,8 @@
           "submitComment",
           "reworkComment",
           "submittedAt",
-          "acceptedAt"
+          "acceptedAt",
+          "photos"
         ],
         "type": "object"
       },
@@ -1425,6 +1514,33 @@
           "page",
           "limit",
           "total"
+        ],
+        "type": "object"
+      },
+      "PhotoDto": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "height": {
+            "description": "Высота полного фото, px",
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "width": {
+            "description": "Ширина полного фото, px",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "width",
+          "height",
+          "createdAt"
         ],
         "type": "object"
       },
@@ -3078,6 +3194,323 @@
         ]
       }
     },
+    "/v1/jobs/{jobId}/messages": {
+      "get": {
+        "operationId": "Messages_list",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobMessagesDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "messages"
+        ]
+      },
+      "post": {
+        "operationId": "Messages_send",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "body": {
+                    "maxLength": 2000,
+                    "type": "string"
+                  },
+                  "photos": {
+                    "items": {
+                      "format": "binary",
+                      "type": "string"
+                    },
+                    "maxItems": 5,
+                    "type": "array"
+                  },
+                  "requestId": {
+                    "pattern": "^[A-Za-z0-9_-]{8,64}$",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "body": {
+                    "maxLength": 2000,
+                    "type": "string"
+                  },
+                  "photos": {
+                    "items": {
+                      "format": "binary",
+                      "type": "string"
+                    },
+                    "maxItems": 5,
+                    "type": "array"
+                  },
+                  "requestId": {
+                    "pattern": "^[A-Za-z0-9_-]{8,64}$",
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobMessagesDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Конфликт с текущим состоянием ресурса"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Файл слишком большой"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "messages"
+        ]
+      }
+    },
+    "/v1/jobs/{jobId}/photos/{photoId}": {
+      "get": {
+        "operationId": "Photos_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photoId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": "full",
+              "enum": [
+                "thumb",
+                "full"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/webp": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Фото (WebP): полное до 2000 px или миниатюра до 480 px"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "photos"
+        ]
+      }
+    },
     "/v1/jobs/{jobId}/plan": {
       "get": {
         "operationId": "Plans_get",
@@ -3995,7 +4428,50 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PlanCommentDto"
+                "additionalProperties": false,
+                "properties": {
+                  "comment": {
+                    "maxLength": 1000,
+                    "minLength": 5,
+                    "type": "string"
+                  },
+                  "photos": {
+                    "items": {
+                      "format": "binary",
+                      "type": "string"
+                    },
+                    "maxItems": 5,
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "comment"
+                ],
+                "type": "object"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "comment": {
+                    "maxLength": 1000,
+                    "minLength": 5,
+                    "type": "string"
+                  },
+                  "photos": {
+                    "items": {
+                      "format": "binary",
+                      "type": "string"
+                    },
+                    "maxItems": 5,
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "comment"
+                ],
+                "type": "object"
               }
             }
           },
@@ -4061,6 +4537,16 @@
               }
             },
             "description": "Конфликт с текущим состоянием ресурса"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Файл слишком большой"
           },
           "429": {
             "content": {

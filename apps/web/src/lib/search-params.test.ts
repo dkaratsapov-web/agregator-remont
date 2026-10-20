@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  historyCursor,
   jobsHref,
   parseCategory,
   parseCity,
@@ -72,5 +73,15 @@ describe('parseOpenOnly', () => {
     expect(parseOpenOnly('1')).toBe(true);
     expect(parseOpenOnly('true')).toBe(false);
     expect(parseOpenOnly(undefined)).toBe(false);
+  });
+});
+
+describe('historyCursor', () => {
+  it('accepts a message id and ignores anything else', () => {
+    expect(historyCursor('cmsg_01')).toBe('cmsg_01');
+    expect(historyCursor(['a1', 'b2'])).toBe('a1');
+    expect(historyCursor(undefined)).toBeUndefined();
+    expect(historyCursor('a b')).toBeUndefined();
+    expect(historyCursor('../x')).toBeUndefined();
   });
 });

@@ -17,6 +17,12 @@ const nextConfig: NextConfig = {
     : {}),
   poweredByHeader: false,
   reactStrictMode: true,
+  experimental: {
+    // Фото к сообщениям и сдаче этапа: до 5 файлов по 8 МБ, но не больше 26 МБ на запрос
+    // (PHOTO_LIMITS). Caddy пропускает такие тела только на страницах заказа и «Хода работ»
+    // (deploy/Caddyfile), остальные запросы — до 8 МБ.
+    serverActions: { bodySizeLimit: '27mb' },
+  },
   async headers() {
     return [
       { source: '/:path*', headers: securityHeaders },

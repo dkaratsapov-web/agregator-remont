@@ -3,12 +3,14 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ApiUnavailable } from '@/components/api-unavailable';
 import { ContractorsOnly } from '@/components/jobs/contractors-only';
+import { JobChatPanel } from '@/components/chat/job-chat-panel';
 import { Notice } from '@/components/notice';
 import { JobPlanPanel } from '@/components/plan/job-plan-panel';
 import { planNotice } from '@/components/plan/plan-notice';
 import { StatusBadge } from '@/components/status-badge';
 import { PageHeader, secondaryLinkClass } from '@/components/ui/page-header';
-import { getPlan, listMyBids } from '@/lib/api';
+import { historyCursor } from '@/lib/search-params';
+import { getMessages, getPlan, listMyBids } from '@/lib/api';
 import { requireContractorPage } from '@/lib/customer';
 
 export const metadata: Metadata = { title: 'Ход работ', robots: { index: false } };
@@ -27,15 +29,24 @@ export default async function WorkPage({
   const [{ jobId }, query] = await Promise.all([params, searchParams]);
   const path = `/account/work/${jobId}`;
   const { token } = await requireContractorPage(path);
+  const before = historyCursor(query.before);
   if (!token) return <ContractorsOnly />;
 
   let plan: Awaited<ReturnType<typeof getPlan>>;
+  let chat: Awaited<ReturnType<typeof getMessages>> = null;
   let job:
     | { id: string; title: string; city: string; status: 'OPEN' | 'IN_PROGRESS' | 'CLOSED' }
     | undefined;
   try {
     plan = /^[A-Za-z0-9_-]{1,64}$/.test(jobId) ? await getPlan(token, jobId) : null;
-    if (plan) job = (await listMyBids(token, 1, { jobId, limit: 1 })).items[0]?.job;
+    if (plan) {
+      const [bids, messages] = await Promise.all([
+        listMyBids(token, 1, { jobId, limit: 1 }),
+        getMessages(token, jobId, before),
+      ]);
+      job = bids.items[0]?.job;
+      chat = messages;
+    }
   } catch (error) {
     console.error('Work: failed to load', error);
     return (
@@ -68,8 +79,16 @@ export default async function WorkPage({
           <Notice>{notice}</Notice>
         </div>
       ) : null}
-      <div className="mt-8 max-w-4xl">
+      <div className="mt-8 flex max-w-4xl flex-col gap-8">
         <JobPlanPanel plan={plan} jobOpen={job.status === 'IN_PROGRESS'} returnTo={path} />
+        {chat ? (
+          <JobChatPanel
+            chat={chat}
+            requestId={crypto.randomUUID()}
+            returnTo={path}
+            earlier={before !== undefined}
+          />
+        ) : null}
       </div>
     </div>
   );

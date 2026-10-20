@@ -8,6 +8,7 @@ import type { ContractorProfileDto, JobBidDto, MyBidDto } from './bids';
 import type { components } from './generated/openapi';
 import type { JobDraftDto, JobDto, JobItemDto, OwnJobDto } from './jobs';
 import type { LeadDto } from './leads';
+import type { JobMessageDto, JobMessagesDto, PhotoDto } from './messages';
 import type { Paginated } from './pagination';
 import type { JobPlanDto, JobStageDto } from './plans';
 
@@ -31,6 +32,9 @@ export type ContractChecks = [
   Expect<Equal<JobBidDto, Schemas['JobBidDto']>>,
   Expect<Equal<JobPlanDto, Schemas['JobPlanDto']>>,
   Expect<Equal<JobStageDto, Schemas['JobStageDto']>>,
+  Expect<Equal<PhotoDto, Schemas['PhotoDto']>>,
+  Expect<Equal<JobMessageDto, Schemas['JobMessageDto']>>,
+  Expect<Equal<JobMessagesDto, Schemas['JobMessagesDto']>>,
   // AUDIT_FINDINGS ARCH-6: сеансы, черновики, позиции заказа и заявки тоже сверяются.
   Expect<Equal<SessionDto, Schemas['SessionDto']>>,
   Expect<Equal<JobDraftDto, Schemas['JobDraftDto']>>,

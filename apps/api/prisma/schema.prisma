@@ -114,6 +114,8 @@ model Job {
   owner        User?            @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   bids         Bid[]
   plan         JobPlan?
+  messages     JobMessage[]
+  photos       JobPhoto[]
   createdAt    DateTime         @default(now()) @map("created_at")
   updatedAt    DateTime         @updatedAt @map("updated_at")
   /// Ключ формы публикации (UUID): повтор того же запроса (двойной клик, обрыв связи) вернёт
@@ -189,6 +191,10 @@ model User {
   bids             Bid[]
   /// Входы через банки (Сбер ID, Т-Банк ID), привязанные к аккаунту.
   externalAccounts ExternalAccount[]
+  messagesWritten  JobMessage[]       @relation("JobMessageAuthor")
+  dealMessages     JobMessage[]       @relation("JobMessageContractor")
+  photosUploaded   JobPhoto[]         @relation("JobPhotoUploader")
+  dealPhotos       JobPhoto[]         @relation("JobPhotoContractor")
 
   @@map("users")
 }
@@ -350,6 +356,8 @@ model JobStage {
   reworkComment String?        @map("rework_comment")
   submittedAt   DateTime?      @map("submitted_at")
   acceptedAt    DateTime?      @map("accepted_at")
+  /// Фото-отчёт к сдачам этапа.
+  photos        JobPhoto[]
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
@@ -380,4 +388,69 @@ model UserAvatar {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("user_avatars")
+}
+
+/// Сообщение переписки по заказу. Переписка своя для каждой сделки (заказ + исполнитель): после
+/// отказа исполнителя новый исполнитель прежнюю не видит. Внешние ключи — Cascade (проверка
+/// миграций: прежний код, удаляя заказ или пользователя, не упрётся в новые строки).
+model JobMessage {
+  id           String     @id @default(cuid())
+  jobId        String     @map("job_id")
+  job          Job        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  /// Исполнитель сделки, к которой относится переписка.
+  contractorId String     @map("contractor_id")
+  contractor   User       @relation("JobMessageContractor", fields: [contractorId], references: [id], onDelete: Cascade)
+  authorId     String     @map("author_id")
+  author       User       @relation("JobMessageAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  /// До 2000 символов; пустой — только если приложено фото (проверяет API).
+  body         String     @default("")
+  /// Ключ отправки из формы: повтор той же отправки (двойной клик, обрыв связи) не создаёт копию.
+  requestId    String?    @map("request_id") @db.VarChar(64)
+  /// SHA-256 текста и исходных файлов отправки с этим ключом: повтор с другим содержимым — 409.
+  requestHash  String?    @map("request_hash") @db.VarChar(64)
+  photos       JobPhoto[]
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@unique([authorId, requestId])
+  @@index([jobId, contractorId, createdAt])
+  @@map("job_messages")
+}
+
+/// Фото к сообщению или к сдаче этапа (ровно к одному из них — CHECK в миграции). Перекодировано
+/// в WebP без метаданных; байты — в job_photo_blobs, чтобы не читаться вместе со списками.
+model JobPhoto {
+  id           String        @id @default(cuid())
+  jobId        String        @map("job_id")
+  job          Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  /// Исполнитель сделки: фото видят он, заказчик и администратор.
+  contractorId String        @map("contractor_id")
+  contractor   User          @relation("JobPhotoContractor", fields: [contractorId], references: [id], onDelete: Cascade)
+  uploaderId   String        @map("uploader_id")
+  uploader     User          @relation("JobPhotoUploader", fields: [uploaderId], references: [id], onDelete: Cascade)
+  stageId      String?       @map("stage_id")
+  stage        JobStage?     @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  messageId    String?       @map("message_id")
+  message      JobMessage?   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  /// Размер полного фото, px, и его вес в байтах.
+  width        Int
+  height       Int
+  bytes        Int
+  blob         JobPhotoBlob?
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  @@index([stageId])
+  @@index([messageId])
+  @@index([jobId])
+  @@map("job_photos")
+}
+
+/// Байты фото: полное (до 2000 px) и миниатюра (до 480 px), WebP. Хранятся в базе, поэтому
+/// попадают в копии и проверку восстановления вместе с остальными данными (docs/JOB_CHAT.md).
+model JobPhotoBlob {
+  photoId String   @id @map("photo_id")
+  photo   JobPhoto @relation(fields: [photoId], references: [id], onDelete: Cascade)
+  full    Bytes
+  thumb   Bytes
+
+  @@map("job_photo_blobs")
 }

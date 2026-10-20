@@ -3,6 +3,7 @@
 import { useActionState, useId } from 'react';
 import { FormError } from '@/components/auth/form-error';
 import type { PlanActionState } from '@/app/(site)/account/plan/actions';
+import { PhotoInput } from '@/components/chat/photo-input';
 
 const FIELD =
   'mt-1.5 block w-full rounded-xl border border-line bg-surface px-4 py-3 text-base leading-relaxed text-ink focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-0';
@@ -20,6 +21,7 @@ export function CommentActionForm({
   pendingLabel,
   summary,
   tone = 'primary',
+  photos = false,
 }: {
   action: (state: PlanActionState, form: FormData) => Promise<PlanActionState>;
   name?: string;
@@ -30,6 +32,8 @@ export function CommentActionForm({
   /** Текст раскрытия; без него форма видна сразу. */
   summary?: string;
   tone?: 'primary' | 'secondary';
+  /** Поле «Фото» (фото-отчёт к сдаче этапа). */
+  photos?: boolean;
 }) {
   const [state, formAction, pending] = useActionState<PlanActionState, FormData>(action, {});
   const id = useId();
@@ -60,6 +64,7 @@ export function CommentActionForm({
           </p>
         ) : null}
       </div>
+      {photos ? <PhotoInput label="Фото-отчёт" /> : null}
       <button
         type="submit"
         disabled={pending}

@@ -23,7 +23,9 @@ import type {
   SessionDto,
   UiPreferences,
   UserDto,
+  JobMessagesDto,
   JobPlanDto,
+  PhotoSize,
   PlanInput,
   PlanParty,
 } from '@agregator/shared';
@@ -422,13 +424,35 @@ export const returnPlan = (
   clientIp?: string,
 ) => planCall(token, jobId, '/plan/return', { version, reason }, clientIp);
 
-export const submitStage = (
+/** Сдача этапа с комментарием и фото-отчётом (multipart); без фото — JSON, как раньше. */
+export async function submitStage(
   token: string,
   jobId: string,
   stageId: string,
   comment: string,
+  photos: Blob[] = [],
   clientIp?: string,
-) => planCall(token, jobId, `/stages/${encodeURIComponent(stageId)}/submit`, { comment }, clientIp);
+): Promise<JobPlanDto> {
+  if (photos.length === 0) {
+    return planCall(
+      token,
+      jobId,
+      `/stages/${encodeURIComponent(stageId)}/submit`,
+      { comment },
+      clientIp,
+    );
+  }
+  const formData = new FormData();
+  formData.append('comment', comment);
+  photos.forEach((photo, index) => formData.append('photos', photo, `photo-${index + 1}`));
+  const res = await request(planPath(jobId, `/stages/${encodeURIComponent(stageId)}/submit`), {
+    method: 'POST',
+    formData,
+    token,
+    clientIp,
+  });
+  return expectJson<JobPlanDto>(res, 'POST /v1/jobs/:id/stages/:id/submit');
+}
 
 export const acceptStage = (token: string, jobId: string, stageId: string, clientIp?: string) =>
   planCall(token, jobId, `/stages/${encodeURIComponent(stageId)}/accept`, {}, clientIp);
@@ -461,6 +485,60 @@ export async function quitJob(
       await userMessageOf(res),
     );
   }
+}
+
+// --- Переписка по заказу и фото
+
+/**
+ * Переписка сделки: последние сообщения или, с before, более ранние. null — сделки нет
+ * (исполнитель не выбран) или нет доступа. Устаревший курсор (400) — последние сообщения.
+ */
+export async function getMessages(
+  token: string,
+  jobId: string,
+  before?: string,
+): Promise<JobMessagesDto | null> {
+  const query = before ? `?before=${encodeURIComponent(before)}` : '';
+  const res = await request(planPath(jobId, `/messages${query}`), { token });
+  if (res.status === 404) return null;
+  if (res.status === 400 && before) return getMessages(token, jobId);
+  return expectJson<JobMessagesDto>(res, 'GET /v1/jobs/:id/messages');
+}
+
+export async function sendMessage(
+  token: string,
+  jobId: string,
+  input: { body: string; requestId: string; photos: Blob[] },
+  clientIp?: string,
+): Promise<JobMessagesDto> {
+  const formData = new FormData();
+  formData.append('body', input.body);
+  formData.append('requestId', input.requestId);
+  input.photos.forEach((photo, index) => formData.append('photos', photo, `photo-${index + 1}`));
+  const res = await request(planPath(jobId, '/messages'), {
+    method: 'POST',
+    formData,
+    token,
+    clientIp,
+  });
+  return expectJson<JobMessagesDto>(res, 'POST /v1/jobs/:id/messages');
+}
+
+/** Фото как есть (WebP); null — фото нет или нет доступа. */
+export async function fetchJobPhoto(
+  token: string,
+  jobId: string,
+  photoId: string,
+  size: PhotoSize,
+): Promise<ArrayBuffer | null> {
+  const res = await request(
+    planPath(jobId, `/photos/${encodeURIComponent(photoId)}?size=${size}`),
+    { token },
+  );
+  if (res.status === 404 || res.status === 400) return null;
+  if (!res.ok)
+    throw new ApiError(`GET /v1/jobs/:id/photos/:id responded ${res.status}`, res.status);
+  return res.arrayBuffer();
 }
 
 // --- Заявки на закрытое тестирование

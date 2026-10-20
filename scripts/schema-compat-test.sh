@@ -4,8 +4,8 @@
 # меняет схему или контракт, обновляет их под свой переход.
 #   bash scripts/schema-compat-test.sh [базовый коммит, по умолчанию origin/main]
 # 1. База на схеме базового коммита с данными прежнего формата (открытый, в работе и закрытый
-#    заказы, ожидающие, выбранные и отклонённые отклики) → новые миграции: новые поля заполнены
-#    как задумано, индексы и расширение созданы, старые строки не тронуты.
+#    заказы, ожидающие, выбранные и отклонённые отклики, план со сданным этапом) → новые
+#    миграции: новые таблицы созданы, ограничения работают, старые строки не тронуты.
 # 2. Прежний API (собран из базового коммита) работает на новой схеме — время между migrate и
 #    стартом нового API и откат без восстановления базы.
 # 3. Новый API читает данные прежнего.
@@ -60,21 +60,32 @@ q "insert into bids (id, job_id, contractor_id, price, comment, status, updated_
    ('b-accepted', 'j-work', 'u-a', 2000, 'Выбранный отклик', 'ACCEPTED', now()),
    ('b-lost', 'j-work', 'u-b', 2500, 'Не выбранный отклик', 'REJECTED', now()),
    ('b-closed', 'j-closed', 'u-b', 3000, 'Отклик на закрытый', 'REJECTED', now())" > /dev/null
+q "insert into job_plans (id, job_id, status, version, updated_at) values ('p-work', 'j-work', 'APPROVED', 3, now());
+   insert into job_stages (id, plan_id, position, title, status, submit_comment, submitted_at, updated_at)
+   values ('s-work', 'p-work', 1, 'Старый этап', 'SUBMITTED', 'Сдан прежним API', now(), now())" > /dev/null
 before=$(q "select count(*) from jobs")/$(q "select count(*) from bids")
 
 (cd "$ROOT/apps/api" && DATABASE_URL=$DB pnpm exec prisma migrate deploy > /dev/null)
 check 'upgrade: rows kept' "$(q "select count(*) from jobs")/$(q "select count(*) from bids")" "$before"
 # Проверки обновления — для миграций этого PR (меняются в каждом PR, который меняет схему).
-check 'upgrade: plan and stage tables created' "$(q "select count(*) from information_schema.tables where table_name in ('job_plans', 'job_stages')")" 2
-check 'upgrade: old jobs in progress have no plan' "$(q "select count(*) from job_plans")" 0
-check 'upgrade: journal knows plan and stage actions' "$(q "select count(*) from pg_enum e join pg_type t on t.oid = e.enumtypid where t.typname = 'AuditAction' and e.enumlabel in ('PLAN_SAVED', 'PLAN_AUTHOR_CHANGED', 'PLAN_PROPOSED', 'PLAN_APPROVED', 'PLAN_RETURNED', 'STAGE_SUBMITTED', 'STAGE_ACCEPTED', 'STAGE_REWORK', 'CONTRACTOR_QUIT')")" 9
-# Прежний код может удалить заказ: план не должен этому мешать (ON DELETE CASCADE).
+check 'upgrade: message and photo tables created' "$(q "select count(*) from information_schema.tables where table_name in ('job_messages', 'job_photos', 'job_photo_blobs')")" 3
+check 'upgrade: old plan and stages kept' "$(q "select count(*) from job_plans")/$(q "select count(*) from job_stages")" 1/1
+check 'upgrade: old deals have no messages and photos' "$(q "select count(*) from job_messages")/$(q "select count(*) from job_photos")" 0/0
+# Прежний код удаляет заказ и план (отказ исполнителя): переписка и фото не должны мешать
+# (ON DELETE CASCADE), фото этапа уходят вместе с этапом.
 q "insert into jobs (id, title, description, category, city, status, owner_id, updated_at) values
    ('j-gone', 'Удаляемый', 'Заказ, который удалит прежний код', 'TILING', 'Москва', 'IN_PROGRESS', 'u-c', now());
    insert into job_plans (id, job_id, updated_at) values ('p-gone', 'j-gone', now());
-   insert into job_stages (id, plan_id, position, title, updated_at) values ('s-gone', 'p-gone', 1, 'Этап', now())" > /dev/null
+   insert into job_stages (id, plan_id, position, title, updated_at) values ('s-gone', 'p-gone', 1, 'Этап', now());
+   insert into job_messages (id, job_id, contractor_id, author_id, body) values ('m-gone', 'j-gone', 'u-a', 'u-c', 'Сообщение');
+   insert into job_photos (id, job_id, contractor_id, uploader_id, stage_id, width, height, bytes) values ('ph-stage', 'j-gone', 'u-a', 'u-a', 's-gone', 10, 10, 1);
+   insert into job_photo_blobs (photo_id, \"full\", thumb) values ('ph-stage', '\x00', '\x00');
+   insert into job_photos (id, job_id, contractor_id, uploader_id, message_id, width, height, bytes) values ('ph-msg', 'j-gone', 'u-a', 'u-c', 'm-gone', 10, 10, 1)" > /dev/null
+q "delete from job_plans where id = 'p-gone'" > /dev/null
+check 'upgrade: deleting a plan removes stage photos, keeps the conversation' "$(q "select count(*) from job_photos where id = 'ph-stage'")/$(q "select count(*) from job_photo_blobs")/$(q "select count(*) from job_photos where id = 'ph-msg'")" 0/0/1
 q "delete from jobs where id = 'j-gone'" > /dev/null
-check 'upgrade: deleting a job removes its plan and stages' "$(q "select count(*) from job_plans where id = 'p-gone'")/$(q "select count(*) from job_stages where id = 's-gone'")" 0/0
+check 'upgrade: deleting a job removes its messages and photos' "$(q "select count(*) from job_messages")/$(q "select count(*) from job_photos")" 0/0
+check 'upgrade: a photo belongs to exactly one message or stage' "$(q "insert into job_photos (id, job_id, contractor_id, uploader_id, width, height, bytes) values ('ph-none', 'j-work', 'u-a', 'u-a', 10, 10, 1)" 2>&1 | grep -c job_photos_owner_check)" 1
 
 # --- 2 и 3. Прежний API на новой схеме, затем новый API на тех же данных.
 start_api() { # каталог порт

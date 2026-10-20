@@ -1,11 +1,13 @@
 import type { JobPlanDto, JobStageDto, PlanParty } from '@agregator/shared';
 import type { JobPlan, JobStage } from '@prisma/client';
+import { toPhotoDto, type PhotoRow } from '../photos/photos.service';
 
-export type PlanWithStages = JobPlan & { stages: JobStage[] };
+/** Этапы с фото-отчётом; у только что сохранённого черновика фото нет и они не читаются. */
+export type PlanWithStages = JobPlan & { stages: (JobStage & { photos?: PhotoRow[] })[] };
 
 const iso = (date: Date | null) => (date ? date.toISOString() : null);
 
-export function toStageDto(stage: JobStage): JobStageDto {
+export function toStageDto(stage: JobStage & { photos?: PhotoRow[] }): JobStageDto {
   return {
     id: stage.id,
     position: stage.position,
@@ -17,6 +19,7 @@ export function toStageDto(stage: JobStage): JobStageDto {
     reworkComment: stage.reworkComment,
     submittedAt: iso(stage.submittedAt),
     acceptedAt: iso(stage.acceptedAt),
+    photos: (stage.photos ?? []).map(toPhotoDto),
   };
 }
 
