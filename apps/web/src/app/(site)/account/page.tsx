@@ -28,6 +28,8 @@ import {
 import { getMyProfile, listMyBids, listMyJobs } from '@/lib/api';
 import { formatAmount, formatBudget } from '@/lib/format';
 import { requireUserPage } from '@/lib/customer';
+import { UnreadPill } from '@/components/notifications/unread-pill';
+import { getUnreadSummary } from '@/lib/notifications-server';
 
 export const metadata: Metadata = { title: 'Личный кабинет', robots: { index: false } };
 
@@ -313,7 +315,10 @@ const PRIMARY: Record<'CUSTOMER' | 'CONTRACTOR' | 'ADMIN', { href: string; label
 };
 
 export default async function AccountPage() {
-  const { user, token } = await requireUserPage('/account');
+  const [{ user, token }, summary] = await Promise.all([
+    requireUserPage('/account'),
+    getUnreadSummary(),
+  ]);
 
   const primary = PRIMARY[user.role];
 
@@ -356,6 +361,12 @@ export default async function AccountPage() {
           <Sheet labelledBy="sections-title">
             <SheetHeader id="sections-title" title="Разделы" />
             <Ledger>
+              <LedgerLink
+                href="/account/notifications"
+                title="Уведомления"
+                meta="Отклики, план, этапы и сообщения"
+                aside={<UnreadPill count={summary?.unread ?? 0} />}
+              />
               {NAV[user.role].map((item) => (
                 <LedgerLink key={item.href} href={item.href} title={item.title} meta={item.text} />
               ))}

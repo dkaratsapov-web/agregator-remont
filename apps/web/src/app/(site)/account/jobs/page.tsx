@@ -14,6 +14,7 @@ import {
 import { Sheet, SheetHeader, SheetPager } from '@/components/ui/sheet';
 import { listDrafts, listMyJobs } from '@/lib/api';
 import { requireCustomerPage } from '@/lib/customer';
+import { getUnreadSummary } from '@/lib/notifications-server';
 import { parsePage } from '@/lib/search-params';
 
 export const metadata: Metadata = { title: 'Мои заказы', robots: { index: false } };
@@ -32,10 +33,11 @@ export default async function MyJobsPage({
   if (!token) return <CustomersOnly />;
   const page = parsePage(params.page);
 
-  const [jobsResult, draftsResult] = await Promise.allSettled([
-    listMyJobs(token, page, PAGE_SIZE),
-    listDrafts(token),
-  ]);
+  const [jobsResult, draftsResult, summary] = await Promise.all([
+    Promise.allSettled([listMyJobs(token, page, PAGE_SIZE), listDrafts(token)]),
+    getUnreadSummary(),
+  ]).then(([[jobs, drafts], unread]) => [jobs, drafts, unread] as const);
+  const unreadByJob = Object.fromEntries(summary?.jobs.map((j) => [j.jobId, j.unread]) ?? []);
   const data = jobsResult.status === 'fulfilled' ? jobsResult.value : null;
   if (jobsResult.status === 'rejected') console.error('My jobs: failed to load', jobsResult.reason);
   // Черновики — дополнение: если не загрузились, список заказов всё равно показываем.
@@ -124,7 +126,7 @@ export default async function MyJobsPage({
                     : 'Опишите работы, город и бюджет: заказ сразу появится в каталоге.'}
               </EmptyState>
             ) : (
-              <OwnJobList jobs={data.items} />
+              <OwnJobList jobs={data.items} unread={unreadByJob} />
             )}
             <SheetPager href="/account/jobs" page={page} totalPages={totalPages} />
           </Sheet>

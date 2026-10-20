@@ -1018,6 +1018,32 @@
         ],
         "type": "object"
       },
+      "MarkNotificationsReadDto": {
+        "additionalProperties": false,
+        "properties": {
+          "all": {
+            "description": "Все уведомления",
+            "enum": [
+              true
+            ],
+            "type": "boolean"
+          },
+          "ids": {
+            "description": "Перечисленные уведомления",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "jobId": {
+            "description": "Уведомления по заказу",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "MyBidDto": {
         "additionalProperties": false,
         "properties": {
@@ -1116,6 +1142,176 @@
           "city",
           "status",
           "closeOutcome"
+        ],
+        "type": "object"
+      },
+      "NotificationData": {
+        "additionalProperties": false,
+        "properties": {
+          "durationDays": {
+            "description": "Срок из отклика, дней",
+            "type": "integer"
+          },
+          "outcome": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/JobCloseOutcome"
+              }
+            ]
+          },
+          "price": {
+            "description": "Цена отклика, ₽",
+            "type": "integer"
+          },
+          "reason": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BidRejectReason"
+              }
+            ]
+          },
+          "stageTitle": {
+            "description": "Название этапа",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "NotificationDto": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "description": "Сколько событий собрано (новые сообщения); у остальных — 1",
+            "type": "integer"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/NotificationData"
+          },
+          "id": {
+            "type": "string"
+          },
+          "jobId": {
+            "type": "string"
+          },
+          "jobTitle": {
+            "description": "Текущее название заказа",
+            "type": "string"
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationKind"
+              }
+            ]
+          },
+          "party": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlanParty"
+              }
+            ],
+            "description": "Кем получатель приходится заказу"
+          },
+          "read": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "jobId",
+          "jobTitle",
+          "party",
+          "count",
+          "data",
+          "read",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "NotificationKind": {
+        "enum": [
+          "BID_RECEIVED",
+          "BID_WITHDRAWN",
+          "BID_ACCEPTED",
+          "BID_REJECTED",
+          "PLAN_PROPOSED",
+          "PLAN_APPROVED",
+          "PLAN_RETURNED",
+          "PLAN_AUTHOR_CHANGED",
+          "STAGE_SUBMITTED",
+          "STAGE_ACCEPTED",
+          "STAGE_REWORK",
+          "CONTRACTOR_QUIT",
+          "JOB_CLOSED",
+          "MESSAGE"
+        ],
+        "type": "string"
+      },
+      "NotificationsPageDto": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationDto"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "description": "Курсор следующей страницы",
+            "nullable": true,
+            "type": "string"
+          },
+          "unread": {
+            "description": "Непрочитанных всего",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "unread",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
+      "NotificationsSummaryDto": {
+        "additionalProperties": false,
+        "properties": {
+          "jobs": {
+            "description": "Заказы с непрочитанным",
+            "items": {
+              "$ref": "#/components/schemas/NotificationsSummaryJobSchema"
+            },
+            "type": "array"
+          },
+          "unread": {
+            "description": "Непрочитанных всего",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "unread",
+          "jobs"
+        ],
+        "type": "object"
+      },
+      "NotificationsSummaryJobSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "jobId": {
+            "type": "string"
+          },
+          "unread": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "jobId",
+          "unread"
         ],
         "type": "object"
       },
@@ -6106,6 +6302,184 @@
         ],
         "tags": [
           "bids"
+        ]
+      }
+    },
+    "/v1/me/notifications": {
+      "get": {
+        "operationId": "Notifications_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_-]{1,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationsPageDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/v1/me/notifications/read": {
+      "post": {
+        "operationId": "Notifications_markRead",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarkNotificationsReadDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationsSummaryDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/v1/me/notifications/summary": {
+      "get": {
+        "operationId": "Notifications_summary",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationsSummaryDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "notifications"
         ]
       }
     },

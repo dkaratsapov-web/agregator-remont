@@ -13,6 +13,7 @@ import {
 import { Sheet, SheetHeader, SheetPager } from '@/components/ui/sheet';
 import { listMyBids } from '@/lib/api';
 import { requireContractorPage } from '@/lib/customer';
+import { getUnreadSummary } from '@/lib/notifications-server';
 import { parsePage } from '@/lib/search-params';
 
 export const metadata: Metadata = { title: 'Мои отклики', robots: { index: false } };
@@ -32,12 +33,16 @@ export default async function MyBidsPage({
   const page = parsePage(query.page);
 
   let data: Awaited<ReturnType<typeof listMyBids>> | null = null;
+  const summary = getUnreadSummary();
   try {
     data = await listMyBids(token, page, { limit: PAGE_SIZE });
   } catch (error) {
     console.error('My bids: failed to load', error);
   }
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
+  const unreadByJob = Object.fromEntries(
+    (await summary)?.jobs.map((j) => [j.jobId, j.unread]) ?? [],
+  );
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 pb-16 pt-10 sm:px-6 md:pt-14 lg:px-10">
@@ -89,6 +94,7 @@ export default async function MyBidsPage({
               </EmptyState>
             ) : (
               <MyBidList
+                unread={unreadByJob}
                 bids={data.items}
                 returnTo={page > 1 ? `/account/bids?page=${page}` : '/account/bids'}
               />

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { MESSAGE_LIMITS, type JobMessagesDto } from '@agregator/shared';
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { notifyMessage } from '../notifications/notify';
 import { findDeal, type Deal } from '../plans/deal';
 import {
   PHOTO_SELECT,
@@ -98,6 +99,11 @@ export class MessagesService {
         { jobId, contractorId: deal.contractorId, uploaderId: userId, messageId: message.id },
         photos,
       );
+      await notifyMessage(tx, {
+        actorId: userId,
+        userId: deal.viewer === 'OWNER' ? deal.contractorId : deal.ownerId,
+        jobId,
+      });
       return this.load(tx, deal, userId);
     });
   }
