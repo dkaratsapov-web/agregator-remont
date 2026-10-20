@@ -123,6 +123,63 @@ try {
     );
   }
 
+  // --- Город в каталоге: без запроса видны только области, города — после нажатия на область;
+  // заголовок раскрытой области при прокрутке закрывает строки под собой без просвета.
+  {
+    const page = await newPage({ width: 1280, height: 900 });
+    await page.goto(`${WEB}/jobs`, { waitUntil: 'networkidle' });
+    await page.click('#catalog-city');
+    const list = page.getByRole('listbox', { name: 'Подсказки' });
+    await list.waitFor();
+    const names = await list.getByRole('option').allTextContents();
+    check(
+      'city list opens with only the two regions collapsed',
+      names.length === 2 &&
+        names[0].startsWith('Москва и Московская область') &&
+        names[1].startsWith('Санкт-Петербург и Ленинградская область'),
+      names.join(' | '),
+    );
+    await list.getByRole('option', { name: /^Москва и Московская область/ }).click();
+    const towns = list.getByRole('option', { name: 'Химки', exact: true });
+    check('clicking a region shows its towns', await towns.isVisible());
+    check(
+      'the other region stays collapsed',
+      (await list.getByRole('option', { name: 'Гатчина', exact: true }).count()) === 0,
+    );
+    // Прокрутка: прилипший заголовок стоит у верхнего края списка, над ним строк не видно.
+    const gap = await list.evaluate((el) => {
+      el.scrollTop = 400;
+      const header = el.querySelector('[role="option"]');
+      return Math.round(header.getBoundingClientRect().top - el.getBoundingClientRect().top);
+    });
+    check('sticky region header leaves no gap above it', gap <= 1, `${gap}px`);
+    await list.getByRole('option', { name: /^Москва и Московская область/ }).click();
+    check(
+      'clicking the region again collapses it',
+      (await list.getByRole('option', { name: 'Химки', exact: true }).count()) === 0,
+    );
+    // С клавиатуры: список заново (области свёрнуты), стрелка к области, Enter раскрывает,
+    // ещё стрелка и Enter выбирают город.
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    check(
+      'keyboard: Enter on a region expands it, then picks a town',
+      (await page.inputValue('#catalog-city')) === 'Москва',
+      await page.inputValue('#catalog-city'),
+    );
+    // Запрос показывает совпадения сразу, без раскрытия областей.
+    await page.fill('#catalog-city', 'Гатч');
+    check(
+      'typing shows matches without expanding regions',
+      await list.getByRole('option', { name: 'Гатчина', exact: true }).isVisible(),
+    );
+    await page.context().close();
+  }
+
   // --- UX-4: Tab из поля города ведёт к следующему элементу, а не в список.
   {
     await app.goto(`${WEB}/account/jobs/new`, { waitUntil: 'networkidle' });
