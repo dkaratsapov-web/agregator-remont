@@ -8,6 +8,8 @@ import {
 import { Prisma } from '@prisma/client';
 import { writeAudit } from '../audit/audit';
 import { ENTITY_ID_PATTERN } from '../common/text';
+import type { ProcessedPhoto } from '../photos/photo-processing';
+import { PHOTO_SELECT, PhotosService } from '../photos/photos.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   PlanAuthorDto,
@@ -17,21 +19,12 @@ import {
   ReturnPlanDto,
   SavePlanDto,
 } from './dto/plan.dto';
+import { findDeal, type Deal } from './deal';
 import { toPlanDto, type PlanWithStages } from './plan.mapper';
 
-const JOB_NOT_FOUND = 'Заказ не найден';
 const STAGE_NOT_FOUND = 'Этап не найден';
 const STALE = 'План изменился, пока вы его смотрели: обновите страницу';
 const PARTY_LABEL: Record<PlanParty, string> = { OWNER: 'заказчик', CONTRACTOR: 'исполнитель' };
-
-interface Deal {
-  jobId: string;
-  status: string;
-  ownerId: string | null;
-  contractorId: string | null;
-  acceptedBidId: string | null;
-  viewer: PlanParty;
-}
 
 /**
  * План работ и этапы (packages/shared/src/plans.ts). Стороны сделки — заказчик-владелец и
@@ -44,7 +37,10 @@ interface Deal {
  */
 @Injectable()
 export class PlansService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly photos: PhotosService,
+  ) {}
 
   async get(userId: string, jobId: string): Promise<JobPlanDto> {
     const deal = await this.findDeal(this.prisma, userId, jobId, false);
@@ -195,12 +191,17 @@ export class PlansService {
     });
   }
 
-  /** Исполнитель сдаёт этап (по порядку, если так согласовано). */
+  /**
+   * Исполнитель сдаёт этап (по порядку, если так согласовано) с комментарием и фото-отчётом:
+   * фото перекодированы до транзакции (PhotosService.prepare). Повтор той же сдачи фото не
+   * добавляет.
+   */
   submitStage(
     userId: string,
     jobId: string,
     stageId: string,
     dto: PlanCommentDto,
+    photos: ProcessedPhoto[] = [],
   ): Promise<JobPlanDto> {
     return this.mutate(userId, jobId, async (tx, deal, plan) => {
       if (deal.viewer !== 'CONTRACTOR') throw new ForbiddenException('Этапы сдаёт исполнитель');
@@ -226,6 +227,11 @@ export class PlansService {
         where: { id: stage.id },
         data: { status: 'SUBMITTED', submitComment: dto.comment, submittedAt: new Date() },
       });
+      await this.photos.attach(
+        tx,
+        { jobId, contractorId: deal.contractorId, uploaderId: userId, stageId: stage.id },
+        photos,
+      );
       await this.audit(
         tx,
         userId,
@@ -234,6 +240,7 @@ export class PlansService {
         {
           jobId: { from: null, to: jobId },
           status: { from: stage.status, to: 'SUBMITTED' },
+          photos: { from: null, to: photos.length },
         },
         'job_stage',
       );
@@ -313,7 +320,7 @@ export class PlansService {
   async quit(userId: string, jobId: string, dto: QuitJobDto): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const deal = await this.findDeal(tx, userId, jobId, true);
-      if (deal.viewer !== 'CONTRACTOR' || !deal.acceptedBidId) {
+      if (deal.viewer !== 'CONTRACTOR') {
         throw new ForbiddenException('Отказаться от заказа может только выбранный исполнитель');
       }
       if (deal.status !== 'IN_PROGRESS') throw new ConflictException('Заказ не в работе');
@@ -370,46 +377,26 @@ export class PlansService {
     });
   }
 
-  /**
-   * Заказ и сторона сделки. Заказчик-владелец — всегда; исполнитель — только с выбранным
-   * откликом. Заказ без выбранного исполнителя — 404 и для владельца: плана у него нет.
-   */
-  private async findDeal(
+  private findDeal(
     db: Prisma.TransactionClient,
     userId: string,
     jobId: string,
     lock: boolean,
   ): Promise<Deal> {
-    if (!ENTITY_ID_PATTERN.test(jobId)) throw new NotFoundException(JOB_NOT_FOUND);
-    const rows = lock
-      ? await db.$queryRaw<{ status: string; owner_id: string | null }[]>`
-          SELECT status::text AS status, owner_id FROM jobs WHERE id = ${jobId} FOR UPDATE`
-      : await db.$queryRaw<{ status: string; owner_id: string | null }[]>`
-          SELECT status::text AS status, owner_id FROM jobs WHERE id = ${jobId}`;
-    if (rows.length === 0) throw new NotFoundException(JOB_NOT_FOUND);
-    const accepted = await db.bid.findFirst({
-      where: { jobId, status: 'ACCEPTED' },
-      select: { id: true, contractorId: true },
-    });
-    const ownerId = rows[0].owner_id;
-    const viewer: PlanParty | null =
-      ownerId === userId ? 'OWNER' : accepted?.contractorId === userId ? 'CONTRACTOR' : null;
-    if (!viewer) throw new NotFoundException(JOB_NOT_FOUND);
-    if (!accepted) throw new NotFoundException('План появится после выбора исполнителя');
-    return {
-      jobId,
-      status: rows[0].status,
-      ownerId,
-      contractorId: accepted.contractorId,
-      acceptedBidId: accepted.id,
-      viewer,
-    };
+    return findDeal(db, userId, jobId, lock, 'План появится после выбора исполнителя');
   }
 
   private loadPlan(db: Prisma.TransactionClient, jobId: string): Promise<PlanWithStages | null> {
     return db.jobPlan.findUnique({
       where: { jobId },
-      include: { stages: { orderBy: { position: 'asc' } } },
+      include: {
+        stages: {
+          orderBy: { position: 'asc' },
+          include: {
+            photos: { select: PHOTO_SELECT, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+          },
+        },
+      },
     });
   }
 

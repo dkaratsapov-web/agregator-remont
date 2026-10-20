@@ -16,6 +16,8 @@ import { ContractorsModule } from './contractors/contractors.module';
 import { LeadsModule } from './leads/leads.module';
 import { MyJobsModule } from './my-jobs/my-jobs.module';
 import { OAuthModule } from './oauth/oauth.module';
+import { MessagesModule } from './messages/messages.module';
+import { PhotosModule } from './photos/photos.module';
 import { PlansModule } from './plans/plans.module';
 import { PrismaModule } from './prisma/prisma.module';
 
@@ -52,6 +54,8 @@ import { PrismaModule } from './prisma/prisma.module';
     LeadsModule,
     OAuthModule,
     PlansModule,
+    MessagesModule,
+    PhotosModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

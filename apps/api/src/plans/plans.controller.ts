@@ -8,15 +8,26 @@ import {
   Param,
   Post,
   Put,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { PHOTO_LIMITS } from '@agregator/shared';
+import {
+  ApiBody,
+  ApiConsumes,
+  ApiNoContentResponse,
+  ApiOkResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { AuthContext } from '../auth/auth.types';
 import { CurrentAuth } from '../auth/current-auth.decorator';
 import { WriteRateLimited } from '../auth/rate-limit';
 import { SessionGuard } from '../auth/session.guard';
 import { ApiErrors, ApiSession } from '../openapi/decorators';
 import { JobPlanSchema } from '../openapi/schemas';
+import { photoUpload } from '../photos/photo-upload';
+import { PhotosService, type UploadedPhoto } from '../photos/photos.service';
 import {
   PlanAuthorDto,
   PlanCommentDto,
@@ -38,7 +49,10 @@ import { PlansService } from './plans.service';
 @Controller('v1/jobs/:jobId')
 @UseGuards(SessionGuard)
 export class PlansController {
-  constructor(private readonly plans: PlansService) {}
+  constructor(
+    private readonly plans: PlansService,
+    private readonly photos: PhotosService,
+  ) {}
 
   @Get('plan')
   @ApiOkResponse({ type: JobPlanSchema })
@@ -111,18 +125,37 @@ export class PlansController {
     return this.plans.returnPlan(auth.user.id, jobId, dto);
   }
 
+  /** Сдача этапа: комментарий и фото-отчёт (multipart, поле photos) или только комментарий (JSON). */
   @Post('stages/:stageId/submit')
   @HttpCode(HttpStatus.OK)
   @WriteRateLimited()
+  @UseInterceptors(photoUpload())
+  @ApiConsumes('multipart/form-data', 'application/json')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['comment'],
+      properties: {
+        comment: { type: 'string', minLength: 5, maxLength: 1000 },
+        photos: {
+          type: 'array',
+          maxItems: PHOTO_LIMITS.PER_UPLOAD,
+          items: { type: 'string', format: 'binary' },
+        },
+      },
+    },
+  })
   @ApiOkResponse({ type: JobPlanSchema })
-  @ApiErrors(400, 403, 404, 409)
-  submit(
+  @ApiErrors(400, 403, 404, 409, 413)
+  async submit(
     @CurrentAuth() auth: AuthContext,
     @Param('jobId') jobId: string,
     @Param('stageId') stageId: string,
     @Body() dto: PlanCommentDto,
+    @UploadedFiles() files: UploadedPhoto[] | undefined,
   ): Promise<JobPlanDto> {
-    return this.plans.submitStage(auth.user.id, jobId, stageId, dto);
+    const photos = await this.photos.prepare(files);
+    return this.plans.submitStage(auth.user.id, jobId, stageId, dto, photos);
   }
 
   @Post('stages/:stageId/accept')

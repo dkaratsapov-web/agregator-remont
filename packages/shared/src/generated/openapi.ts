@@ -228,6 +228,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/jobs/{jobId}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Messages_list"];
+        put?: never;
+        post: operations["Messages_send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jobs/{jobId}/photos/{photoId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Photos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/jobs/{jobId}/plan": {
         parameters: {
             query?: never;
@@ -870,6 +902,26 @@ export interface components {
                 [key: string]: string | number | boolean | string[];
             };
         };
+        JobMessageDto: {
+            /** @description Чья реплика */
+            author: components["schemas"]["PlanParty"];
+            body: string;
+            /** Format: date-time */
+            createdAt: string;
+            id: string;
+            /** @description Своё ли сообщение для того, кто смотрит */
+            own: boolean;
+            photos: components["schemas"]["PhotoDto"][];
+        };
+        JobMessagesDto: {
+            /** @description Можно ли писать: заказ в работе */
+            canWrite: boolean;
+            /** @description Последние сообщения, от старых к новым */
+            items: components["schemas"]["JobMessageDto"][];
+            jobId: string;
+            /** @description Кто смотрит */
+            viewer: components["schemas"]["PlanParty"];
+        };
         JobPlanDto: {
             /** Format: date-time */
             approvedAt: string | null;
@@ -895,6 +947,8 @@ export interface components {
             description: string;
             durationDays: number | null;
             id: string;
+            /** @description Фото-отчёт к сдачам этапа */
+            photos: components["schemas"]["PhotoDto"][];
             /** @description С 1, порядок сдачи */
             position: number;
             /** @description Что доработать */
@@ -1054,6 +1108,15 @@ export interface components {
             limit: number;
             page: number;
             total: number;
+        };
+        PhotoDto: {
+            /** Format: date-time */
+            createdAt: string;
+            /** @description Высота полного фото, px */
+            height: number;
+            id: string;
+            /** @description Ширина полного фото, px */
+            width: number;
         };
         PlanAuthorDto: {
             author: components["schemas"]["PlanParty"];
@@ -1930,6 +1993,194 @@ export interface operations {
             };
         };
     };
+    Messages_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobMessagesDto"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ресурса нет или он принадлежит другому пользователю */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Messages_send: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    body?: string;
+                    photos?: string[];
+                    requestId?: string;
+                };
+                "multipart/form-data": {
+                    body?: string;
+                    photos?: string[];
+                    requestId?: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobMessagesDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ресурса нет или он принадлежит другому пользователю */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Конфликт с текущим состоянием ресурса */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Файл слишком большой */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Photos_get: {
+        parameters: {
+            query?: {
+                size?: "thumb" | "full";
+            };
+            header?: never;
+            path: {
+                jobId: string;
+                photoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Фото (WebP): полное до 2000 px или миниатюра до 480 px */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/webp": string;
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ресурса нет или он принадлежит другому пользователю */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     Plans_get: {
         parameters: {
             query?: never;
@@ -2610,7 +2861,14 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["PlanCommentDto"];
+                "application/json": {
+                    comment: string;
+                    photos?: string[];
+                };
+                "multipart/form-data": {
+                    comment: string;
+                    photos?: string[];
+                };
             };
         };
         responses: {
@@ -2660,6 +2918,15 @@ export interface operations {
             };
             /** @description Конфликт с текущим состоянием ресурса */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Файл слишком большой */
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };

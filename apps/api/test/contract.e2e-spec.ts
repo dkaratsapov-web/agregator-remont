@@ -688,6 +688,137 @@ describe('API contract (e2e)', () => {
     });
   });
 
+  it('message and photo endpoints match openapi.json', async () => {
+    const high = {
+      RATE_LIMIT_PER_MIN: '1000',
+      AUTH_RATE_LIMIT_PER_MIN: '1000',
+      WRITE_RATE_LIMIT_PER_MIN: '1000',
+    };
+    await withApp(high, async (app) => {
+      const http = () => request(app.getHttpServer());
+      const check = async (
+        method: 'get' | 'post',
+        template: string,
+        req: request.Test,
+        status: number,
+      ) => {
+        const res = await req;
+        expect(res.status).toBe(status);
+        expectContract(res, method, template);
+        return res;
+      };
+      const owner = await signUp(app, 'CUSTOMER');
+      const contractor = await signUp(app, 'CONTRACTOR');
+      const stranger = await signUp(app, 'CUSTOMER');
+      const { body: created } = await http().post('/v1/me/jobs').set(owner.auth).send(job);
+      const { body: placed } = await http()
+        .post(`/v1/jobs/${created.id}/bids`)
+        .set(contractor.auth)
+        .send(bid);
+      await http()
+        .post(`/v1/me/jobs/${created.id}/bids/${placed.id}/accept`)
+        .set(owner.auth)
+        .expect(200);
+      const base = `/v1/jobs/${created.id}`;
+      const M = '/v1/jobs/{jobId}/messages';
+      const P = '/v1/jobs/{jobId}/photos/{photoId}';
+      const photo = await sharp({
+        create: { width: 64, height: 48, channels: 3, background: '#c2410c' },
+      })
+        .jpeg()
+        .toBuffer();
+
+      await check('get', M, http().get(`${base}/messages`).set(owner.auth), 200);
+      await check('get', M, http().get(`${base}/messages`), 401);
+      await check('get', M, http().get(`${base}/messages`).set(stranger.auth), 404);
+
+      const sent = await check(
+        'post',
+        M,
+        http()
+          .post(`${base}/messages`)
+          .set(contractor.auth)
+          .field('body', 'Фото стены до начала работ')
+          .attach('photos', photo, { filename: 'a.jpg', contentType: 'image/jpeg' }),
+        200,
+      );
+      await check(
+        'post',
+        M,
+        http().post(`${base}/messages`).set(owner.auth).send({ body: '' }),
+        400,
+      );
+      await check('post', M, http().post(`${base}/messages`).send({ body: 'Привет' }), 401);
+      await check(
+        'post',
+        M,
+        http().post(`${base}/messages`).set(stranger.auth).send({ body: 'Привет' }),
+        404,
+      );
+      await check(
+        'post',
+        M,
+        http()
+          .post(`${base}/messages`)
+          .set(owner.auth)
+          .attach('photos', Buffer.alloc(8 * 1024 * 1024 + 1, 1), {
+            filename: 'big.jpg',
+            contentType: 'image/jpeg',
+          }),
+        413,
+      );
+
+      const photoId = sent.body.items[0].photos[0].id as string;
+      await check('get', P, http().get(`${base}/photos/${photoId}`).set(owner.auth), 200);
+      await check('get', P, http().get(`${base}/photos/${photoId}?size=big`).set(owner.auth), 400);
+      await check('get', P, http().get(`${base}/photos/${photoId}`), 401);
+      await check('get', P, http().get(`${base}/photos/${photoId}`).set(stranger.auth), 404);
+
+      // Сдача этапа с фото: файл больше 8 МБ — 413.
+      const draft = await http()
+        .put(`${base}/plan`)
+        .set(contractor.auth)
+        .send({ version: 0, sequential: true, stages: [{ title: 'Работы', description: '' }] })
+        .expect(200);
+      const proposed = await http()
+        .post(`${base}/plan/propose`)
+        .set(contractor.auth)
+        .send({ version: draft.body.version })
+        .expect(200);
+      const approved = await http()
+        .post(`${base}/plan/approve`)
+        .set(owner.auth)
+        .send({ version: proposed.body.version })
+        .expect(200);
+      await check(
+        'post',
+        '/v1/jobs/{jobId}/stages/{stageId}/submit',
+        http()
+          .post(`${base}/stages/${approved.body.stages[0].id}/submit`)
+          .set(contractor.auth)
+          .field('comment', 'Работы выполнены')
+          .attach('photos', Buffer.alloc(8 * 1024 * 1024 + 1, 1), {
+            filename: 'big.jpg',
+            contentType: 'image/jpeg',
+          }),
+        413,
+      );
+
+      // Заказ закрыт — писать нельзя (409).
+      await http()
+        .post(`/v1/me/jobs/${created.id}/close`)
+        .set(owner.auth)
+        .send({ outcome: 'COMPLETED' })
+        .expect(200);
+      await check(
+        'post',
+        M,
+        http().post(`${base}/messages`).set(owner.auth).send({ body: 'Спасибо' }),
+        409,
+      );
+    });
+  });
+
   it('lead endpoints match openapi.json', async () => {
     const high = {
       RATE_LIMIT_PER_MIN: '1000',

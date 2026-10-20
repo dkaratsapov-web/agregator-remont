@@ -404,9 +404,12 @@ model JobMessage {
   author       User       @relation("JobMessageAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   /// До 2000 символов; пустой — только если приложено фото (проверяет API).
   body         String     @default("")
+  /// Ключ отправки из формы: повтор той же отправки (двойной клик, обрыв связи) не создаёт копию.
+  requestId    String?    @map("request_id") @db.VarChar(64)
   photos       JobPhoto[]
   createdAt    DateTime   @default(now()) @map("created_at")
 
+  @@unique([authorId, requestId])
   @@index([jobId, contractorId, createdAt])
   @@map("job_messages")
 }

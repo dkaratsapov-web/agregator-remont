@@ -24,6 +24,8 @@ import {
   type JobDraftDto,
   type JobDto,
   type JobItemDto,
+  type JobMessageDto,
+  type JobMessagesDto,
   type JobPlanDto,
   type JobStageDto,
   type JobStatus,
@@ -33,6 +35,7 @@ import {
   type Paginated,
   type PlanParty,
   type PlanStatus,
+  type PhotoDto,
   type SessionDto,
   type StageStatus,
   type UiMotion,
@@ -347,6 +350,14 @@ export class LinkedBankSchema {
 const nullableDateTime = (description?: string) =>
   ApiProperty({ type: String, format: 'date-time', nullable: true, description });
 
+@ApiSchema({ name: 'PhotoDto' })
+export class PhotoSchema implements PhotoDto {
+  @ApiProperty() id!: string;
+  @int({ description: 'Ширина полного фото, px' }) width!: number;
+  @int({ description: 'Высота полного фото, px' }) height!: number;
+  @dateTime() createdAt!: string;
+}
+
 @ApiSchema({ name: 'JobStageDto' })
 export class JobStageSchema implements JobStageDto {
   @ApiProperty() id!: string;
@@ -361,6 +372,8 @@ export class JobStageSchema implements JobStageDto {
   reworkComment!: string | null;
   @nullableDateTime() submittedAt!: string | null;
   @nullableDateTime() acceptedAt!: string | null;
+  @ApiProperty({ type: [PhotoSchema], description: 'Фото-отчёт к сдачам этапа' })
+  photos!: PhotoSchema[];
 }
 
 @ApiSchema({ name: 'JobPlanDto' })
@@ -378,4 +391,25 @@ export class JobPlanSchema implements JobPlanDto {
   @ApiProperty({ type: [JobStageSchema] }) stages!: JobStageSchema[];
   @ApiProperty({ enum: PLAN_PARTIES, enumName: 'PlanParty', description: 'Кто смотрит' })
   viewer!: PlanParty;
+}
+
+@ApiSchema({ name: 'JobMessageDto' })
+export class JobMessageSchema implements JobMessageDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ enum: PLAN_PARTIES, enumName: 'PlanParty', description: 'Чья реплика' })
+  author!: PlanParty;
+  @ApiProperty({ description: 'Своё ли сообщение для того, кто смотрит' }) own!: boolean;
+  @ApiProperty() body!: string;
+  @ApiProperty({ type: [PhotoSchema] }) photos!: PhotoSchema[];
+  @dateTime() createdAt!: string;
+}
+
+@ApiSchema({ name: 'JobMessagesDto' })
+export class JobMessagesSchema implements JobMessagesDto {
+  @ApiProperty() jobId!: string;
+  @ApiProperty({ enum: PLAN_PARTIES, enumName: 'PlanParty', description: 'Кто смотрит' })
+  viewer!: PlanParty;
+  @ApiProperty({ description: 'Можно ли писать: заказ в работе' }) canWrite!: boolean;
+  @ApiProperty({ type: [JobMessageSchema], description: 'Последние сообщения, от старых к новым' })
+  items!: JobMessageSchema[];
 }

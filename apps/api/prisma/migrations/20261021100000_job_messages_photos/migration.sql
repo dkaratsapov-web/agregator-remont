@@ -10,6 +10,7 @@ CREATE TABLE "job_messages" (
     "contractor_id" TEXT NOT NULL,
     "author_id" TEXT NOT NULL,
     "body" TEXT NOT NULL DEFAULT '',
+    "request_id" VARCHAR(64),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "job_messages_pkey" PRIMARY KEY ("id"),
@@ -43,6 +44,9 @@ CREATE TABLE "job_photo_blobs" (
 
     CONSTRAINT "job_photo_blobs_pkey" PRIMARY KEY ("photo_id")
 );
+
+-- CreateIndex
+CREATE UNIQUE INDEX "job_messages_author_id_request_id_key" ON "job_messages"("author_id", "request_id");
 
 -- CreateIndex
 CREATE INDEX "job_messages_job_id_contractor_id_created_at_idx" ON "job_messages"("job_id", "contractor_id", "created_at");
