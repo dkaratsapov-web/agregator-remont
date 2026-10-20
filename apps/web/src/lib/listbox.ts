@@ -160,3 +160,50 @@ export function groupItems<T extends { option: ListOption }>(
   }
   return result;
 }
+
+/** Строка выпадающего списка: заголовок группы (раскрывает её) или вариант. */
+export type ListRow<T extends ListOption = ListOption> =
+  | { kind: 'group'; group: ListGroup; expanded: boolean; size: number }
+  | { kind: 'option'; option: T; match: readonly [number, number] | null };
+
+/**
+ * Строки списка в порядке показа. Пустой запрос и есть группы — режим просмотра: варианты без
+ * группы, затем заголовки групп; варианты группы видны, только если она в `expanded`. Есть
+ * запрос — все совпадения (сгруппировать их для показа — groupItems), без заголовков-строк.
+ */
+export function buildRows<T extends ListOption>(
+  options: readonly T[],
+  groups: readonly ListGroup[] | undefined,
+  query: string,
+  expanded: ReadonlySet<string>,
+): ListRow<T>[] {
+  const matches = filterOptions(options, query);
+  if (!isBrowsing(groups, query)) {
+    return matches.map(({ option, match }) => ({ kind: 'option', option, match }));
+  }
+  const rows: ListRow<T>[] = [];
+  for (const section of groupItems(matches, groups)) {
+    if (section.group) {
+      const open = expanded.has(section.group.id);
+      rows.push({
+        kind: 'group',
+        group: section.group,
+        expanded: open,
+        size: section.items.length,
+      });
+      if (!open) continue;
+    }
+    for (const { option, match } of section.items) rows.push({ kind: 'option', option, match });
+  }
+  return rows;
+}
+
+/** Режим просмотра по группам: запрос пуст и группы заданы. */
+export function isBrowsing(groups: readonly ListGroup[] | undefined, query: string): boolean {
+  return (groups?.length ?? 0) > 0 && normalizeQuery(query) === '';
+}
+
+/** Строки для moveActiveIndex: заголовки групп доступны всегда, варианты — если не disabled. */
+export function rowStates(rows: readonly ListRow[]): { disabled?: boolean }[] {
+  return rows.map((row) => ({ disabled: row.kind === 'option' && row.option.disabled === true }));
+}
