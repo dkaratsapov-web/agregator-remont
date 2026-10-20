@@ -13,8 +13,11 @@ import {
 } from '@/components/jobs/job-details';
 import { getJob, getMyJob, listMyBids } from '@/lib/api';
 import { getCurrentUser, getSessionToken } from '@/lib/session';
+import { ReportButton } from '@/components/moderation/report-button';
+import { Notice } from '@/components/notice';
 import { MarkSeen } from '@/components/notifications/mark-seen';
 import { getUnreadSummary, unreadForJob } from '@/lib/notifications-server';
+import { reportNotice } from '@/lib/search-params';
 import { formatBudget, formatDate } from '@/lib/format';
 import { jobsHref } from '@/lib/search-params';
 
@@ -73,6 +76,7 @@ export default async function JobPage({
   ]);
   if (!job) notFound();
   const own = viewer.own;
+  const reported = reportNotice(query.report);
   const notice =
     query.bid === 'sent'
       ? 'Отклик отправлен заказчику.'
@@ -84,6 +88,11 @@ export default async function JobPage({
     <div className="mx-auto max-w-[1600px] px-4 pt-8 sm:px-6 lg:px-10 md:pt-12">
       {/* Отклонённый отклик ведёт сюда: уведомление прочитано, когда карточка открыта. */}
       <MarkSeen jobId={job.id} unread={unreadForJob(summary, job.id)} />
+      {reported ? (
+        <div className="mt-6">
+          <Notice tone={reported.ok ? 'ok' : 'neutral'}>{reported.text}</Notice>
+        </div>
+      ) : null}
       <nav aria-label="Навигационная цепочка" className="text-sm text-ink-soft">
         <ol className="flex flex-wrap items-center gap-1.5">
           <li>
@@ -168,6 +177,11 @@ export default async function JobPage({
               notice={notice}
             />
           )}
+          {viewer.user && !own ? (
+            <div className="mt-4">
+              <ReportButton targetType="JOB" targetId={job.id} returnTo={`/jobs/${job.id}`} />
+            </div>
+          ) : null}
         </aside>
       </div>
 

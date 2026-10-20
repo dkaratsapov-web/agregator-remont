@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   historyCursor,
+  reportNotice,
   jobsHref,
   parseCategory,
   parseCity,
@@ -83,5 +84,17 @@ describe('historyCursor', () => {
     expect(historyCursor(undefined)).toBeUndefined();
     expect(historyCursor('a b')).toBeUndefined();
     expect(historyCursor('../x')).toBeUndefined();
+  });
+});
+
+describe('reportNotice', () => {
+  it('turns the outcome of a complaint without JS into a notice', () => {
+    expect(reportNotice('sent')).toEqual({
+      text: 'Жалоба отправлена. Администратор разберёт её.',
+      ok: true,
+    });
+    expect(reportNotice('limit')?.ok).toBe(false);
+    expect(reportNotice('weird')).toBeNull();
+    expect(reportNotice(undefined)).toBeNull();
   });
 });

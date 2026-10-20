@@ -20,7 +20,7 @@ import { JobBidList } from '@/components/bids/job-bid-list';
 import { JobChatPanel } from '@/components/chat/job-chat-panel';
 import { JobPlanPanel } from '@/components/plan/job-plan-panel';
 import { planNotice } from '@/components/plan/plan-notice';
-import { historyCursor } from '@/lib/search-params';
+import { historyCursor, reportNotice } from '@/lib/search-params';
 import { getMessages, getMyJob, getPlan, listJobBids } from '@/lib/api';
 import { requireCustomerPage } from '@/lib/customer';
 import { MarkSeen } from '@/components/notifications/mark-seen';
@@ -69,6 +69,7 @@ export default async function MyJobPage({
   }
   if (!job) notFound();
   const summary = await getUnreadSummary();
+  const reported = reportNotice(query.report);
 
   const notice = query.created
     ? 'Заказ опубликован и появился в каталоге.'
@@ -105,6 +106,19 @@ export default async function MyJobPage({
       {notice ? (
         <div className="mt-6">
           <Notice>{notice}</Notice>
+        </div>
+      ) : null}
+      {reported ? (
+        <div className="mt-6">
+          <Notice tone={reported.ok ? 'ok' : 'neutral'}>{reported.text}</Notice>
+        </div>
+      ) : null}
+      {job.hidden ? (
+        <div className="mt-6">
+          <Notice tone="neutral">
+            Заказ скрыт модератором: в каталоге его не видно, новые отклики не принимаются. Работа с
+            выбранным исполнителем продолжается. Если это ошибка, напишите в поддержку.
+          </Notice>
         </div>
       ) : null}
 

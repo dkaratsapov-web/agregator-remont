@@ -303,6 +303,8 @@ const NAV: Record<'CUSTOMER' | 'CONTRACTOR' | 'ADMIN', NavItem[]> = {
     { href: '/account/settings', title: 'Настройки', text: 'Профиль, пароль, входы' },
   ],
   ADMIN: [
+    { href: '/admin/reports', title: 'Жалобы', text: 'Очередь жалоб, скрытие и блокировка' },
+    { href: '/admin/leads', title: 'Заявки', text: 'Заявки на закрытое тестирование' },
     { href: '/jobs', title: 'Каталог', text: 'Все опубликованные заказы' },
     { href: '/account/settings', title: 'Настройки', text: 'Профиль, пароль, входы' },
   ],

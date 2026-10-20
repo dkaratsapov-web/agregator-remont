@@ -15,6 +15,7 @@ import { BlockDto, HideDto, ListReportsQuery, ResolveReportDto } from './dto/mod
 
 const REPORT_NOT_FOUND = 'Жалоба не найдена';
 const EXCERPT_MAX = 300;
+const rubles = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
 
 const PERSON = { id: true, publicId: true, name: true, blockedAt: true } as const;
 const REPORT_SELECT = {
@@ -239,7 +240,7 @@ export class ModerationService {
       } else {
         const bid = bidById.get(row.targetId);
         subject = {
-          excerpt: bid ? excerpt(`${bid.price} ₽. ${bid.comment}`) : '',
+          excerpt: bid ? excerpt(`${rubles.format(bid.price)} ₽. ${bid.comment}`) : '',
           hidden: !!bid?.hiddenAt,
           author: author(bid?.contractor ?? null),
         };

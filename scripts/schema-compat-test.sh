@@ -68,22 +68,23 @@ before=$(q "select count(*) from jobs")/$(q "select count(*) from bids")
 (cd "$ROOT/apps/api" && DATABASE_URL=$DB pnpm exec prisma migrate deploy > /dev/null)
 check 'upgrade: rows kept' "$(q "select count(*) from jobs")/$(q "select count(*) from bids")" "$before"
 # Проверки обновления — для миграций этого PR (меняются в каждом PR, который меняет схему).
-check 'upgrade: notifications table created' "$(q "select count(*) from information_schema.tables where table_name = 'notifications'")" 1
-check 'upgrade: old deals have no notifications' "$(q "select count(*) from notifications")" 0
-check 'upgrade: old plan and stages kept' "$(q "select count(*) from job_plans")/$(q "select count(*) from job_stages")" 1/1
-# Прежний код удаляет заказы и пользователей (тестовые данные, поддержка): уведомления не должны
-# мешать (ON DELETE CASCADE).
+check 'upgrade: reports table created' "$(q "select count(*) from information_schema.tables where table_name = 'reports'")" 1
+check 'upgrade: old rows are not hidden or blocked' "$(q "select count(*) from jobs where hidden_at is not null")/$(q "select count(*) from bids where hidden_at is not null")/$(q "select count(*) from users where blocked_at is not null")" 0/0/0
+# Прежний код удаляет заказы и пользователей: жалобы не должны мешать (ON DELETE CASCADE /
+# SET NULL у решившего администратора).
 q "insert into jobs (id, title, description, category, city, status, owner_id, updated_at) values
    ('j-gone', 'Удаляемый', 'Заказ, который удалит прежний код', 'TILING', 'Москва', 'OPEN', 'u-c', now());
-   insert into notifications (id, user_id, job_id, kind) values ('n-job', 'u-c', 'j-gone', 'BID_RECEIVED');
    insert into users (id, email, name, password_hash, role, updated_at) values ('u-gone', 'gone@example.ru', 'Удаляемый', 'x', 'CONTRACTOR', now());
-   insert into notifications (id, user_id, job_id, kind) values ('n-user', 'u-gone', 'j-work', 'BID_REJECTED')" > /dev/null
-q "delete from jobs where id = 'j-gone'; delete from users where id = 'u-gone'" > /dev/null
-check 'upgrade: deleting a job or a user removes their notifications' "$(q "select count(*) from notifications")" 0
-q "insert into notifications (id, user_id, job_id, kind) values ('n-m1', 'u-a', 'j-work', 'MESSAGE')" > /dev/null
-check 'upgrade: one unread message row per user and job' "$(q "insert into notifications (id, user_id, job_id, kind) values ('n-m2', 'u-a', 'j-work', 'MESSAGE')" 2>&1 | grep -c notifications_message_unread_key)" 1
-check 'upgrade: notification data is an object' "$(q "insert into notifications (id, user_id, job_id, kind, data) values ('n-bad', 'u-a', 'j-work', 'BID_ACCEPTED', '[]')" 2>&1 | grep -c notifications_data_check)" 1
-q "delete from notifications" > /dev/null
+   insert into users (id, email, name, password_hash, role, updated_at) values ('u-adm', 'adm@example.ru', 'Администратор', 'x', 'ADMIN', now());
+   insert into reports (id, reporter_id, target_type, target_id, job_id, reason) values ('r-job', 'u-a', 'JOB', 'j-gone', 'j-gone', 'SPAM');
+   insert into reports (id, reporter_id, target_type, target_id, job_id, reason) values ('r-user', 'u-gone', 'JOB', 'j-open', 'j-open', 'FAKE');
+   insert into reports (id, reporter_id, target_type, target_id, job_id, reason, status, note, resolved_by_id, resolved_at)
+     values ('r-done', 'u-a', 'JOB', 'j-open', 'j-open', 'FAKE', 'DISMISSED', 'Нарушения нет', 'u-adm', now())" > /dev/null
+q "delete from jobs where id = 'j-gone'; delete from users where id in ('u-gone', 'u-adm')" > /dev/null
+check 'upgrade: deleting a job or a reporter removes their reports, a resolver is forgotten' "$(q "select count(*) || '/' || count(resolved_by_id) from reports")" 1/0
+check 'upgrade: one open report per reporter and target' "$(q "insert into reports (id, reporter_id, target_type, target_id, job_id, reason) values ('r-1', 'u-a', 'JOB', 'j-open', 'j-open', 'SPAM'); insert into reports (id, reporter_id, target_type, target_id, job_id, reason) values ('r-2', 'u-a', 'JOB', 'j-open', 'j-open', 'SPAM')" 2>&1 | grep -c reports_open_key)" 1
+check 'upgrade: an open report has no resolution' "$(q "insert into reports (id, reporter_id, target_type, target_id, job_id, reason, resolved_at) values ('r-bad', 'u-c', 'JOB', 'j-open', 'j-open', 'SPAM', now())" 2>&1 | grep -c reports_resolution_check)" 1
+q "delete from reports" > /dev/null
 
 # --- 2 и 3. Прежний API на новой схеме, затем новый API на тех же данных.
 start_api() { # каталог порт
