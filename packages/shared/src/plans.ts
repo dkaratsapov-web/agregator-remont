@@ -1,3 +1,5 @@
+import type { PhotoDto } from './messages';
+
 /**
  * План работ по заказу и его этапы (фаза 2, сделка без денег). Составляет одна сторона —
  * исполнитель или заказчик (настраивает заказчик, пока план не согласован), согласует другая.
@@ -78,6 +80,8 @@ export interface JobStageDto {
   submittedAt: string | null;
   /** ISO 8601 */
   acceptedAt: string | null;
+  /** Фото-отчёт: фото, приложенные исполнителем к сдачам этапа, от старых к новым. */
+  photos: PhotoDto[];
 }
 
 export interface JobPlanDto {
