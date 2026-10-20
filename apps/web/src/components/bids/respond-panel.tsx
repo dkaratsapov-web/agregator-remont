@@ -4,7 +4,7 @@ import { placeBidAction, withdrawBidAction } from '@/app/(site)/account/bids/act
 import { Notice } from '@/components/notice';
 import { formatAmount } from '@/lib/format';
 import { BidForm } from './bid-form';
-import { BidStatusBadge } from './bid-status-badge';
+import { BidJobChangedNote, BidStatusBadge } from './bid-status-badge';
 import { ConfirmActionForm } from './confirm-action-form';
 
 interface Props {
@@ -43,8 +43,13 @@ export function RespondPanel({ job, viewerRole, myBid, notice }: Props) {
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-medium">Ваш отклик</p>
-            <BidStatusBadge status={myBid.status} />
+            <BidStatusBadge status={myBid.status} rejectReason={myBid.rejectReason} />
           </div>
+          <BidJobChangedNote
+            status={myBid.status}
+            jobChangedAt={myBid.jobChangedAt}
+            audience="contractor"
+          />
           <p className="font-semibold tabular-nums">
             {formatAmount(myBid.price)}&nbsp;₽
             {myBid.durationDays !== null ? (
@@ -64,7 +69,7 @@ export function RespondPanel({ job, viewerRole, myBid, notice }: Props) {
           ) : null}
           <Link
             href="/account/bids"
-            className="inline-block text-sm font-semibold text-accent hover:underline"
+            className="inline-flex min-h-6 items-center text-sm font-semibold text-accent hover:underline"
           >
             Все мои отклики
           </Link>

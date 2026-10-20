@@ -57,6 +57,99 @@ describe('My jobs concurrency (e2e)', () => {
     delete process.env.WRITE_RATE_LIMIT_PER_MIN;
   });
 
+  describe('job version (expectedUpdatedAt, ТЗ #37 MVP-2, #40 п. 7)', () => {
+    it('parallel edits from one stale form: exactly one applies, the rest get 409', async () => {
+      const owner = await signUp(app, 'CUSTOMER');
+      const { body: job } = await http().post('/v1/me/jobs').set(owner.auth).send(baseJob);
+      const results = await Promise.all(
+        Array.from({ length: 6 }, (_, i) =>
+          http()
+            .patch(`/v1/me/jobs/${job.id}`)
+            .set(owner.auth)
+            .send({ title: `Вкладка ${i}: новое название`, expectedUpdatedAt: job.updatedAt }),
+        ),
+      );
+      const won = results.filter((r) => r.status === 200);
+      expect(won).toHaveLength(1);
+      expect(results.filter((r) => r.status === 409)).toHaveLength(5);
+      const stored = await prisma.job.findUniqueOrThrow({ where: { id: job.id } });
+      expect(stored.title).toBe(won[0].body.title);
+      expect(
+        await prisma.auditLog.count({ where: { entityId: job.id, action: 'JOB_UPDATED' } }),
+      ).toBe(1);
+    });
+
+    it('a stale version changes nothing; no version keeps the old contract', async () => {
+      const owner = await signUp(app, 'CUSTOMER');
+      const { body: job } = await http().post('/v1/me/jobs').set(owner.auth).send(baseJob);
+      await http()
+        .patch(`/v1/me/jobs/${job.id}`)
+        .set(owner.auth)
+        .send({ title: 'Первая правка заказа' })
+        .expect(200);
+      const stale = await http()
+        .patch(`/v1/me/jobs/${job.id}`)
+        .set(owner.auth)
+        .send({ title: 'Правка со старой версией', expectedUpdatedAt: job.updatedAt })
+        .expect(409);
+      expect(stale.body.message).toMatch(/изменён в другой вкладке/);
+      expect((await prisma.job.findUniqueOrThrow({ where: { id: job.id } })).title).toBe(
+        'Первая правка заказа',
+      );
+    });
+  });
+
+  describe('bids marked after a job change (ТЗ #37 MVP-3, #40 п. 7)', () => {
+    it('only pending bids get the mark, with the job version; a no-op edit marks nothing', async () => {
+      const owner = await signUp(app, 'CUSTOMER');
+      const [a, b, c] = await Promise.all([
+        signUp(app, 'CONTRACTOR'),
+        signUp(app, 'CONTRACTOR'),
+        signUp(app, 'CONTRACTOR'),
+      ]);
+      const { body: job } = await http().post('/v1/me/jobs').set(owner.auth).send(baseJob);
+      const bid = { price: 10_000, comment: 'Готов выполнить работу в срок.' };
+      const placed = [];
+      for (const who of [a, b, c]) {
+        placed.push(
+          (await http().post(`/v1/jobs/${job.id}/bids`).set(who.auth).send(bid).expect(201)).body,
+        );
+      }
+      await http().post(`/v1/me/bids/${placed[1].id}/withdraw`).set(b.auth).expect(200);
+
+      // Правка без изменений: пометки нет.
+      await http()
+        .patch(`/v1/me/jobs/${job.id}`)
+        .set(owner.auth)
+        .send({ title: baseJob.title })
+        .expect(200);
+      expect(
+        await prisma.bid.count({ where: { jobId: job.id, jobChangedAt: { not: null } } }),
+      ).toBe(0);
+
+      const edited = await http()
+        .patch(`/v1/me/jobs/${job.id}`)
+        .set(owner.auth)
+        .send({ budgetMax: 50_000 })
+        .expect(200);
+      const stored = await prisma.bid.findMany({
+        where: { jobId: job.id },
+        orderBy: { id: 'asc' },
+      });
+      const byId = new Map(stored.map((x) => [x.id, x]));
+      expect(byId.get(placed[0].id)?.jobChangedAt?.toISOString()).toBe(edited.body.updatedAt);
+      expect(byId.get(placed[2].id)?.jobChangedAt?.toISOString()).toBe(edited.body.updatedAt);
+      expect(byId.get(placed[1].id)?.jobChangedAt).toBeNull();
+
+      const mine = await http().get('/v1/me/bids').set(a.auth).expect(200);
+      expect(mine.body.items[0].jobChangedAt).toBe(edited.body.updatedAt);
+      const forOwner = await http().get(`/v1/me/jobs/${job.id}/bids`).set(owner.auth).expect(200);
+      expect(
+        forOwner.body.filter((x: { jobChangedAt: string | null }) => x.jobChangedAt),
+      ).toHaveLength(2);
+    });
+  });
+
   it('parallel PATCHes of one field are serialized: no lost updates, continuous audit chain', async () => {
     const owner = await signUp(app, 'CUSTOMER');
     const { body: job } = await http()
@@ -113,7 +206,10 @@ describe('My jobs concurrency (e2e)', () => {
         expect(actions).toEqual(['JOB_CREATED', 'JOB_CLOSED']);
         expect(stored.title).toBe(baseJob.title);
       }
-      expect(audit.at(-1)?.changes).toEqual({ status: { from: 'OPEN', to: 'CLOSED' } });
+      expect(audit.at(-1)?.changes).toEqual({
+        status: { from: 'OPEN', to: 'CLOSED' },
+        closeOutcome: { from: null, to: 'CANCELLED' },
+      });
     }
   });
 

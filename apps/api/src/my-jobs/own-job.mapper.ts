@@ -7,5 +7,6 @@ export function toOwnJobDto(job: Job): OwnJobDto {
     ...toJobDto(job),
     updatedAt: job.updatedAt.toISOString(),
     editable: job.status === 'OPEN',
+    closeOutcome: job.closeOutcome,
   };
 }

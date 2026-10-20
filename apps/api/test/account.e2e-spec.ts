@@ -164,6 +164,29 @@ describe('Account (e2e)', () => {
       expect(after.passwordHash).toBe(before.passwordHash);
     });
 
+    it('two simultaneous changes from different sessions: exactly one wins (SEC-5)', async () => {
+      const user = await register();
+      const other = await login(user.email).expect(200);
+      const otherAuth = { Authorization: `Bearer ${other.body.token}` };
+      const change = (auth: object, newPassword: string) =>
+        http()
+          .post('/v1/me/password')
+          .set(auth as Record<string, string>)
+          .send({ currentPassword: PASSWORD, newPassword });
+      const results = await Promise.all([
+        change(user.auth, 'owner-password-2026'),
+        change(otherAuth, 'attacker-password-2026'),
+      ]);
+      const statuses = results.map((r) => r.status).sort();
+      expect(statuses[0]).toBe(204);
+      expect([400, 401]).toContain(statuses[1]);
+      const winner = results[0].status === 204 ? 'owner-password-2026' : 'attacker-password-2026';
+      await login(user.email, winner).expect(200);
+      expect(
+        await prisma.auditLog.count({ where: { entityId: user.id, action: 'PASSWORD_CHANGED' } }),
+      ).toBe(1);
+    });
+
     it('rejects a new password equal to the email', async () => {
       const email = `pw-${Date.now()}@example.ru`;
       const user = await register(email);

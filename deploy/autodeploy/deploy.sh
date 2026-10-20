@@ -5,7 +5,9 @@
 # 1. Есть новый коммит в origin/main, который ещё не развёрнут и не помечен неудачным.
 # 2. CI по этому точному SHA зелёный строго: workflow .github/workflows/ci.yml завершён успешно и
 #    каждая обязательная задача (REQUIRED_JOBS) — success (ci_gate.py). Пока CI идёт или GitHub
-#    не ответил (403/429/таймаут) — ждём следующего запуска, ничего не трогая.
+#    не ответил (403/429/таймаут) — ждём следующего запуска, ничего не трогая. Коммит должен быть
+#    слиянием PR в main (ci_gate.py pr): прямой push в main, в том числе с изменённым ci.yml, не
+#    разворачивается — вторая линия защиты на случай, если правила ветки не настроены.
 # 3. Сервер переходит на коммит (только fast-forward), собирает образы (старые контейнеры в это
 #    время работают), затем переключает контейнеры и при изменённом Caddyfile перезапускает Caddy.
 # 4. Проверка здоровья: контейнеры запущены и healthy, через Caddy по HTTPS главная 200, закрытая
@@ -27,10 +29,20 @@ GITHUB_API=${GITHUB_API:-https://api.github.com/repos/dkaratsapov-web/agregator-
 STATE_DIR=${STATE_DIR:-/var/lib/agregator-deploy}
 LOCK_FILE=${LOCK_FILE:-/run/agregator-deploy.lock}
 REQUIRED_WORKFLOW=${REQUIRED_WORKFLOW:-.github/workflows/ci.yml}
-REQUIRED_JOBS=${REQUIRED_JOBS:-Lint, typecheck, test, build|Docker stack (compose)|Docker stack behind Caddy (proxy)}
+REQUIRED_JOBS=${REQUIRED_JOBS:-Lint, typecheck, test, build|Docker stack (compose)|Docker stack behind Caddy (proxy)|Disaster drills (backup, restore, broken release, rollback)}
 HEALTH_ATTEMPTS=${HEALTH_ATTEMPTS:-30}
 HEALTH_DELAY=${HEALTH_DELAY:-5}
-GATE="$(cd "$(dirname "$0")" && pwd)/ci_gate.py"
+# Сколько раз пробовать коммит при сбое сборки, переключения или проверки (сеть apt/npm, медленный
+# старт), прежде чем пометить его неудачным. Повтор — при следующем запуске таймера.
+DEPLOY_ATTEMPTS=${DEPLOY_ATTEMPTS:-3}
+# Минимум свободного места перед сборкой, ГБ (на сервере 30 ГБ, сборка Next.js — несколько ГБ).
+MIN_FREE_GB=${MIN_FREE_GB:-5}
+# Сколько последних развёрнутых версий образов хранить для быстрого отката (rollback.sh).
+KEEP_RELEASES=${KEEP_RELEASES:-3}
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GATE="$SCRIPT_DIR/ci_gate.py"
+# shellcheck source=deploy/autodeploy/lib.sh
+. "$SCRIPT_DIR/lib.sh"
 
 log() { echo "[agregator-deploy] $*"; }
 
@@ -56,13 +68,26 @@ if [ -f "$STATE_DIR/failed" ] && [ "$(cat "$STATE_DIR/failed")" = "$target" ]; t
   exit 0
 fi
 
-# Неудача: коммит помечается, причина и команды восстановления — в журнал, выход с ошибкой.
+# Неудача. Временные сбои (сборка, переключение, проверка) повторяются до DEPLOY_ATTEMPTS раз при
+# следующих запусках; после последней попытки коммит помечается неудачным и владелец получает
+# уведомление. Причина и команды восстановления — в журнал, выход с ошибкой.
 fail() {
+  local tries=1
+  if [ "${2:-}" = retry ]; then
+    tries=$(($(sed -n "s/^$target //p" "$STATE_DIR/attempts" 2> /dev/null || true) + 1))
+    echo "$target $tries" > "$STATE_DIR/attempts"
+    if [ "$tries" -lt "$DEPLOY_ATTEMPTS" ]; then
+      log "ОШИБКА: $1 (попытка $tries из $DEPLOY_ATTEMPTS, повтор при следующем запуске)"
+      exit 1
+    fi
+  fi
   log "ОШИБКА: $1"
   log "коммит $target помечен неудачным, сайт может работать на прежних или частично обновлённых контейнерах"
   log "диагностика: ${compose[*]} ps; ${compose[*]} logs --tail 100 web api caddy"
-  log "восстановление: deploy/README.md, раздел «Если обновление не прошло»"
+  log "восстановление: deploy/README.md, раздел «Если обновление не прошло»; откат: deploy/autodeploy/rollback.sh"
   echo "$target" > "$STATE_DIR/failed"
+  rm -f "$STATE_DIR/attempts"
+  notify "обновление ${target:0:12} не прошло: $1. Откат: sudo bash deploy/autodeploy/rollback.sh"
   exit 1
 }
 
@@ -81,6 +106,7 @@ case "$verdict" in
   failure:*)
     log "CI для $target красный (${verdict#failure:}), этот коммит не разворачиваю"
     echo "$target" > "$STATE_DIR/failed"
+    notify "CI для ${target:0:12} красный (${verdict#failure:}), сайт не обновлён"
     exit 0
     ;;
   *) wait_ci 'ещё идёт или не найден' ;;
@@ -103,9 +129,23 @@ case "$verdict" in
   failure:*)
     log "CI для $target не зелёный (${verdict#failure:}), этот коммит не разворачиваю"
     echo "$target" > "$STATE_DIR/failed"
+    notify "CI для ${target:0:12} не зелёный (${verdict#failure:}), сайт не обновлён"
     exit 0
     ;;
   *) wait_ci 'задачи ещё идут' ;;
+esac
+
+pulls=$(api "commits/$target/pulls") || wait_ci 'связь коммита с PR недоступна (сеть, 403/429 или таймаут)'
+verdict=$(printf '%s' "$pulls" | python3 "$GATE" pr "$target" "$BRANCH")
+case "$verdict" in
+  pr:*) log "коммит $target — слияние PR #${verdict#pr:}" ;;
+  failure:*)
+    log "ОШИБКА: ${verdict#failure:}, этот коммит не разворачиваю (правила ветки: docs/BRANCH_PROTECTION.md)"
+    echo "$target" > "$STATE_DIR/failed"
+    notify "${target:0:12}: ${verdict#failure:}, сайт не обновлён. Проверьте защиту main (docs/BRANCH_PROTECTION.md)"
+    exit 0
+    ;;
+  *) wait_ci 'ответ о PR непонятен' ;;
 esac
 
 # --- Обновление ------------------------------------------------------------------------------
@@ -117,17 +157,39 @@ if ! git merge --ff-only --quiet "origin/$BRANCH"; then
   exit 1
 fi
 
+# Образы помечаются коммитом (agregator-api:<sha>): прошлые версии остаются для отката.
+export IMAGE_TAG=${target:0:12}
+
+# Место на диске: сборке нужно несколько ГБ. Не хватает — сначала чистится кеш сборки.
+free_gb() { df -Pk "$(docker info --format '{{.DockerRootDir}}' 2> /dev/null || echo /)" 2> /dev/null |
+  awk 'NR==2 {print int($4 / 1048576)}'; }
+if [ "$(free_gb || echo 0)" -lt "$MIN_FREE_GB" ]; then
+  log "свободно меньше $MIN_FREE_GB ГБ, чищу кеш сборки"
+  docker builder prune -f > /dev/null || true
+  [ "$(free_gb || echo 0)" -ge "$MIN_FREE_GB" ] ||
+    fail "на диске меньше $MIN_FREE_GB ГБ, сборка не запускалась (docker system df)" retry
+fi
+
 # Сначала только сборка: пока она идёт или если она упала, работают прежние контейнеры.
-"${compose[@]}" build || fail 'сборка образов не удалась, контейнеры не переключались'
+"${compose[@]}" build || fail 'сборка образов не удалась, контейнеры не переключались' retry
+
+# Новая миграция: перед переключением — копия базы (deploy/backup/backup.sh). Без копии нет и
+# переключения: миграции назад автоматически не откатываются.
+base=$current
+if [ -n "$deployed" ] && git cat-file -e "$deployed^{commit}" 2> /dev/null; then base=$deployed; fi
+if ! git diff --quiet "$base" "$target" -- apps/api/prisma/migrations; then
+  log 'в обновлении новая миграция базы: делаю резервную копию'
+  bash "$SCRIPT_DIR/../backup/backup.sh" pre-migration ||
+    fail 'резервная копия перед миграцией не сделана, контейнеры не переключались' retry
+fi
+
 # Переключение. Может закончиться частично (часть контейнеров новая) — это видно в проверке ниже.
-"${compose[@]}" up -d --remove-orphans || fail 'переключение контейнеров не удалось'
+"${compose[@]}" up -d --remove-orphans || fail 'переключение контейнеров не удалось' retry
 # Caddyfile смонтирован файлом: после git pull контейнер видит новую версию только после рестарта.
 # Сравнение с последним развёрнутым коммитом, а не с HEAD: при повторе после неудачи HEAD уже
 # на target, а Caddy ещё со старым файлом.
-base=$current
-if [ -n "$deployed" ] && git cat-file -e "$deployed^{commit}" 2> /dev/null; then base=$deployed; fi
 if ! git diff --quiet "$base" "$target" -- deploy/Caddyfile; then
-  "${compose[@]}" restart caddy || fail 'перезапуск Caddy не удался'
+  "${compose[@]}" restart caddy || fail 'перезапуск Caddy не удался' retry
 fi
 
 # --- Проверка здоровья -----------------------------------------------------------------------
@@ -139,7 +201,10 @@ fetch() { curl -s -o "${2:-/dev/null}" -w '%{http_code}' --max-time 10 --resolve
 # Контейнеры: запущены, а у кого есть healthcheck — healthy (migrate завершается сам и не нужен).
 containers_ok() {
   local states
-  states=$("${compose[@]}" ps --format '{{.Service}} {{.State}} {{.Health}}' 2> /dev/null) || return 1
+  # У сервиса без healthcheck (caddy) поле Health пустое, и строка кончается пробелом:
+  # «caddy running ». Хвостовые пробелы убираются, иначе проверка не проходит никогда.
+  states=$("${compose[@]}" ps --format '{{.Service}} {{.State}} {{.Health}}' 2> /dev/null | sed 's/[[:space:]]*$//') ||
+    return 1
   for service in db api web caddy; do
     printf '%s\n' "$states" | grep -Eq "^$service running( healthy)?\$" || return 1
   done
@@ -170,11 +235,33 @@ for _ in $(seq 1 "$HEALTH_ATTEMPTS"); do
   fi
   sleep "$HEALTH_DELAY"
 done
-[ -z "$problem" ] || fail "проверка после обновления: $problem"
-
-# Висячие образы от прошлых сборок занимают диск (на сервере 30 ГБ).
-docker image prune -f > /dev/null || true
+[ -z "$problem" ] || fail "проверка после обновления: $problem" retry
 
 echo "$target" > "$STATE_DIR/deployed"
-rm -f "$STATE_DIR/failed"
+rm -f "$STATE_DIR/failed" "$STATE_DIR/attempts"
+# История для отката: последние развёрнутые коммиты, новые в конце.
+{ grep -v "^$target\$" "$STATE_DIR/history" 2> /dev/null || true; echo "$target"; } |
+  tail -n 20 > "$STATE_DIR/history.new" && mv "$STATE_DIR/history.new" "$STATE_DIR/history"
+
+# Место на диске (на сервере 30 ГБ): образы старше KEEP_RELEASES последних версий, висячие образы
+# и кеш сборки старше трёх суток.
+keep=$(tail -n "$KEEP_RELEASES" "$STATE_DIR/history" | cut -c1-12)
+# Нет ни одного подходящего образа — не ошибка (иначе pipefail завершил бы скрипт кодом 1 уже
+# после успешного обновления, и служба сообщила бы о сбое).
+{ docker image ls --format '{{.Repository}}:{{.Tag}}' 2> /dev/null || true; } |
+  { grep -E '^agregator-(api|web):([0-9a-f]{12}|local)$' || true; } | while read -r image; do
+  printf '%s\n' "$keep" | grep -qx "${image##*:}" || docker image rm "$image" > /dev/null 2>&1 || true
+done
+docker image prune -f > /dev/null || true
+docker builder prune -f --filter until=72h > /dev/null 2>&1 || true
+
+heartbeat=$(env_value DEPLOY_HEARTBEAT_URL)
+if [ -n "$heartbeat" ]; then
+  printf 'url = "%s"\n' "$heartbeat" | curl -fsS --max-time 10 -K - > /dev/null || log 'heartbeat не отправлен'
+fi
+# Без внешнего монитора о падении всего сервера и о недошедших уведомлениях никто не узнает
+# (monitor.sh намеренно не роняет службу каждый час) — напоминание в каждом обновлении.
+if [ -z "$(env_value MONITOR_HEARTBEAT_URL)" ]; then
+  log 'ВНИМАНИЕ: внешний монитор не настроен (MONITOR_HEARTBEAT_URL): падение сервера и недошедшие уведомления никто не увидит'
+fi
 log "готово: $target, проверка пройдена"

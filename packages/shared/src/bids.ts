@@ -1,4 +1,4 @@
-import type { JobCategory, JobStatus } from './jobs';
+import type { JobCategory, JobCloseOutcome, JobStatus } from './jobs';
 
 export const BID_STATUSES = ['PENDING', 'ACCEPTED', 'REJECTED', 'WITHDRAWN'] as const;
 export type BidStatus = (typeof BID_STATUSES)[number];
@@ -8,6 +8,15 @@ export const BID_STATUS_LABELS: Record<BidStatus, string> = {
   ACCEPTED: 'Выбран исполнителем',
   REJECTED: 'Не выбран',
   WITHDRAWN: 'Отозван',
+};
+
+/** Почему отклик отклонён: заказчик выбрал другого исполнителя или закрыл заказ. */
+export const BID_REJECT_REASONS = ['OTHER_ACCEPTED', 'JOB_CLOSED'] as const;
+export type BidRejectReason = (typeof BID_REJECT_REASONS)[number];
+
+export const BID_REJECT_REASON_LABELS: Record<BidRejectReason, string> = {
+  OTHER_ACCEPTED: 'Выбран другой исполнитель',
+  JOB_CLOSED: 'Заказ закрыт',
 };
 
 export const BID_LIMITS = {
@@ -60,11 +69,22 @@ export interface BidDto {
   comment: string;
   /** ISO 8601 */
   createdAt: string;
+  /** ISO 8601: когда заказчик изменил заказ после этого отклика; null — не менял. */
+  jobChangedAt: string | null;
+  /** Причина отклонения (только у REJECTED); null у остальных и у старых откликов. */
+  rejectReason: BidRejectReason | null;
 }
 
 /** Отклик в кабинете подрядчика: с краткой информацией о заказе. */
 export interface MyBidDto extends BidDto {
-  job: { id: string; title: string; city: string; status: JobStatus };
+  job: {
+    id: string;
+    title: string;
+    city: string;
+    status: JobStatus;
+    /** Исход закрытого заказа (выполнен или отменён); null — не закрыт или неизвестно. */
+    closeOutcome: JobCloseOutcome | null;
+  };
 }
 
 /** Отклик, который видит владелец заказа: подрядчик без email и других контактов. */

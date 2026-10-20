@@ -180,6 +180,23 @@ describe('Leads (e2e)', () => {
       expect(actions.map((a) => a.action)).toEqual(['LEAD_PROCESSED', 'LEAD_REOPENED']);
     });
 
+    it('two admins marking one lead at once write one audit record', async () => {
+      const second = (await signUpAdmin(app, prisma)).auth;
+      await post(lead).expect(201);
+      const [row] = await prisma.lead.findMany();
+      const server = app.getHttpServer();
+      const results = await Promise.all(
+        [adminAuth, second, adminAuth, second].map((auth) =>
+          request(server).patch(`/v1/admin/leads/${row.id}`).set(auth).send({ processed: true }),
+        ),
+      );
+      expect(results.map((r) => r.status)).toEqual([200, 200, 200, 200]);
+      expect(new Set(results.map((r) => r.body.processedAt)).size).toBe(1);
+      expect(
+        await prisma.auditLog.count({ where: { entityId: row.id, action: 'LEAD_PROCESSED' } }),
+      ).toBe(1);
+    });
+
     it('is forbidden for customers and contractors, 401 without a session', async () => {
       const server = app.getHttpServer();
       for (const role of ['CUSTOMER', 'CONTRACTOR'] as const) {

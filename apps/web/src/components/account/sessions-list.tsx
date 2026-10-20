@@ -50,21 +50,30 @@ function RevokeButton({ id }: { id: string }) {
     revokeSessionAction.bind(null, id),
     {},
   );
+  // Подтверждение отдельным раскрытием, как у «Закрыть заказ» (AUDIT_FINDINGS UX-10).
   return (
-    <form action={action} className="flex flex-col items-end gap-1">
-      <button
-        type="submit"
-        disabled={pending}
-        className="inline-flex min-h-10 items-center rounded-[10px] border border-line bg-surface px-3.5 text-sm font-semibold text-ink transition-colors duration-150 hover:border-accent hover:text-accent disabled:opacity-60"
-      >
-        {pending ? 'Завершаем…' : 'Завершить'}
-      </button>
-      {state.error ? (
-        <span role="alert" className="text-xs text-accent">
-          {state.error}
-        </span>
-      ) : null}
-    </form>
+    <details className="group flex flex-col items-end">
+      <summary className="inline-flex min-h-10 cursor-pointer list-none items-center rounded-[10px] border border-line bg-surface px-3.5 text-sm font-semibold text-ink transition-colors duration-150 hover:border-accent hover:text-accent group-open:border-ink [&::-webkit-details-marker]:hidden">
+        Завершить
+      </summary>
+      <form action={action} className="mt-2 flex flex-col items-end gap-1.5 text-right">
+        <p className="max-w-[16rem] text-sm text-ink-soft">
+          На этом устройстве придётся войти заново.
+        </p>
+        <button
+          type="submit"
+          disabled={pending}
+          className="inline-flex min-h-10 items-center rounded-[10px] border border-accent px-3.5 text-sm font-semibold text-accent transition-colors duration-150 hover:bg-accent-tint disabled:opacity-60"
+        >
+          {pending ? 'Завершаем…' : 'Да, завершить сеанс'}
+        </button>
+        {state.error ? (
+          <span role="alert" className="text-xs text-accent">
+            {state.error}
+          </span>
+        ) : null}
+      </form>
+    </details>
   );
 }
 
@@ -99,15 +108,23 @@ export function SessionsList({ sessions }: { sessions: SessionDto[] }) {
         ))}
       </ul>
       {others > 0 ? (
-        <form action={action}>
-          <button
-            type="submit"
-            disabled={pending}
-            className="inline-flex min-h-11 items-center rounded-[10px] bg-ink px-4 text-sm font-semibold text-canvas transition-[background-color,transform] duration-150 hover:bg-ink/85 active:scale-[0.97] disabled:opacity-60"
-          >
-            {pending ? 'Завершаем…' : 'Выйти на всех других устройствах'}
-          </button>
-        </form>
+        <details className="group">
+          <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-[10px] bg-ink px-4 text-sm font-semibold text-canvas transition-[background-color,transform] duration-150 hover:bg-ink/85 active:scale-[0.97] [&::-webkit-details-marker]:hidden">
+            Выйти на всех других устройствах
+          </summary>
+          <form action={action} className="mt-3 space-y-2">
+            <p className="text-sm text-ink-soft">
+              Другие устройства ({others}) выйдут из аккаунта. Это устройство останется.
+            </p>
+            <button
+              type="submit"
+              disabled={pending}
+              className="inline-flex min-h-11 items-center rounded-[10px] border border-accent px-4 text-sm font-semibold text-accent transition-colors duration-150 hover:bg-accent-tint disabled:opacity-60"
+            >
+              {pending ? 'Завершаем…' : 'Да, выйти на других устройствах'}
+            </button>
+          </form>
+        </details>
       ) : (
         <p className="text-sm text-ink-soft">Других активных входов нет.</p>
       )}

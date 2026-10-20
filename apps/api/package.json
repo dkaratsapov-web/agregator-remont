@@ -8,6 +8,7 @@
     "start": "node dist/main.js",
     "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit",
     "test": "prisma generate && dotenv -e ../../.env -- jest --runInBand",
+    "test:cov": "prisma generate && dotenv -e ../../.env -- jest --runInBand --coverage",
     "db:migrate": "dotenv -e ../../.env -- prisma migrate dev",
     "db:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
     "db:seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",

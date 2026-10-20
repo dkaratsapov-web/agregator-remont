@@ -2,7 +2,7 @@ import 'server-only';
 import type { UserDto } from '@agregator/shared';
 import { cookies, headers } from 'next/headers';
 import { cache } from 'react';
-import { getMe } from './api';
+import { getMe, logoutSession } from './api';
 import { clientIpFromForwardedFor, parseTrustProxyHops } from './client-ip';
 
 /**
@@ -26,7 +26,14 @@ function cookieAttributes() {
   };
 }
 
+/**
+ * Новая сессия после входа или регистрации. Прежняя сессия этого браузера (повторный вход, в том
+ * числе под другим аккаунтом) отзывается в API, а не просто затирается в cookie: иначе её токен
+ * жил бы ещё 30 дней (AUDIT_FINDINGS SEC-4). Сбой отзыва вход не прерывает.
+ */
 export async function setSessionCookie(token: string, expiresAt: string): Promise<void> {
+  const previous = await getSessionToken();
+  if (previous && previous !== token) await logoutSession(previous);
   (await cookies()).set(sessionCookieName(), token, {
     ...cookieAttributes(),
     expires: new Date(expiresAt),
@@ -41,16 +48,33 @@ export async function clearSessionCookie(): Promise<void> {
   (await cookies()).set(sessionCookieName(), '', { ...cookieAttributes(), maxAge: 0 });
 }
 
-/** Текущий пользователь (один запрос к API на рендер). null без сессии или при её истечении. */
-export const getCurrentUser = cache(async (): Promise<UserDto | null> => {
+export type SessionState =
+  | { kind: 'anonymous' }
+  | { kind: 'user'; user: UserDto; token: string }
+  /** API не ответил (сбой, таймаут): неизвестно, есть ли сессия. Это не повод выходить. */
+  | { kind: 'unavailable' };
+
+/**
+ * Сессия посетителя (один запрос к API на рендер). Нет cookie или API ответил 401 — anonymous;
+ * сбой API — unavailable: страницы кабинета показывают «сервис недоступен», а не вход
+ * (AUDIT_FINDINGS ARCH-3).
+ */
+export const getSessionState = cache(async (): Promise<SessionState> => {
   const token = await getSessionToken();
-  if (!token) return null;
+  if (!token) return { kind: 'anonymous' };
   try {
-    return await getMe(token);
+    const user = await getMe(token);
+    return user ? { kind: 'user', user, token } : { kind: 'anonymous' };
   } catch (error) {
     console.error('Session: failed to load current user', error);
-    return null;
+    return { kind: 'unavailable' };
   }
+});
+
+/** Текущий пользователь или null (нет сессии или API недоступен): для шапки и оформления. */
+export const getCurrentUser = cache(async (): Promise<UserDto | null> => {
+  const session = await getSessionState();
+  return session.kind === 'user' ? session.user : null;
 });
 
 /** IP посетителя с учётом доверенных прокси перед web (WEB_TRUST_PROXY_HOPS, docs/DEPLOYMENT.md). */

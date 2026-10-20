@@ -1,7 +1,7 @@
 import { JOB_CATEGORY_LABELS, type JobBidDto } from '@agregator/shared';
 import { acceptBidAction } from '@/app/(site)/account/jobs/actions';
 import { formatAmount, formatDate, formatYears } from '@/lib/format';
-import { BidStatusBadge } from './bid-status-badge';
+import { BidJobChangedNote, BidStatusBadge } from './bid-status-badge';
 import { ConfirmActionForm } from './confirm-action-form';
 
 /** Отклики на заказ для его владельца. */
@@ -42,7 +42,7 @@ export function JobBidList({
                   <p className="mt-0.5 text-sm text-ink-soft">Профиль не заполнен</p>
                 )}
               </div>
-              <BidStatusBadge status={bid.status} />
+              <BidStatusBadge status={bid.status} rejectReason={bid.rejectReason} />
             </div>
             <p className="mt-3 font-display text-xl font-semibold tabular-nums tracking-[-0.02em]">
               {formatAmount(bid.price)}&nbsp;₽
@@ -55,6 +55,11 @@ export function JobBidList({
             <p className="mt-2 whitespace-pre-line break-words text-sm leading-relaxed text-ink">
               {bid.comment}
             </p>
+            <BidJobChangedNote
+              status={bid.status}
+              jobChangedAt={bid.jobChangedAt}
+              audience="customer"
+            />
             {profile?.about ? (
               <p className="mt-2 whitespace-pre-line break-words text-sm leading-relaxed text-ink-soft">
                 {profile.about}

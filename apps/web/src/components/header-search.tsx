@@ -88,7 +88,7 @@ function SearchField({
   return (
     <label
       data-focus-ring="within"
-      className={`group flex h-11 w-full max-w-md items-center gap-2.5 ${app ? 'rounded-[12px]' : 'rounded-full'} border border-line bg-surface/80 pl-4 pr-1.5 transition-[border-color,box-shadow] duration-150 focus-within:border-ink/30 focus-within:shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_14%,transparent)] hover:border-ink/20`}
+      className={`group flex h-11 w-full max-w-md items-center gap-2.5 ${app ? 'rounded-[12px]' : 'rounded-full'} border border-line bg-surface/80 pl-4 pr-1.5 transition-[border-color,box-shadow] duration-150 focus-within:border-accent focus-within:shadow-[0_0_0_1px_var(--accent)] hover:border-ink/20`}
     >
       <SearchIcon />
       <span className="sr-only">Найти заказ</span>
@@ -102,7 +102,7 @@ function SearchField({
         required
         autoComplete="off"
         enterKeyHint="search"
-        className="min-w-0 flex-1 bg-transparent text-[0.95rem] text-ink placeholder:text-ink-soft/70 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+        className="min-w-0 flex-1 bg-transparent text-[0.95rem] text-ink placeholder:text-ink-soft focus:outline-none [&::-webkit-search-cancel-button]:hidden"
       />
       <button
         type="submit"

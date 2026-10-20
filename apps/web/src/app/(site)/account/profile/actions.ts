@@ -4,11 +4,13 @@ import { redirect } from 'next/navigation';
 import { FOREIGN_ORIGIN, isTrustedOrigin } from '@/lib/action-guard';
 import { apiErrorMessage, redirectIfUnauthorized, requireSessionToken } from '@/lib/action-helpers';
 import { saveMyProfile } from '@/lib/api';
-import { parseProfileForm, type ProfileFormValues } from '@/lib/bid-form';
+import { parseProfileForm, type FieldErrors, type ProfileFormValues } from '@/lib/bid-form';
 import { getClientIp } from '@/lib/session';
 
 export interface ProfileFormState {
   error?: string;
+  /** Ошибки у полей формы. */
+  fields?: FieldErrors<keyof ProfileFormValues>;
   values?: ProfileFormValues;
 }
 
@@ -19,7 +21,7 @@ export async function saveProfileAction(
   const parsed = parseProfileForm(form);
   if (!(await isTrustedOrigin())) return { error: FOREIGN_ORIGIN, values: parsed.values };
   const token = await requireSessionToken('/account/profile');
-  if (!parsed.ok) return { error: parsed.error, values: parsed.values };
+  if (!parsed.ok) return { error: parsed.error, fields: parsed.fields, values: parsed.values };
 
   try {
     await saveMyProfile(token, parsed.input, await getClientIp());

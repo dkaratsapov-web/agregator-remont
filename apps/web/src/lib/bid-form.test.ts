@@ -36,6 +36,15 @@ describe('parseBidForm', () => {
     expect(result.values.comment).toBe('Комментарий');
   });
 
+  it('reports every invalid field at once (UX-5)', () => {
+    const result = parseBidForm(form({ price: 'дёшево', durationDays: '0', comment: 'мало' }));
+    expect(!result.ok && Object.keys(result.fields).sort()).toEqual([
+      'comment',
+      'durationDays',
+      'price',
+    ]);
+  });
+
   it('never forwards fields outside the form contract', () => {
     const result = parseBidForm(
       form({ price: '1000', comment: 'Комментарий', status: 'ACCEPTED', jobId: 'x' }),

@@ -3,7 +3,9 @@ import {
   FLIGHT_KEYS,
   FLIGHT_SECONDS,
   FLIGHT_STOPS,
+  FLIGHT_VIDEO_LOAD,
   flightGlideRate,
+  flightLoadsAfterPageLoad,
   flightPoster,
   flightSeconds,
   flightSources,
@@ -92,5 +94,18 @@ describe('flightSources', () => {
       { src: '/landing/flight-v3/mobile-reverse.webm', type: 'video/webm; codecs="vp9"' },
     ]);
     expect(flightPoster('desktop')).toBe('/landing/flight-v3/desktop-poster.avif');
+  });
+});
+
+describe('flightLoadsAfterPageLoad', () => {
+  it('after-load — всегда сразу, on-intent — никогда, on-intent-save-data — по saveData', () => {
+    expect(flightLoadsAfterPageLoad('after-load', true)).toBe(true);
+    expect(flightLoadsAfterPageLoad('on-intent', false)).toBe(false);
+    expect(flightLoadsAfterPageLoad('on-intent-save-data', false)).toBe(true);
+    expect(flightLoadsAfterPageLoad('on-intent-save-data', true)).toBe(false);
+  });
+
+  it('утверждённый вариант по умолчанию — сразу после загрузки страницы', () => {
+    expect(FLIGHT_VIDEO_LOAD).toBe('after-load');
   });
 });

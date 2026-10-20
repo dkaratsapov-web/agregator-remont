@@ -35,7 +35,8 @@ html:has([data-ui-theme='dark']) {
   --line: #262f3f;
   --accent: #ea6a32;
   --accent-hover: #f2844f;
-  --accent-ink: #ffffff;
+  /* Тёмный текст на светлом акценте: 6.0:1 (белый давал 3.2:1, AUDIT_FINDINGS UX-6). */
+  --accent-ink: #0b0f17;
   --accent-tint: #2b1a12;
   --ok: #4ade80;
   --ok-tint: #10261a;
@@ -54,7 +55,7 @@ html:has([data-ui-theme='dark']) {
     --line: #262f3f;
     --accent: #ea6a32;
     --accent-hover: #f2844f;
-    --accent-ink: #ffffff;
+    --accent-ink: #0b0f17;
     --accent-tint: #2b1a12;
     --ok: #4ade80;
     --ok-tint: #10261a;
@@ -279,5 +280,29 @@ body:has(.auth-screen) .site-footer {
 @media (max-height: 46rem) {
   .auth-screen input:not([type='radio']):not([type='checkbox']) {
     min-height: 2.75rem;
+  }
+}
+
+/* Переход между страницами приложения (components/navigation-progress.tsx). */
+.nav-progress::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  transform-origin: left;
+  animation: nav-progress 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes nav-progress {
+  0% {
+    transform: translateX(-100%) scaleX(0.4);
+  }
+  100% {
+    transform: translateX(100%) scaleX(0.4);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-progress::before {
+    animation: none;
+    opacity: 0.8;
   }
 }

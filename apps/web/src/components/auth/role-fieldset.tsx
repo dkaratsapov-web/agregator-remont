@@ -29,8 +29,10 @@ export function RoleFieldset({
               className="mt-1 size-4 accent-[var(--accent)]"
               required
             />
-            <span>
-              <span className="block whitespace-nowrap text-[15px] font-semibold sm:text-base">
+            {/* На 320 px строка не помещалась в карточку (AUDIT_FINDINGS UX-13): шрифт меньше и
+                перенос вместо выхода за рамку. */}
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold min-[360px]:text-[15px] sm:text-base">
                 {option.title}
               </span>
               <span className="mt-0.5 block text-sm text-ink-soft">{option.text}</span>

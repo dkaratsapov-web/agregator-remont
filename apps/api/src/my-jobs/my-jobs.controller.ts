@@ -17,7 +17,7 @@ import { WriteRateLimited } from '../auth/rate-limit';
 import { Roles, RolesGuard } from '../auth/roles';
 import { SessionGuard } from '../auth/session.guard';
 import { PaginationQuery } from '../jobs/dto/list-jobs.query';
-import { CreateJobDto, UpdateJobDto } from './dto/job-input.dto';
+import { CloseJobDto, CreateJobDto, UpdateJobDto } from './dto/job-input.dto';
 import { MyJobsService } from './my-jobs.service';
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { ApiErrors, ApiRole } from '../openapi/decorators';
@@ -74,8 +74,12 @@ export class MyJobsController {
   @HttpCode(HttpStatus.OK)
   @WriteRateLimited()
   @ApiOkResponse({ type: OwnJobSchema })
-  @ApiErrors(404, 409)
-  close(@CurrentAuth() auth: AuthContext, @Param('id') id: string): Promise<OwnJobDto> {
-    return this.jobs.close(auth.user.id, id);
+  @ApiErrors(400, 404, 409)
+  close(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') id: string,
+    @Body() dto: CloseJobDto,
+  ): Promise<OwnJobDto> {
+    return this.jobs.close(auth.user.id, id, dto.outcome);
   }
 }

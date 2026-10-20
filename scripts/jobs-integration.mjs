@@ -124,7 +124,8 @@ check(
 
 // --- правка и закрытие владельцем через формы
 const isEdit = (html) => html.includes('name="title"');
-const isClose = (html) => html.includes('Да, закрыть заказ');
+// Исполнитель не выбран: заказ можно только отменить (исход CANCELLED в скрытом поле).
+const isClose = (html) => html.includes('Да, отменить заказ');
 const edited = await submit(
   `/account/jobs/${id}`,
   { ...job, title: 'Интеграционный заказ: плитка и сантехника' },
@@ -140,12 +141,14 @@ check('edit is visible publicly', afterEdit.title === 'Интеграционн�
 
 const closed = await submit(`/account/jobs/${id}`, {}, { cookie: owner.cookie, pick: isClose });
 check(
-  'owner closes the job -> 303 ?closed=1',
-  closed.status === 303 && closed.location?.endsWith('?closed=1'),
+  'owner cancels the job -> 303 ?closed=cancelled',
+  closed.status === 303 && closed.location?.endsWith('?closed=cancelled'),
   `got ${closed.status}`,
 );
 const afterClose = await (await fetch(`${API}/v1/jobs/${id}`)).json();
 check('job is CLOSED publicly', afterClose.status === 'CLOSED');
+const ownClosed = await (await fetch(`${API}/v1/me/jobs/${id}`, { headers: owner.auth })).json();
+check('closed job keeps its outcome', ownClosed.closeOutcome === 'CANCELLED');
 const editClosed = await fetch(`${API}/v1/me/jobs/${id}`, {
   method: 'PATCH',
   headers: { ...owner.auth, 'Content-Type': 'application/json' },

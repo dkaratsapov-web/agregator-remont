@@ -102,7 +102,7 @@ function LogoutItem() {
 
 /**
  * Иконки разделов и меню кабинета. Меню открывается наведением мыши, нажатием (телефон)
- * и с клавиатуры; закрывается уходом курсора, Escape и нажатием вне меню.
+ * и с клавиатуры; закрывается уходом курсора, Escape, нажатием вне меню и уходом фокуса.
  */
 /** app — шапка приложения (прямоугольные формы, как в кабинете); без него — вид главной. */
 export function AccountMenu({ user, app = false }: { user: MenuUser; app?: boolean }) {
@@ -172,6 +172,11 @@ export function AccountMenu({ user, app = false }: { user: MenuUser; app?: boole
         className="relative"
         onPointerEnter={hoverOpen}
         onPointerLeave={hoverClose}
+        // Фокус ушёл Tab'ом за пределы меню: закрываем, иначе панель перекрывает элементы
+        // страницы под фокусом (AUDIT_FINDINGS UX-3).
+        onBlur={(event) => {
+          if (!rootRef.current?.contains(event.relatedTarget as Node | null)) setOpen(false);
+        }}
       >
         <button
           ref={buttonRef}

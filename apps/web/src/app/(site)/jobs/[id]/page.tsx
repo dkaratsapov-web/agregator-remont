@@ -79,7 +79,10 @@ export default async function JobPage({
       <nav aria-label="Навигационная цепочка" className="text-sm text-ink-soft">
         <ol className="flex flex-wrap items-center gap-1.5">
           <li>
-            <Link href="/jobs" className="hover:text-ink hover:underline">
+            <Link
+              href="/jobs"
+              className="inline-flex min-h-6 items-center hover:text-ink hover:underline"
+            >
               Заказы
             </Link>
           </li>
@@ -87,7 +90,7 @@ export default async function JobPage({
           <li>
             <Link
               href={jobsHref({ category: job.category })}
-              className="hover:text-ink hover:underline"
+              className="inline-flex min-h-6 items-center hover:text-ink hover:underline"
             >
               {JOB_CATEGORY_LABELS[job.category]}
             </Link>

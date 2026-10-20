@@ -4,7 +4,7 @@ import { LEAD_LIMITS } from '@agregator/shared';
 import { useState } from 'react';
 
 const inputClass =
-  'mt-1.5 block min-h-13 w-full rounded-2xl border border-line bg-canvas px-4 text-base text-ink placeholder:text-ink-soft/70 transition-colors duration-150 focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60';
+  'mt-1.5 block min-h-13 w-full rounded-2xl border border-line bg-canvas px-4 text-base text-ink placeholder:text-ink-soft transition-colors duration-150 focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60';
 
 function Submit({ disabled, pending }: { disabled: boolean; pending: boolean }) {
   return (

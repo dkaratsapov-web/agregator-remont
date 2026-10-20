@@ -10,7 +10,6 @@ import {
 } from '@agregator/shared';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 import { AccountStamp } from '@/components/account/account-stamp';
 import { LogoutForm } from '@/components/auth/logout-form';
 import { BID_STATUS_DOTS, BidStatusBadge } from '@/components/bids/bid-status-badge';
@@ -28,7 +27,7 @@ import {
 } from '@/components/ui/sheet';
 import { getMyProfile, listMyBids, listMyJobs } from '@/lib/api';
 import { formatAmount, formatBudget } from '@/lib/format';
-import { getCurrentUser, getSessionToken } from '@/lib/session';
+import { requireUserPage } from '@/lib/customer';
 
 export const metadata: Metadata = { title: 'Личный кабинет', robots: { index: false } };
 
@@ -276,7 +275,7 @@ async function ContractorSummary({ token }: { token: string }) {
                     <span className="text-sm font-semibold tabular-nums text-ink">
                       {formatAmount(bid.price)} ₽
                     </span>
-                    <BidStatusBadge status={bid.status} />
+                    <BidStatusBadge status={bid.status} rejectReason={bid.rejectReason} />
                   </>
                 }
               />
@@ -314,8 +313,7 @@ const PRIMARY: Record<'CUSTOMER' | 'CONTRACTOR' | 'ADMIN', { href: string; label
 };
 
 export default async function AccountPage() {
-  const [user, token] = await Promise.all([getCurrentUser(), getSessionToken()]);
-  if (!user || !token) redirect('/login?next=/account');
+  const { user, token } = await requireUserPage('/account');
 
   const primary = PRIMARY[user.role];
 

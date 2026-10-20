@@ -30,6 +30,8 @@ import {
 
 export interface AuthFormState {
   error?: string;
+  /** Ошибки у полей формы (подсвечиваются, первое поле получает фокус). */
+  fields?: Partial<Record<'name' | 'email' | 'password', string>>;
   /** Введённые значения (кроме пароля), чтобы не очищать форму при ошибке. */
   values?: Record<string, string>;
 }
@@ -53,6 +55,27 @@ function messageFor(error: unknown): string {
   return 'Сервис временно недоступен. Попробуйте позже.';
 }
 
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function registerFieldErrors(
+  name: string,
+  email: string,
+  password: string,
+): NonNullable<AuthFormState['fields']> {
+  const fields: NonNullable<AuthFormState['fields']> = {};
+  const nameLength = name.trim().length;
+  if (nameLength < AUTH_LIMITS.NAME_MIN || nameLength > AUTH_LIMITS.NAME_MAX) {
+    fields.name = `Имя: от ${AUTH_LIMITS.NAME_MIN} до ${AUTH_LIMITS.NAME_MAX} символов.`;
+  }
+  if (!EMAIL.test(email.trim()) || email.length > AUTH_LIMITS.EMAIL_MAX) {
+    fields.email = 'Укажите email в формате name@example.ru.';
+  }
+  if (password.length < AUTH_LIMITS.PASSWORD_MIN || password.length > AUTH_LIMITS.PASSWORD_MAX) {
+    fields.password = `Пароль: от ${AUTH_LIMITS.PASSWORD_MIN} до ${AUTH_LIMITS.PASSWORD_MAX} символов.`;
+  }
+  return fields;
+}
+
 export async function registerAction(_prev: AuthFormState, form: FormData): Promise<AuthFormState> {
   // Пароль обрезается чуть длиннее лимита, чтобы API вернул понятную ошибку валидации.
   const values = {
@@ -66,6 +89,11 @@ export async function registerAction(_prev: AuthFormState, form: FormData): Prom
   if (!(SELF_SERVICE_ROLES as readonly string[]).includes(values.role)) {
     return { error: 'Выберите, кто вы: заказчик или подрядчик.', values };
   }
+  // Все ошибки сразу и у своих полей (AUDIT_FINDINGS UX-5); те же правила проверяет API.
+  const fields = registerFieldErrors(values.name, values.email, password);
+  if (Object.keys(fields).length > 0) {
+    return { error: 'Проверьте поля, отмеченные ниже.', fields, values };
+  }
 
   try {
     const session = await registerUser(
@@ -75,7 +103,9 @@ export async function registerAction(_prev: AuthFormState, form: FormData): Prom
     );
     await setSessionCookie(session.token, session.expiresAt);
   } catch (error) {
-    return { error: messageFor(error), values };
+    const message = messageFor(error);
+    const taken = error instanceof ApiError && error.status === 409;
+    return { error: message, values, ...(taken ? { fields: { email: message } } : {}) };
   }
   redirect('/account');
 }
@@ -95,7 +125,12 @@ export async function loginAction(_prev: AuthFormState, form: FormData): Promise
     );
     await setSessionCookie(session.token, session.expiresAt);
   } catch (error) {
-    return { error: messageFor(error), values };
+    const wrong = error instanceof ApiError && error.status === 401;
+    return {
+      error: messageFor(error),
+      values,
+      ...(wrong ? { fields: { password: 'Введите пароль ещё раз.' } } : {}),
+    };
   }
   redirect(next);
 }

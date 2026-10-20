@@ -140,6 +140,39 @@ describe('Job drafts (e2e)', () => {
     expect(still.body.title).toBe('Мой черновик');
   });
 
+  it('draft version: parallel saves from one stale form apply once (ТЗ #37 MVP-6, #40 п. 7)', async () => {
+    const { body: draft } = await save({ title: 'Черновик: исходный' }).expect(201);
+    const results = await Promise.all(
+      Array.from({ length: 6 }, (_, i) =>
+        http()
+          .put(`/v1/me/drafts/${draft.id}`)
+          .set(owner.auth)
+          .send({ title: `Вкладка ${i}`, expectedUpdatedAt: draft.updatedAt }),
+      ),
+    );
+    const won = results.filter((r) => r.status === 200);
+    expect(won).toHaveLength(1);
+    expect(results.filter((r) => r.status === 409)).toHaveLength(5);
+    const stored = await prisma.jobDraft.findUniqueOrThrow({ where: { id: draft.id } });
+    expect(stored.title).toBe(won[0].body.title);
+    // Без версии — замена как раньше («оставить мою версию» в форме).
+    await http()
+      .put(`/v1/me/drafts/${draft.id}`)
+      .set(owner.auth)
+      .send({ title: 'Оставил мою версию' })
+      .expect(200);
+    expect((await prisma.jobDraft.findUniqueOrThrow({ where: { id: draft.id } })).title).toBe(
+      'Оставил мою версию',
+    );
+    // Удалённый черновик с версией — 404, а не 409.
+    await http().delete(`/v1/me/drafts/${draft.id}`).set(owner.auth).expect(204);
+    await http()
+      .put(`/v1/me/drafts/${draft.id}`)
+      .set(owner.auth)
+      .send({ title: 'Поздно', expectedUpdatedAt: draft.updatedAt })
+      .expect(404);
+  });
+
   it('deletes a draft', async () => {
     const draft = (await save({ title: 'Удалю' }).expect(201)).body;
     await http().delete(`/v1/me/drafts/${draft.id}`).set(owner.auth).expect(204);

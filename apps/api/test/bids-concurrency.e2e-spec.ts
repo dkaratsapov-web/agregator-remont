@@ -140,6 +140,25 @@ describe('Bids concurrency (e2e)', () => {
     expect(await prisma.bid.count({ where: { jobId, status: 'ACCEPTED' } })).toBe(1);
   });
 
+  it('parallel repeated bids of one contractor on one job leave exactly one bid', async () => {
+    const { jobId } = await jobWithBids(0);
+    const contractor = await signUp(app, 'CONTRACTOR');
+    const results = await Promise.all(
+      Array.from({ length: 8 }, (_, i) =>
+        http()
+          .post(`/v1/jobs/${jobId}/bids`)
+          .set(contractor.auth)
+          .send({ ...bid, price: 10_000 + i }),
+      ),
+    );
+    expect(results.filter((r) => r.status === 201)).toHaveLength(1);
+    expect(results.filter((r) => r.status === 409)).toHaveLength(7);
+    expect(await prisma.bid.count({ where: { jobId, contractorId: contractor.id } })).toBe(1);
+    expect(
+      await prisma.auditLog.count({ where: { actorId: contractor.id, action: 'BID_CREATED' } }),
+    ).toBe(1);
+  });
+
   it('parallel bids cannot exceed the daily quota', async () => {
     const customer = await signUp(app, 'CUSTOMER');
     const contractor = await signUp(app, 'CONTRACTOR');

@@ -9,12 +9,14 @@ import {
   requireSessionToken,
 } from '@/lib/action-helpers';
 import { placeBid, withdrawBid } from '@/lib/api';
-import { parseBidForm, type BidFormValues } from '@/lib/bid-form';
+import { parseBidForm, type BidFormValues, type FieldErrors } from '@/lib/bid-form';
 import { safeRedirectPath } from '@/lib/redirect';
 import { getClientIp } from '@/lib/session';
 
 export interface BidFormState {
   error?: string;
+  /** Ошибки у полей формы. */
+  fields?: FieldErrors<keyof BidFormValues>;
   values?: Partial<BidFormValues>;
 }
 
@@ -30,7 +32,7 @@ export async function placeBidAction(
   if (!isEntityId(jobId)) return { error: 'Заказ не найден.' };
   const path = `/jobs/${jobId}`;
   const token = await requireSessionToken(path);
-  if (!parsed.ok) return { error: parsed.error, values: parsed.values };
+  if (!parsed.ok) return { error: parsed.error, fields: parsed.fields, values: parsed.values };
 
   try {
     await placeBid(token, jobId, parsed.input, await getClientIp());

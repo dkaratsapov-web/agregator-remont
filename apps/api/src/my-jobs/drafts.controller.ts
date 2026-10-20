@@ -56,7 +56,7 @@ export class DraftsController {
   @Put(':id')
   @WriteRateLimited()
   @ApiOkResponse({ type: JobDraftSchema })
-  @ApiErrors(400, 404)
+  @ApiErrors(400, 404, 409)
   replace(
     @CurrentAuth() auth: AuthContext,
     @Param('id') id: string,

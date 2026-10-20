@@ -1,8 +1,11 @@
 import { BID_LIMITS, JOB_LIMITS } from '@agregator/shared';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import sharp from 'sharp';
 import request from 'supertest';
+import { HealthController } from '../src/health/health.controller';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { expectContract, uncoveredResponses } from './contract';
 import { createTestApp } from './create-app';
 import { CHALLENGE, NONCE, STATE, VERIFIER, startFakeBank } from './fake-bank';
@@ -89,6 +92,7 @@ describe('API contract (e2e)', () => {
         };
 
         await check('get', '/health', http().get('/health'), 200);
+        await check('get', '/health/ready', http().get('/health/ready'), 200);
 
         // --- auth
         const email = `contract-${Date.now()}@example.ru`;
@@ -264,6 +268,12 @@ describe('API contract (e2e)', () => {
         await check('post', CLOSE, http().post(closeUrl).set(other.auth), 404);
         await check('post', CLOSE, http().post(closeUrl), 401);
         await check('post', CLOSE, http().post(closeUrl).set(contractor.auth), 403);
+        await check(
+          'post',
+          CLOSE,
+          http().post(closeUrl).set(customer.auth).send({ outcome: 'DONE' }),
+          400,
+        );
         await check('post', CLOSE, http().post(closeUrl).set(customer.auth), 200);
         await check('post', CLOSE, http().post(closeUrl).set(customer.auth), 409);
         await check('patch', MY_JOB, patch(customer.auth, { city: 'Мытищи' }, second.body.id), 409);
@@ -454,6 +464,16 @@ describe('API contract (e2e)', () => {
       await check('put', ONE, put(customer.auth), 200);
       await check('put', ONE, put(customer.auth, { title: 'я'.repeat(200) }), 400);
       await check('put', ONE, put(customer.auth, {}, 'missing'), 404);
+      // Черновик изменён в другой вкладке: устаревшая версия → 409.
+      await check(
+        'put',
+        ONE,
+        put(customer.auth, {
+          title: 'Старая вкладка',
+          expectedUpdatedAt: '2020-01-01T00:00:00.000Z',
+        }),
+        409,
+      );
       await check('put', ONE, put(), 401);
       await check('put', ONE, put(contractor.auth), 403);
 
@@ -754,6 +774,27 @@ describe('API contract (e2e)', () => {
         expectContract(bidQuota, 'post', '/v1/jobs/{jobId}/bids');
       },
     );
+  });
+
+  it('readiness reports 503 when the database does not answer', async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [HealthController],
+      providers: [
+        {
+          provide: PrismaService,
+          useValue: { $queryRaw: () => Promise.reject(new Error('connection refused')) },
+        },
+      ],
+    }).compile();
+    const app = moduleRef.createNestApplication();
+    await app.init();
+    try {
+      const res = await request(app.getHttpServer()).get('/health/ready');
+      expect(res.status).toBe(503);
+      expectContract(res, 'get', '/health/ready');
+    } finally {
+      await app.close();
+    }
   });
 
   it('rejects responses that do not match the schema', () => {

@@ -300,7 +300,8 @@ describe('Contractor profiles and bids (e2e)', () => {
       const mineB = await http().get('/v1/me/bids').set(b.auth).expect(200);
       expect(mineB.body.items[0]).toMatchObject({
         status: 'REJECTED',
-        job: { status: 'IN_PROGRESS' },
+        rejectReason: 'OTHER_ACCEPTED',
+        job: { status: 'IN_PROGRESS', closeOutcome: null },
       });
 
       // Повторный выбор и новые отклики невозможны.
@@ -354,8 +355,54 @@ describe('Contractor profiles and bids (e2e)', () => {
       const contractor = await signUp(app, 'CONTRACTOR');
       await placeBid(contractor.auth, jobId).expect(201);
       await http().post(`/v1/me/jobs/${jobId}/close`).set(customer.auth).expect(200);
-      expect((await prisma.bid.findFirstOrThrow()).status).toBe('REJECTED');
+      const stored = await prisma.bid.findFirstOrThrow();
+      expect(stored).toMatchObject({ status: 'REJECTED', rejectReason: 'JOB_CLOSED' });
     });
+
+    it('a job without a contractor can only be cancelled', async () => {
+      const { customer, jobId } = await customerWithJob();
+      const close = (body: object) =>
+        http().post(`/v1/me/jobs/${jobId}/close`).set(customer.auth).send(body);
+      await close({ outcome: 'DONE' }).expect(400);
+      await close({ outcome: 'COMPLETED' }).expect(409);
+      const res = await close({ outcome: 'CANCELLED' }).expect(200);
+      expect(res.body).toMatchObject({ status: 'CLOSED', closeOutcome: 'CANCELLED' });
+    });
+
+    it.each(['COMPLETED', 'CANCELLED'] as const)(
+      'a job in progress is closed with outcome %s, visible to the contractor',
+      async (outcome) => {
+        const { customer, jobId } = await customerWithJob();
+        const contractor = await signUp(app, 'CONTRACTOR');
+        const { body: placed } = await placeBid(contractor.auth, jobId).expect(201);
+        await http()
+          .post(`/v1/me/jobs/${jobId}/bids/${placed.id}/accept`)
+          .set(customer.auth)
+          .expect(200);
+        // У заказа в работе исход обязателен.
+        await http().post(`/v1/me/jobs/${jobId}/close`).set(customer.auth).expect(400);
+        const res = await http()
+          .post(`/v1/me/jobs/${jobId}/close`)
+          .set(customer.auth)
+          .send({ outcome })
+          .expect(200);
+        expect(res.body).toMatchObject({ status: 'CLOSED', closeOutcome: outcome });
+
+        const mine = await http().get('/v1/me/bids').set(contractor.auth).expect(200);
+        expect(mine.body.items[0]).toMatchObject({
+          status: 'ACCEPTED',
+          rejectReason: null,
+          job: { status: 'CLOSED', closeOutcome: outcome },
+        });
+        const audit = await prisma.auditLog.findFirstOrThrow({
+          where: { entityId: jobId, action: 'JOB_CLOSED' },
+        });
+        expect(audit.changes).toEqual({
+          status: { from: 'IN_PROGRESS', to: 'CLOSED' },
+          closeOutcome: { from: null, to: outcome },
+        });
+      },
+    );
 
     it('the database allows only one accepted bid per job', async () => {
       const { customer, jobId } = await customerWithJob();

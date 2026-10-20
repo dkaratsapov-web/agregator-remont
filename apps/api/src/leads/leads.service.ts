@@ -95,8 +95,13 @@ export class LeadsService {
   async setProcessed(adminId: string, id: string, processed: boolean): Promise<LeadDto> {
     if (!ENTITY_ID_PATTERN.test(id)) throw new NotFoundException('Заявка не найдена');
     return this.prisma.$transaction(async (tx) => {
-      const before = await tx.lead.findUnique({ where: { id } });
-      if (!before) throw new NotFoundException('Заявка не найдена');
+      // Строка заявки блокируется до конца транзакции: два администратора, нажавшие
+      // одновременно, меняют её по очереди, и второй видит уже обработанную заявку
+      // (одна запись в журнале, AUDIT_FINDINGS ARCH-5).
+      const locked = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM leads WHERE id = ${id} FOR UPDATE`;
+      if (locked.length === 0) throw new NotFoundException('Заявка не найдена');
+      const before = await tx.lead.findUniqueOrThrow({ where: { id } });
       if ((before.processedAt !== null) === processed) return toLeadDto(before);
       const after = await tx.lead.update({
         where: { id },

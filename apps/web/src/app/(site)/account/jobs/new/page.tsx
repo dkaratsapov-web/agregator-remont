@@ -1,5 +1,6 @@
 import type { JobDraftDto } from '@agregator/shared';
 import type { Metadata } from 'next';
+import { randomUUID } from 'node:crypto';
 import Link from 'next/link';
 import { CustomersOnly } from '@/components/jobs/customers-only';
 import { JobForm } from '@/components/jobs/job-form';
@@ -52,7 +53,10 @@ export default async function NewJobPage({
   return (
     <div className="mx-auto max-w-[1600px] px-4 pb-16 pt-10 sm:px-6 md:pt-14 lg:px-10">
       <p className="text-sm text-ink-soft">
-        <Link href="/account/jobs" className="hover:text-ink hover:underline">
+        <Link
+          href="/account/jobs"
+          className="inline-flex min-h-6 items-center hover:text-ink hover:underline"
+        >
           Мои заказы
         </Link>
       </p>
@@ -79,6 +83,8 @@ export default async function NewJobPage({
           action={createJobAction}
           initial={draft ? draftValues(draft) : undefined}
           draftId={draft?.id ?? null}
+          draftVersion={draft?.updatedAt ?? null}
+          requestId={randomUUID()}
           submitLabel="Опубликовать заказ"
           pendingLabel="Публикуем…"
         />

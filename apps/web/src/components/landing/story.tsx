@@ -1,7 +1,14 @@
 'use client';
 
-import { motion, useScroll, useSpring, useTransform, type MotionValue } from 'motion/react';
-import { useRef } from 'react';
+import {
+  motion,
+  useMotionValueEvent,
+  useScroll,
+  useSpring,
+  useTransform,
+  type MotionValue,
+} from 'motion/react';
+import { useRef, useState } from 'react';
 import { FLIGHT_BASE } from '@/lib/flight';
 import { type FlightPlayer, FlightVideo } from './flight-video';
 import { StatusPill } from './status-pill';
@@ -55,10 +62,12 @@ const BIDS = [
 
 const STAGES = ['Демонтаж', 'Черновые работы', 'Чистовая отделка'];
 
+// Только то, что уже работает (ТЗ #42, п. 7): гарантии качества, удержания денег и разбора споров
+// в сервисе пока нет — о них только как о разработке.
 const HERO_POINTS = [
   'Соединяем заказчиков с мастерами и бригадами',
-  'Выступаем гарантом качества выполнения вашего ремонта',
-  'Включаемся в решение спорных ситуаций без потери ваших денег',
+  'Отклики с ценой и сроком: сравниваете и выбираете сами',
+  'Безопасная сделка и помощь в спорах — в разработке',
 ];
 
 function HeroCopy() {
@@ -320,6 +329,9 @@ function ScrollyStory() {
   const heroOpacity = useTransform(progress, [0, 0.06, 0.1], [1, 1, 0]);
   const heroY = useTransform(progress, [0, 0.1], [0, -48]);
   const heroPointer = useTransform(heroOpacity, (v) => (v < 0.3 ? 'none' : 'auto'));
+  // Скрытые кнопки первого экрана не должны получать фокус Tab (AUDIT_FINDINGS UX-2).
+  const [heroHidden, setHeroHidden] = useState(false);
+  useMotionValueEvent(heroOpacity, 'change', (v) => setHeroHidden(v < 0.3));
   const cueOpacity = useTransform(progress, [0, 0.04], [1, 0]);
 
   return (
@@ -339,6 +351,7 @@ function ScrollyStory() {
             <motion.div
               className="relative z-10 [grid-area:1/1]"
               style={{ opacity: heroOpacity, y: heroY, pointerEvents: heroPointer }}
+              inert={heroHidden}
             >
               <HeroCopy />
             </motion.div>

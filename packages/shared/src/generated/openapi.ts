@@ -20,6 +20,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/health/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Health_ready"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/leads": {
         parameters: {
             query?: never;
@@ -547,11 +563,20 @@ export interface components {
             name: string;
             profile: components["schemas"]["ContractorProfileDto"] | null;
         };
+        /**
+         * @description Почему отклик отклонён (только у REJECTED)
+         * @enum {string}
+         */
+        BidRejectReason: "OTHER_ACCEPTED" | "JOB_CLOSED";
         /** @enum {string} */
         BidStatus: "PENDING" | "ACCEPTED" | "REJECTED" | "WITHDRAWN";
         ChangePasswordDto: {
             currentPassword: string;
             newPassword: string;
+        };
+        CloseJobDto: {
+            /** @description Чем закончился заказ. Открытый заказ (исполнитель не выбран) можно только отменить, поле можно не передавать. Для заказа в работе поле обязательно */
+            outcome?: components["schemas"]["JobCloseOutcome"];
         };
         ContractorProfileDto: {
             about: string;
@@ -594,6 +619,11 @@ export interface components {
                     [key: string]: string | number | boolean | string[];
                 };
             }[];
+            /**
+             * Format: uuid
+             * @description Ключ формы публикации: повтор запроса с тем же ключом (двойной клик, обрыв связи) вернёт уже созданный заказ
+             */
+            requestId?: string;
             title: string;
         };
         CreateLeadDto: {
@@ -628,13 +658,25 @@ export interface components {
             createdAt: string;
             durationDays: number | null;
             id: string;
+            /**
+             * Format: date-time
+             * @description Когда заказчик изменил заказ после этого отклика; null — не менял
+             */
+            jobChangedAt: string | null;
             jobId: string;
             /** @description Целые рубли */
             price: number;
+            /** @description Почему отклик отклонён (только у REJECTED) */
+            rejectReason: components["schemas"]["BidRejectReason"] | null;
             status: components["schemas"]["BidStatus"];
         };
         /** @enum {string} */
         JobCategory: "REPAIR_TURNKEY" | "PLUMBING" | "ELECTRICAL" | "TILING" | "FINISHING" | "FLOORING" | "ROOFING" | "WINDOWS_DOORS" | "DESIGN" | "OTHER";
+        /**
+         * @description Исход закрытого заказа; null — не закрыт или закрыт до появления поля
+         * @enum {string}
+         */
+        JobCloseOutcome: "COMPLETED" | "CANCELLED";
         JobDraftDto: {
             budgetMax: number | null;
             budgetMin: number | null;
@@ -721,13 +763,21 @@ export interface components {
             durationDays: number | null;
             id: string;
             job: components["schemas"]["MyBidJob"];
+            /**
+             * Format: date-time
+             * @description Когда заказчик изменил заказ после этого отклика; null — не менял
+             */
+            jobChangedAt: string | null;
             jobId: string;
             /** @description Целые рубли */
             price: number;
+            /** @description Почему отклик отклонён (только у REJECTED) */
+            rejectReason: components["schemas"]["BidRejectReason"] | null;
             status: components["schemas"]["BidStatus"];
         };
         MyBidJob: {
             city: string;
+            closeOutcome: components["schemas"]["JobCloseOutcome"] | null;
             id: string;
             status: components["schemas"]["JobStatus"];
             title: string;
@@ -781,6 +831,8 @@ export interface components {
             budgetMin: number | null;
             category: components["schemas"]["JobCategory"];
             city: string;
+            /** @description Исход закрытого заказа; null — не закрыт или закрыт до появления поля */
+            closeOutcome: components["schemas"]["JobCloseOutcome"] | null;
             /** Format: date-time */
             createdAt: string;
             currency: components["schemas"]["Currency"];
@@ -840,6 +892,11 @@ export interface components {
             details?: {
                 [key: string]: string | number | boolean | string[];
             };
+            /**
+             * Format: date-time
+             * @description Только при замене (PUT): updatedAt черновика, с которым работает форма. Изменён в другой вкладке — 409
+             */
+            expectedUpdatedAt?: string;
             /** @description Позиции других категорий; проверяются мягко, неверные отбрасываются */
             extraItems?: Record<string, never>[];
             title?: string | null;
@@ -885,6 +942,11 @@ export interface components {
             details?: {
                 [key: string]: string | number | boolean | string[];
             };
+            /**
+             * Format: date-time
+             * @description updatedAt заказа, с которым открыта форма. Если заказ с тех пор изменён (другая вкладка) — 409, правка не применяется
+             */
+            expectedUpdatedAt?: string;
             /** @description Позиции других категорий целиком (заменяют прежние); без поля: не менять */
             extraItems?: {
                 category: components["schemas"]["JobCategory"];
@@ -961,6 +1023,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Health"];
+                };
+            };
+        };
+    };
+    Health_ready: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Health"];
+                };
+            };
+            /** @description Функция временно выключена */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -2261,6 +2351,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Конфликт с текущим состоянием ресурса */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Превышен лимит частоты запросов или суточная квота */
             429: {
                 headers: {
@@ -2589,7 +2688,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseJobDto"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -2597,6 +2700,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OwnJobDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Нет действующей сессии или неверные учётные данные */

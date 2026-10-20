@@ -5,7 +5,9 @@ import { type RefObject, useEffect, useRef } from 'react';
 import {
   FLIGHT_BASE,
   FLIGHT_SECONDS,
+  FLIGHT_VIDEO_LOAD,
   flightGlideRate,
+  flightLoadsAfterPageLoad,
   flightPoster,
   flightSeconds,
   flightSources,
@@ -265,8 +267,22 @@ export function FlightVideo({
 
     // Видео — после загрузки страницы: иначе на медленной сети оно задерживает событие load,
     // а первый кадр и так виден картинкой.
-    const start = () => load(forward, 'forward');
-    if (document.readyState === 'complete') start();
+    // Reduced motion: при гидратации компонент успевает смонтироваться до переключения на
+    // статичную версию — без этой проверки 15 МБ ролика грузились зря (ТЗ #40, п. 8).
+    const start = () => {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || forward.src) return;
+      load(forward, 'forward');
+    };
+    // Вариант загрузки (FLIGHT_VIDEO_LOAD): сразу после загрузки страницы или по первому действию
+    // человека — до него виден постер, видео не качается.
+    const intents = ['wheel', 'touchstart', 'keydown', 'scroll'] as const;
+    const onIntent = () => {
+      for (const type of intents) window.removeEventListener(type, onIntent);
+      start();
+    };
+    if (!flightLoadsAfterPageLoad(FLIGHT_VIDEO_LOAD, connection?.saveData === true)) {
+      for (const type of intents) window.addEventListener(type, onIntent, { passive: true });
+    } else if (document.readyState === 'complete') start();
     else window.addEventListener('load', start, { once: true });
 
     const unsubscribe = progress.on('change', schedule);
@@ -274,14 +290,21 @@ export function FlightVideo({
       cancelled = true;
       player.current = null;
       window.removeEventListener('load', start);
+      for (const type of intents) window.removeEventListener(type, onIntent);
       forward.removeEventListener('loadeddata', onForwardData);
       reverse.removeEventListener('loadeddata', onReverseData);
       forward.removeEventListener('canplaythrough', onForwardReady);
       forward.removeEventListener('seeked', onSeeked);
       unsubscribe();
       cancelAnimationFrame(raf);
-      forward.pause();
-      reverse.pause();
+      // Снять адреса: иначе браузер докачивает ролики после ухода компонента.
+      for (const video of [forward, reverse]) {
+        video.pause();
+        if (video.getAttribute('src')) {
+          video.removeAttribute('src');
+          video.load();
+        }
+      }
     };
   }, [progress, player]);
 

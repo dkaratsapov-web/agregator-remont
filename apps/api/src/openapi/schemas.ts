@@ -1,18 +1,22 @@
 import {
+  BID_REJECT_REASONS,
   BID_STATUSES,
   CURRENCIES,
   JOB_CATEGORIES,
+  JOB_CLOSE_OUTCOMES,
   JOB_STATUSES,
   UI_MOTIONS,
   UI_SCALES,
   UI_THEMES,
   USER_ROLES,
   type AuthSessionDto,
+  type BidRejectReason,
   type BidStatus,
   type ContractorProfileDto,
   type Currency,
   type JobBidDto,
   type JobCategory,
+  type JobCloseOutcome,
   type JobDetails,
   type JobDraftDto,
   type JobDto,
@@ -83,6 +87,13 @@ export class JobSchema implements JobDto {
 export class OwnJobSchema extends JobSchema implements OwnJobDto {
   @dateTime() updatedAt!: string;
   @ApiProperty({ description: 'Редактировать можно только открытый заказ' }) editable!: boolean;
+  @ApiProperty({
+    enum: JOB_CLOSE_OUTCOMES,
+    enumName: 'JobCloseOutcome',
+    nullable: true,
+    description: 'Исход закрытого заказа; null — не закрыт или закрыт до появления поля',
+  })
+  closeOutcome!: JobCloseOutcome | null;
 }
 
 @ApiSchema({ name: 'JobDraftDto' })
@@ -199,6 +210,20 @@ class BidFields {
   @int({ nullable: true }) durationDays!: number | null;
   @ApiProperty() comment!: string;
   @dateTime() createdAt!: string;
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'Когда заказчик изменил заказ после этого отклика; null — не менял',
+  })
+  jobChangedAt!: string | null;
+  @ApiProperty({
+    enum: BID_REJECT_REASONS,
+    enumName: 'BidRejectReason',
+    nullable: true,
+    description: 'Почему отклик отклонён (только у REJECTED)',
+  })
+  rejectReason!: BidRejectReason | null;
 }
 
 @ApiSchema({ name: 'MyBidJob' })
@@ -207,6 +232,8 @@ export class MyBidJobSchema {
   @ApiProperty() title!: string;
   @ApiProperty() city!: string;
   @ApiProperty({ enum: JOB_STATUSES, enumName: 'JobStatus' }) status!: JobStatus;
+  @ApiProperty({ enum: JOB_CLOSE_OUTCOMES, enumName: 'JobCloseOutcome', nullable: true })
+  closeOutcome!: JobCloseOutcome | null;
 }
 
 @ApiSchema({ name: 'MyBidDto' })

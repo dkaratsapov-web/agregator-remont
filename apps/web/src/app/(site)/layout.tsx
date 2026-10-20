@@ -1,4 +1,6 @@
 import { DEFAULT_UI_PREFERENCES } from '@agregator/shared';
+import { Suspense } from 'react';
+import { NavigationProgress } from '@/components/navigation-progress';
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { getCurrentUser } from '@/lib/session';
@@ -22,6 +24,10 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
         <div className="site-backdrop__glow" />
         <div className="site-backdrop__fade" />
       </div>
+      {/* useSearchParams требует границу Suspense, иначе страница перестаёт быть статической. */}
+      <Suspense fallback={null}>
+        <NavigationProgress />
+      </Suspense>
       <SiteHeader />
       <main id="main" className="pb-[env(safe-area-inset-bottom)]">
         {children}

@@ -11,6 +11,8 @@
         pending | failure:<причина> | success
     python3 ci_gate.py pages < page.json
         число задач на странице и total_count через пробел (для перебора страниц)
+    python3 ci_gate.py pr SHA BRANCH < pulls.json   (ответ /commits/SHA/pulls)
+        pr:<номер> | failure:<причина>
 """
 
 import json
@@ -55,6 +57,20 @@ def check_jobs(pages: list, required: list) -> str:
     return 'success'
 
 
+def merged_pr(pulls: list, sha: str, branch: str) -> str:
+    # Коммит ветки должен быть результатом слияния PR в эту ветку (merge, squash или rebase —
+    # merge_commit_sha совпадает с SHA). Прямой push в main такого PR не имеет, а коммит из
+    # середины PR — имеет, но с другим merge_commit_sha.
+    for pr in pulls:
+        if (
+            pr.get('merged_at')
+            and pr.get('merge_commit_sha') == sha
+            and (pr.get('base') or {}).get('ref') == branch
+        ):
+            return f"pr:{pr['number']}"
+    return f'failure:коммит попал в {branch} не через слитый PR'
+
+
 def main() -> None:
     mode = sys.argv[1]
     if mode == 'run':
@@ -66,6 +82,11 @@ def main() -> None:
     elif mode == 'pages':
         page = json.load(sys.stdin)
         print(len(page.get('jobs') or []), page.get('total_count', 0))
+    elif mode == 'pr':
+        pulls = json.load(sys.stdin)
+        if not isinstance(pulls, list):
+            raise TypeError('pulls')
+        print(merged_pr(pulls, sys.argv[2], sys.argv[3]))
     else:
         raise SystemExit(f'unknown mode {mode}')
 

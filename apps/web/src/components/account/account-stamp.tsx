@@ -59,7 +59,7 @@ export function AccountStamp({ user }: { user: UserDto }) {
       footer={
         <Link
           href="/account/settings#profile"
-          className="font-semibold text-ink underline decoration-ink/25 underline-offset-4 hover:decoration-accent"
+          className="inline-flex min-h-6 items-center font-semibold text-ink underline decoration-ink/25 underline-offset-4 hover:decoration-accent"
         >
           Изменить профиль
         </Link>

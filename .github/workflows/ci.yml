@@ -20,7 +20,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
         env:
           POSTGRES_USER: agregator
           POSTGRES_PASSWORD: agregator
@@ -28,7 +28,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U agregator -d agregator_test"
+          --health-cmd "pg_isready -h 127.0.0.1 -U agregator -d agregator_test"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
@@ -41,11 +41,11 @@ jobs:
       NEXT_TELEMETRY_DISABLED: '1'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -62,13 +62,37 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Test
-        run: pnpm test
+      - name: Test with coverage
+        run: |
+          pnpm --filter @agregator/shared build
+          pnpm --filter @agregator/api test:cov
+          pnpm --filter @agregator/web test:cov
+
+      - name: Coverage report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage
+          path: |
+            apps/api/coverage/lcov.info
+            apps/web/coverage/lcov.info
+          if-no-files-found: ignore
+
+      # Новые миграции PR не ломают прежнюю версию API (откат и время между migrate и стартом
+      # нового API): опасные операции — только с пометкой rollback-safe (ТЗ #40, DEV-7).
+      - name: New migrations are compatible with the previous API
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          bash deploy/autodeploy/migration-check.sh FETCH_HEAD HEAD
 
       - name: Autodeploy script (shellcheck and scenarios)
         run: |
-          shellcheck deploy/autodeploy/*.sh scripts/autodeploy-test.sh
+          shellcheck -x deploy/autodeploy/*.sh deploy/backup/*.sh scripts/autodeploy-test.sh scripts/perf/*.sh scripts/image-secrets-check.sh scripts/drills.sh scripts/schema-compat-test.sh scripts/migration-check-test.sh
           bash scripts/autodeploy-test.sh
+          bash scripts/migration-check-test.sh
 
       - name: Build
         run: pnpm build
@@ -81,14 +105,35 @@ jobs:
           pnpm --filter @agregator/shared openapi:types
           git diff --exit-code -- apps/api/openapi.json packages/shared/src/generated
 
+      # ARCH-8: schema.prisma и миграции не расходятся (забытая миграция или правка SQL мимо
+      # схемы). Частичные индексы Prisma не видит; они перечислены в комментариях schema.prisma.
+      - name: Schema matches migrations
+        run: |
+          PGPASSWORD=agregator psql -h localhost -U agregator -d agregator_test \
+            -c 'CREATE DATABASE agregator_shadow'
+          pnpm --filter @agregator/api exec prisma migrate diff --exit-code \
+            --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url postgresql://agregator:agregator@localhost:5432/agregator_shadow
+
       - name: Migrations and seed apply cleanly
         run: |
           pnpm --filter @agregator/api exec prisma migrate deploy
           pnpm --filter @agregator/api exec tsx prisma/seed.ts
           pnpm --filter @agregator/api exec tsx prisma/seed.ts
 
+      # Обновление схемы на данных прежнего формата и совместимость прежнего API с новой схемой
+      # (ТЗ #40, п. 6): база базовой ветки → новые миграции; прежний и новый API на ней.
+      - name: Schema upgrade on legacy data and the previous API
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          COMPAT_PG: postgresql://agregator:agregator@localhost:5432
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          bash scripts/schema-compat-test.sh FETCH_HEAD
+
       - name: Install Chromium for browser checks
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium webkit
 
       - name: Smoke and integration tests (production build)
         env:
@@ -102,7 +147,7 @@ jobs:
         run: |
           # Логин и пароль тестировщика (страница /gate) проверяет web: хеш тот же, что в deploy/.env.
           export BASIC_AUTH_USER=tester
-          export BASIC_AUTH_HASH=$(docker run --rm caddy:2-alpine caddy hash-password --plaintext 'ci-password')
+          export BASIC_AUTH_HASH=$(docker run --rm caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f caddy hash-password --plaintext 'ci-password')
           node apps/api/dist/main.js > api.log 2>&1 &
           echo $! > api.pid
           (cd apps/web && pnpm exec next start --port 3000 > ../../web.log 2>&1 &)
@@ -113,13 +158,26 @@ jobs:
           node scripts/drafts-e2e.mjs
           # Заказ с несколькими категориями: позиции в форме, страница заказа, каталог.
           node scripts/job-items-e2e.mjs
+          # Сценарии MVP из аудита: повтор публикации, две вкладки (заказ и черновик), истёкшая
+          # сессия посреди формы, пометка откликов после правки, исход закрытия.
+          node scripts/mvp-e2e.mjs
+          # Пробелы тестов из аудита: регистрация, обрыв сети при автосохранении, пустой поиск,
+          # двойной клик по «Откликнуться» и «Выбрать», выход в другой вкладке.
+          node scripts/cabinet-e2e.mjs
+          # Сквозной путь на телефоне: регистрация → анкета → черновик → публикация → отклик с
+          # клавиатуры → выбор → закрытие; страницы на 320/390/768 px (ТЗ #42, п. 7).
+          node scripts/journey-e2e.mjs
+          # Доступность из аудита (UX-1…14), замеры LCP/CLS/INP и видео пролёта на главной.
+          node scripts/ux-e2e.mjs
+          # Safari (WebKit, iPhone): поведение главной, видео, reduced motion, вход (ТЗ #40, п. 8).
+          node scripts/webkit-e2e.mjs
           # Главная за настоящим deploy/Caddyfile (http://localhost:8080, подходит для service
           # worker): публичность, отсутствие запросов в закрытую часть, клавиатура, reduced motion,
           # диалог пароля мимо SW и офлайн-страница при остановленном Caddy (scripts/landing-e2e.mjs).
           sed 's#web:3000#localhost:3000#g' deploy/Caddyfile > "$RUNNER_TEMP/Caddyfile"
           docker run -d --name e2e-caddy --network host \
             -e DOMAIN=http://localhost:8080 \
-            -v "$RUNNER_TEMP/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine
+            -v "$RUNNER_TEMP/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
           for i in $(seq 1 30); do curl -fs -o /dev/null http://localhost:8080/ && break; sleep 1; done
           STOP_PROXY_CMD='docker stop e2e-caddy' node scripts/landing-e2e.mjs
           # Последним: в конце останавливает API, чтобы проверить выход при сбое API.
@@ -137,9 +195,9 @@ jobs:
       COMPOSE: docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.local.yml -f deploy/docker-compose.ci.yml
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
 
@@ -163,8 +221,29 @@ jobs:
             grep -q 'DEBIAN_MIRROR:' build.log || { echo "failed for another reason: $bad"; tail -20 build.log; exit 1; }
           done
 
+      # В контексте сборки как на сервере: deploy/.env, сертификат банка, дамп базы, локальный
+      # .env. Ни один из них не должен попасть в образы (проверка ниже, ТЗ #40, DEV-5).
+      - name: Plant secrets in the build context
+        run: |
+          mkdir -p deploy/secrets
+          echo planted > deploy/secrets/ci-planted.p12
+          echo planted > deploy/secrets/ci-planted.pem
+          echo planted > agregator-20260101T000000Z-ci.dump
+          echo 'PLANTED=1' > .env.local
+
       - name: Build images and start the stack
         run: $COMPOSE up -d --build
+
+      - name: No secrets in the built images
+        run: |
+          # Самопроверка: образ с .env внутри должен не пройти.
+          mkdir -p "$RUNNER_TEMP/bad" && echo 'PLANTED=1' > "$RUNNER_TEMP/bad/.env"
+          printf 'FROM scratch\nCOPY .env /repo/.env\n' > "$RUNNER_TEMP/bad/Dockerfile"
+          docker build -q -t secrets-selftest "$RUNNER_TEMP/bad" > /dev/null
+          if bash scripts/image-secrets-check.sh secrets-selftest; then
+            echo 'self-test: planted .env was not detected'; exit 1
+          fi
+          bash scripts/image-secrets-check.sh agregator-api:local agregator-web:local
 
       - name: Wait for web
         run: |
@@ -211,6 +290,53 @@ jobs:
         if: always()
         run: $COMPOSE down -v
 
+  drills:
+    name: Disaster drills (backup, restore, broken release, rollback)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      COMPOSE: docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install age and rclone (offsite backup drill)
+        run: sudo apt-get update -q && sudo apt-get install -y -q age rclone
+
+      - name: Prepare deploy/.env
+        run: |
+          cp deploy/.env.example deploy/.env
+          HASH=$(docker run --rm caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f caddy hash-password --plaintext 'ci-password')
+          {
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
+            echo "DOMAIN=localhost"
+            echo "PUBLIC_ORIGIN=https://localhost"
+            echo "WEB_TRUST_PROXY_HOPS=1"
+            echo "BASIC_AUTH_USER=tester"
+            echo "BASIC_AUTH_HASH='$HASH'"
+          } >> deploy/.env
+
+      - name: Build images and start the stack
+        run: $COMPOSE up -d --build
+
+      # Одноразовый стек раннера: настоящие копия, восстановление, сломанный релиз и откат
+      # (scripts/drills.sh, ТЗ #40). На production не запускается.
+      - name: Drills
+        env:
+          DRILLS_DIR: ${{ runner.temp }}/drills
+        run: bash scripts/drills.sh
+
+      - name: Drill logs on failure
+        if: failure()
+        run: |
+          tail -n 50 "$RUNNER_TEMP"/drills/*.log || true
+          $COMPOSE ps
+          $COMPOSE logs --tail 100 api
+
+      - name: Stop the stack
+        if: always()
+        run: $COMPOSE down -v
+
   proxy:
     name: Docker stack behind Caddy (proxy)
     runs-on: ubuntu-latest
@@ -219,16 +345,16 @@ jobs:
       COMPOSE: docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
 
       - name: Prepare deploy/.env for https://localhost (Caddy internal CA)
         run: |
           cp deploy/.env.example deploy/.env
-          HASH=$(docker run --rm caddy:2-alpine caddy hash-password --plaintext 'ci-password')
+          HASH=$(docker run --rm caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f caddy hash-password --plaintext 'ci-password')
           {
             echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
             echo "DOMAIN=localhost"

@@ -138,13 +138,12 @@ const sber = {
       },
     });
     const accessToken = accessTokenOf(token.status, token.body);
+    // Сбер всегда отдаёт id_token (OIDC): без него nonce не проверить, вход не принимается.
     const claims = jwtPayload(record(token.body).id_token);
-    if (claims) {
-      const aud = claims.aud;
-      const audiences = Array.isArray(aud) ? aud : [aud];
-      if (!audiences.includes(config.clientId)) throw new BankAuthError('id_token aud mismatch');
-      if (claims.nonce !== params.nonce) throw new BankAuthError('id_token nonce mismatch');
-    }
+    if (!claims) throw new BankAuthError('no id_token in token response');
+    const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+    if (!audiences.includes(config.clientId)) throw new BankAuthError('id_token aud mismatch');
+    if (claims.nonce !== params.nonce) throw new BankAuthError('id_token nonce mismatch');
 
     const info = await bankRequest({
       url: config.userinfoUrl,
@@ -158,8 +157,8 @@ const sber = {
     });
     if (info.status !== 200) throw new BankAuthError(`userinfo failed with ${info.status}`);
     const user = record(info.body);
-    const subject = subjectOf(user.sub ?? claims?.sub);
-    if (claims?.sub !== undefined && String(claims.sub) !== subject) {
+    const subject = subjectOf(user.sub ?? claims.sub);
+    if (claims.sub !== undefined && String(claims.sub) !== subject) {
       throw new BankAuthError('userinfo sub differs from id_token sub');
     }
 
