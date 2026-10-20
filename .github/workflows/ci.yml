@@ -169,6 +169,9 @@ jobs:
           node scripts/journey-e2e.mjs
           # «Ход работ» двумя пользователями: план, согласование, этапы, доработка, отказ (фаза 2).
           node scripts/plan-e2e.mjs
+          # Переписка и фото двумя пользователями: автообновление, уменьшение фото в браузере,
+          # фото-отчёт к этапу, сообщение без JS, посторонний не видит фото (фаза 2).
+          node scripts/chat-e2e.mjs
           # Доступность из аудита (UX-1…14), замеры LCP/CLS/INP и видео пролёта на главной.
           node scripts/ux-e2e.mjs
           # Safari (WebKit, iPhone): поведение главной, видео, reduced motion, вход (ТЗ #40, п. 8).
@@ -406,6 +409,18 @@ jobs:
           grep -q '__Host-ar_gate' gate.jar
           test "$(curl -sk -b gate.jar -o /dev/null -w '%{http_code}' https://localhost/jobs)" = "200"
           curl -sk -D - -o /dev/null -b gate.jar https://localhost/jobs | grep -i '^strict-transport-security: max-age=31536000'
+          # Размер тела: до 8 МБ везде, до 27 МБ на страницах заказа и «Хода работ» (фото к
+          # сообщениям и сдаче этапа); больше — 413 от Caddy, до web.
+          head -c 9437184 /dev/zero > body-9m.bin
+          head -c 29360128 /dev/zero > body-28m.bin
+          post_size() {
+            curl -sk -b gate.jar -o /dev/null -w '%{http_code}' -X POST \
+              -H 'Content-Type: application/octet-stream' --data-binary "@$1" "https://localhost$2"
+          }
+          test "$(post_size body-9m.bin /jobs)" = "413"
+          test "$(post_size body-9m.bin /account/work/nope)" != "413"
+          test "$(post_size body-28m.bin /account/work/nope)" = "413"
+          rm -f body-9m.bin body-28m.bin
           # Подделанный или чужой пропуск не принимается.
           test "$(curl -sk -H 'Cookie: __Host-ar_gate=v1.9999999999.forged' -o /dev/null -w '%{http_code}' https://localhost/jobs)" = "401"
           test "$(curl -sk -H 'Cookie: __Host-ar_gate=' -o /dev/null -w '%{http_code}' https://localhost/jobs)" = "401"
