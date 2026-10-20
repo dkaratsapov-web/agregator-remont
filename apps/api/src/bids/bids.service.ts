@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { Job, Prisma } from '@prisma/client';
 import { writeAudit } from '../audit/audit';
+import { notify } from '../notifications/notify';
 import { ENTITY_ID_PATTERN } from '../common/text';
 import { PrismaService } from '../prisma/prisma.service';
 import { toJobBidDto, toMyBidDto } from './bid.mapper';
@@ -34,8 +35,9 @@ const BID_NOT_FOUND = 'Отклик не найден';
  * Каждая операция берёт подмножество этой цепочки строго в этом порядке:
  * - create: пользователь (FOR UPDATE, квота) → заказ (FOR SHARE);
  * - accept / закрытие заказа: заказ (FOR UPDATE) → отклики (FOR UPDATE);
- * - withdraw: только отклик (FOR UPDATE) — после него ничего не блокируется,
- *   поэтому цикл ожидания с accept невозможен.
+ * - withdraw: заказ (FOR KEY SHARE) → отклик (FOR UPDATE). Заказ берётся первым, потому что
+ *   уведомление заказчику ссылается на заказ (внешний ключ тоже берёт KEY SHARE): взятый после
+ *   отклика, он замкнул бы цикл ожидания с accept.
  */
 @Injectable()
 export class BidsService {
@@ -91,6 +93,13 @@ export class BidsService {
             status: { from: null, to: created.status },
           },
         });
+        await notify(tx, {
+          actorId: contractorId,
+          userId: created.job.ownerId,
+          jobId,
+          kind: 'BID_RECEIVED',
+          data: { price: created.price, durationDays: created.durationDays ?? undefined },
+        });
         return created;
       });
       return toMyBidDto(bid);
@@ -123,6 +132,10 @@ export class BidsService {
   async withdraw(contractorId: string, bidId: string): Promise<MyBidDto> {
     if (!ENTITY_ID_PATTERN.test(bidId)) throw new NotFoundException(BID_NOT_FOUND);
     const bid = await this.prisma.$transaction(async (tx) => {
+      const own = await tx.$queryRaw<{ job_id: string }[]>`
+        SELECT job_id FROM bids WHERE id = ${bidId} AND contractor_id = ${contractorId}`;
+      if (own.length === 0) throw new NotFoundException(BID_NOT_FOUND);
+      await tx.$queryRaw`SELECT id FROM jobs WHERE id = ${own[0].job_id} FOR KEY SHARE`;
       const locked = await tx.$queryRaw<{ id: string }[]>`
         SELECT id FROM bids WHERE id = ${bidId} AND contractor_id = ${contractorId} FOR UPDATE`;
       if (locked.length === 0) throw new NotFoundException(BID_NOT_FOUND);
@@ -141,6 +154,12 @@ export class BidsService {
         entityType: 'bid',
         entityId: bidId,
         changes: { status: { from: current.status, to: updated.status } },
+      });
+      await notify(tx, {
+        actorId: contractorId,
+        userId: updated.job.ownerId,
+        jobId: updated.jobId,
+        kind: 'BID_WITHDRAWN',
       });
       return updated;
     });
@@ -194,6 +213,12 @@ export class BidsService {
         entityId: bidId,
         changes: { status: { from: 'PENDING', to: 'ACCEPTED' } },
       });
+      await notify(tx, {
+        actorId: ownerId,
+        userId: updated.contractorId,
+        jobId,
+        kind: 'BID_ACCEPTED',
+      });
 
       await this.rejectPending(tx, ownerId, jobId, bidId, 'OTHER_ACCEPTED');
 
@@ -226,8 +251,8 @@ export class BidsService {
     exceptBidId: string | null,
     reason: BidRejectReason,
   ): Promise<void> {
-    const pending = await tx.$queryRaw<{ id: string }[]>`
-      SELECT id FROM bids
+    const pending = await tx.$queryRaw<{ id: string; contractor_id: string }[]>`
+      SELECT id, contractor_id FROM bids
       WHERE job_id = ${jobId} AND status = 'PENDING'::"BidStatus"
         AND (${exceptBidId}::text IS NULL OR id <> ${exceptBidId})
       ORDER BY id
@@ -247,6 +272,13 @@ export class BidsService {
           status: { from: 'PENDING', to: 'REJECTED' },
           rejectReason: { from: null, to: reason },
         },
+      });
+      await notify(tx, {
+        actorId,
+        userId: bid.contractor_id,
+        jobId,
+        kind: 'BID_REJECTED',
+        data: { reason },
       });
     }
   }

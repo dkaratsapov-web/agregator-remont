@@ -21,6 +21,7 @@ import {
 import { Job, Prisma } from '@prisma/client';
 import { diffFields, writeAudit, type FieldChanges } from '../audit/audit';
 import { BidsService } from '../bids/bids.service';
+import { notify } from '../notifications/notify';
 import { PaginationQuery } from '../jobs/dto/list-jobs.query';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateJobDto, UpdateJobDto } from './dto/job-input.dto';
@@ -291,6 +292,19 @@ export class MyJobsService {
         entityId: id,
         changes: diffFields(current, closed, ['status', 'closeOutcome']),
       });
+      if (current.status === 'IN_PROGRESS') {
+        const accepted = await tx.bid.findFirst({
+          where: { jobId: id, status: 'ACCEPTED' },
+          select: { contractorId: true },
+        });
+        await notify(tx, {
+          actorId: ownerId,
+          userId: accepted?.contractorId ?? null,
+          jobId: id,
+          kind: 'JOB_CLOSED',
+          data: { outcome: closed.closeOutcome ?? 'CANCELLED' },
+        });
+      }
       return closed;
     });
     return toOwnJobDto(job);

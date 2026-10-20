@@ -596,6 +596,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Notifications_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/notifications/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Notifications_markRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/notifications/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Notifications_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/oauth": {
         parameters: {
             query?: never;
@@ -990,6 +1038,17 @@ export interface components {
             email: string;
             password: string;
         };
+        MarkNotificationsReadDto: {
+            /**
+             * @description Все уведомления
+             * @enum {boolean}
+             */
+            all?: true;
+            /** @description Перечисленные уведомления */
+            ids?: string[];
+            /** @description Уведомления по заказу */
+            jobId?: string;
+        };
         MyBidDto: {
             comment: string;
             /** Format: date-time */
@@ -1015,6 +1074,50 @@ export interface components {
             id: string;
             status: components["schemas"]["JobStatus"];
             title: string;
+        };
+        NotificationData: {
+            /** @description Срок из отклика, дней */
+            durationDays?: number;
+            outcome?: components["schemas"]["JobCloseOutcome"];
+            /** @description Цена отклика, ₽ */
+            price?: number;
+            reason?: components["schemas"]["BidRejectReason"];
+            /** @description Название этапа */
+            stageTitle?: string;
+        };
+        NotificationDto: {
+            /** @description Сколько событий собрано (новые сообщения); у остальных — 1 */
+            count: number;
+            /** Format: date-time */
+            createdAt: string;
+            data: components["schemas"]["NotificationData"];
+            id: string;
+            jobId: string;
+            /** @description Текущее название заказа */
+            jobTitle: string;
+            kind: components["schemas"]["NotificationKind"];
+            /** @description Кем получатель приходится заказу */
+            party: components["schemas"]["PlanParty"];
+            read: boolean;
+        };
+        /** @enum {string} */
+        NotificationKind: "BID_RECEIVED" | "BID_WITHDRAWN" | "BID_ACCEPTED" | "BID_REJECTED" | "PLAN_PROPOSED" | "PLAN_APPROVED" | "PLAN_RETURNED" | "PLAN_AUTHOR_CHANGED" | "STAGE_SUBMITTED" | "STAGE_ACCEPTED" | "STAGE_REWORK" | "CONTRACTOR_QUIT" | "JOB_CLOSED" | "MESSAGE";
+        NotificationsPageDto: {
+            items: components["schemas"]["NotificationDto"][];
+            /** @description Курсор следующей страницы */
+            nextCursor: string | null;
+            /** @description Непрочитанных всего */
+            unread: number;
+        };
+        NotificationsSummaryDto: {
+            /** @description Заказы с непрочитанным */
+            jobs: components["schemas"]["NotificationsSummaryJobSchema"][];
+            /** @description Непрочитанных всего */
+            unread: number;
+        };
+        NotificationsSummaryJobSchema: {
+            jobId: string;
+            unread: number;
         };
         OAuthAuthorizeDto: {
             /** @description PKCE S256 */
@@ -4096,6 +4199,141 @@ export interface operations {
             };
             /** @description Конфликт с текущим состоянием ресурса */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Notifications_list: {
+        parameters: {
+            query?: {
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationsPageDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Notifications_markRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkNotificationsReadDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationsSummaryDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Notifications_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationsSummaryDto"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

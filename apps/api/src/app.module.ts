@@ -17,6 +17,7 @@ import { LeadsModule } from './leads/leads.module';
 import { MyJobsModule } from './my-jobs/my-jobs.module';
 import { OAuthModule } from './oauth/oauth.module';
 import { MessagesModule } from './messages/messages.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { PhotosModule } from './photos/photos.module';
 import { PlansModule } from './plans/plans.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -55,6 +56,7 @@ import { PrismaModule } from './prisma/prisma.module';
     OAuthModule,
     PlansModule,
     MessagesModule,
+    NotificationsModule,
     PhotosModule,
   ],
   controllers: [HealthController],

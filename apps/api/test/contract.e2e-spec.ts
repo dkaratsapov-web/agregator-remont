@@ -816,6 +816,23 @@ describe('API contract (e2e)', () => {
         http().post(`${base}/messages`).set(owner.auth).send({ body: 'Спасибо' }),
         409,
       );
+
+      // Уведомления: у заказчика — отклик с ценой и сообщение, у исполнителя — выбор, план,
+      // сообщения и закрытие заказа с исходом.
+      const N = '/v1/me/notifications';
+      const S = '/v1/me/notifications/summary';
+      const R = '/v1/me/notifications/read';
+      for (const who of [owner, contractor]) {
+        const listed = await check('get', N, http().get(N).set(who.auth), 200);
+        expect(listed.body.items.length).toBeGreaterThan(0);
+        await check('get', S, http().get(S).set(who.auth), 200);
+      }
+      await check('get', N, http().get(`${N}?cursor=a%20b`).set(owner.auth), 400);
+      await check('get', N, http().get(N), 401);
+      await check('get', S, http().get(S), 401);
+      await check('post', R, http().post(R).set(owner.auth).send({ jobId: created.id }), 200);
+      await check('post', R, http().post(R).set(owner.auth).send({}), 400);
+      await check('post', R, http().post(R).send({ all: true }), 401);
     });
   });
 

@@ -1,4 +1,4 @@
-import type { JobPlanDto, PlanParty } from '@agregator/shared';
+import type { JobPlanDto, NotificationData, NotificationKind, PlanParty } from '@agregator/shared';
 import {
   ConflictException,
   ForbiddenException,
@@ -8,6 +8,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { writeAudit } from '../audit/audit';
 import { ENTITY_ID_PATTERN } from '../common/text';
+import { notify } from '../notifications/notify';
 import type { ProcessedPhoto } from '../photos/photo-processing';
 import { PHOTO_SELECT, PhotosService } from '../photos/photos.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -112,6 +113,7 @@ export class PlansService {
       await this.audit(tx, userId, 'PLAN_AUTHOR_CHANGED', jobId, {
         author: { from: plan?.author ?? 'CONTRACTOR', to: dto.author },
       });
+      await this.notifyOther(tx, userId, deal, 'PLAN_AUTHOR_CHANGED');
       return saved;
     });
   }
@@ -137,6 +139,7 @@ export class PlansService {
         status: { from: 'DRAFT', to: 'PROPOSED' },
         version: { from: plan.version, to: saved.version },
       });
+      await this.notifyOther(tx, userId, deal, 'PLAN_PROPOSED');
       return saved;
     });
   }
@@ -159,6 +162,7 @@ export class PlansService {
         status: { from: 'PROPOSED', to: 'APPROVED' },
         version: { from: plan.version, to: saved.version },
       });
+      await this.notifyOther(tx, userId, deal, 'PLAN_APPROVED');
       return saved;
     });
   }
@@ -187,6 +191,7 @@ export class PlansService {
         status: { from: 'PROPOSED', to: 'DRAFT' },
         returnReason: { from: plan.returnReason, to: dto.reason },
       });
+      await this.notifyOther(tx, userId, deal, 'PLAN_RETURNED');
       return saved;
     });
   }
@@ -244,6 +249,7 @@ export class PlansService {
         },
         'job_stage',
       );
+      await this.notifyOther(tx, userId, deal, 'STAGE_SUBMITTED', { stageTitle: stage.title });
       return this.loadPlan(tx, jobId);
     });
   }
@@ -272,6 +278,7 @@ export class PlansService {
         },
         'job_stage',
       );
+      await this.notifyOther(tx, userId, deal, 'STAGE_ACCEPTED', { stageTitle: stage.title });
       return this.loadPlan(tx, jobId);
     });
   }
@@ -308,6 +315,7 @@ export class PlansService {
         },
         'job_stage',
       );
+      await this.notifyOther(tx, userId, deal, 'STAGE_REWORK', { stageTitle: stage.title });
       return this.loadPlan(tx, jobId);
     });
   }
@@ -352,10 +360,28 @@ export class PlansService {
         reason: { from: null, to: dto.reason },
         reopenedBids: { from: null, to: reopened.map((bid) => bid.id) },
       });
+      await this.notifyOther(tx, userId, deal, 'CONTRACTOR_QUIT');
     });
   }
 
   // --- общее
+
+  /** Уведомление другой стороне сделки — в той же транзакции, что и событие. */
+  private notifyOther(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    deal: Deal,
+    kind: Exclude<NotificationKind, 'MESSAGE'>,
+    data?: NotificationData,
+  ): Promise<void> {
+    return notify(tx, {
+      actorId: userId,
+      userId: deal.viewer === 'OWNER' ? deal.contractorId : deal.ownerId,
+      jobId: deal.jobId,
+      kind,
+      data,
+    });
+  }
 
   private async mutate(
     userId: string,

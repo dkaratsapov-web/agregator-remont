@@ -5,6 +5,7 @@ import {
   JOB_CATEGORIES,
   JOB_CLOSE_OUTCOMES,
   JOB_STATUSES,
+  NOTIFICATION_KINDS,
   PLAN_PARTIES,
   PLAN_STATUSES,
   STAGE_STATUSES,
@@ -28,6 +29,11 @@ import {
   type JobMessagesDto,
   type JobPlanDto,
   type JobStageDto,
+  type NotificationData,
+  type NotificationDto,
+  type NotificationKind,
+  type NotificationsPageDto,
+  type NotificationsSummaryDto,
   type JobStatus,
   type LeadDto,
   type MyBidDto,
@@ -45,7 +51,7 @@ import {
   type UserDto,
   type UserRole,
 } from '@agregator/shared';
-import { ApiProperty, ApiSchema } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
 import { jobDetailsProperty } from './job-details';
 
 /**
@@ -412,4 +418,56 @@ export class JobMessagesSchema implements JobMessagesDto {
   @ApiProperty({ description: 'Можно ли писать: заказ в работе' }) canWrite!: boolean;
   @ApiProperty({ type: [JobMessageSchema], description: 'Последние сообщения, от старых к новым' })
   items!: JobMessageSchema[];
+}
+
+/** Подробности события: только поля, относящиеся к его виду (остальных нет). */
+@ApiSchema({ name: 'NotificationData' })
+export class NotificationDataSchema implements NotificationData {
+  @ApiPropertyOptional({ description: 'Название этапа' }) stageTitle?: string;
+  @ApiPropertyOptional({ type: 'integer', description: 'Цена отклика, ₽' }) price?: number;
+  @ApiPropertyOptional({ type: 'integer', description: 'Срок из отклика, дней' })
+  durationDays?: number;
+  @ApiPropertyOptional({ enum: BID_REJECT_REASONS, enumName: 'BidRejectReason' })
+  reason?: BidRejectReason;
+  @ApiPropertyOptional({ enum: JOB_CLOSE_OUTCOMES, enumName: 'JobCloseOutcome' })
+  outcome?: JobCloseOutcome;
+}
+
+@ApiSchema({ name: 'NotificationDto' })
+export class NotificationSchema implements NotificationDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ enum: NOTIFICATION_KINDS, enumName: 'NotificationKind' }) kind!: NotificationKind;
+  @ApiProperty() jobId!: string;
+  @ApiProperty({ description: 'Текущее название заказа' }) jobTitle!: string;
+  @ApiProperty({
+    enum: PLAN_PARTIES,
+    enumName: 'PlanParty',
+    description: 'Кем получатель приходится заказу',
+  })
+  party!: PlanParty;
+  @int({ description: 'Сколько событий собрано (новые сообщения); у остальных — 1' })
+  count!: number;
+  @ApiProperty({ type: NotificationDataSchema }) data!: NotificationDataSchema;
+  @ApiProperty() read!: boolean;
+  @dateTime() createdAt!: string;
+}
+
+@ApiSchema({ name: 'NotificationsPageDto' })
+export class NotificationsPageSchema implements NotificationsPageDto {
+  @ApiProperty({ type: [NotificationSchema] }) items!: NotificationSchema[];
+  @int({ description: 'Непрочитанных всего' }) unread!: number;
+  @ApiProperty({ type: String, nullable: true, description: 'Курсор следующей страницы' })
+  nextCursor!: string | null;
+}
+
+export class NotificationsSummaryJobSchema {
+  @ApiProperty() jobId!: string;
+  @int() unread!: number;
+}
+
+@ApiSchema({ name: 'NotificationsSummaryDto' })
+export class NotificationsSummarySchema implements NotificationsSummaryDto {
+  @int({ description: 'Непрочитанных всего' }) unread!: number;
+  @ApiProperty({ type: [NotificationsSummaryJobSchema], description: 'Заказы с непрочитанным' })
+  jobs!: NotificationsSummaryJobSchema[];
 }

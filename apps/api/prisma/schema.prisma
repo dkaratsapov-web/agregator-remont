@@ -86,43 +86,44 @@ enum UserRole {
 }
 
 model Job {
-  id           String           @id @default(cuid())
-  title        String           @db.VarChar(160)
-  description  String
-  category     JobCategory
-  city         String           @db.VarChar(100)
+  id            String           @id @default(cuid())
+  title         String           @db.VarChar(160)
+  description   String
+  category      JobCategory
+  city          String           @db.VarChar(100)
   /// Целые рубли; null — «по договорённости». Ограничения проверяются CHECK в миграции.
-  budgetMin    Int?             @map("budget_min")
-  budgetMax    Int?             @map("budget_max")
-  currency     Currency         @default(RUB)
-  status       JobStatus        @default(OPEN)
+  budgetMin     Int?             @map("budget_min")
+  budgetMax     Int?             @map("budget_max")
+  currency      Currency         @default(RUB)
+  status        JobStatus        @default(OPEN)
   /// Чем закончился заказ: выполнен или отменён. Задаётся при закрытии; null — не закрыт или
   /// закрыт до появления поля.
-  closeOutcome JobCloseOutcome? @map("close_outcome")
+  closeOutcome  JobCloseOutcome? @map("close_outcome")
   /// Ответы анкеты категории ({ id вопроса: значение }); проверяются validateJobDetails из
   /// @agregator/shared. Объект и размер ограничены CHECK в миграции.
-  details      Json             @default("{}")
+  details       Json             @default("{}")
   /// Позиции других категорий: [{ category, details }], до 4 (job-items.ts). Проверяются
   /// validateJobItems; массив и размер ограничены CHECK в миграции.
-  extraItems   Json             @default("[]") @map("extra_items")
+  extraItems    Json             @default("[]") @map("extra_items")
   /// Все категории заказа: основная первой, затем дополнительные. Заполняет триггер базы из
   /// category и extraItems (писать не нужно); по ней ищет каталог (GIN-индекс).
-  categories   JobCategory[]    @default([])
+  categories    JobCategory[]    @default([])
   /// Заказчик-владелец. null у демонстрационных заказов из сида.
-  ownerId      String?          @map("owner_id")
+  ownerId       String?          @map("owner_id")
   /// Restrict: удаление пользователя не должно молча удалять или «осиротить» его заказы.
-  owner        User?            @relation(fields: [ownerId], references: [id], onDelete: Restrict)
-  bids         Bid[]
-  plan         JobPlan?
-  messages     JobMessage[]
-  photos       JobPhoto[]
-  createdAt    DateTime         @default(now()) @map("created_at")
-  updatedAt    DateTime         @updatedAt @map("updated_at")
+  owner         User?            @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  bids          Bid[]
+  plan          JobPlan?
+  messages      JobMessage[]
+  photos        JobPhoto[]
+  notifications Notification[]
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
   /// Ключ формы публикации (UUID): повтор того же запроса (двойной клик, обрыв связи) вернёт
   /// уже созданный заказ, а не создаст второй. Уникален в пределах владельца.
-  requestId    String?          @map("request_id") @db.Uuid
+  requestId     String?          @map("request_id") @db.Uuid
   /// SHA-256 содержимого публикации с этим ключом: повтор с другим содержимым — 409.
-  requestHash  String?          @map("request_hash") @db.VarChar(64)
+  requestHash   String?          @map("request_hash") @db.VarChar(64)
 
   @@unique([ownerId, requestId])
   @@index([createdAt(sort: Desc), id(sort: Desc)])
@@ -195,6 +196,7 @@ model User {
   dealMessages     JobMessage[]       @relation("JobMessageContractor")
   photosUploaded   JobPhoto[]         @relation("JobPhotoUploader")
   dealPhotos       JobPhoto[]         @relation("JobPhotoContractor")
+  notifications    Notification[]
 
   @@map("users")
 }
@@ -451,4 +453,48 @@ model JobPhotoBlob {
   thumb   Bytes
 
   @@map("job_photo_blobs")
+}
+
+// Синхронизировано с NOTIFICATION_KINDS в packages/shared/src/notifications.ts.
+enum NotificationKind {
+  BID_RECEIVED
+  BID_WITHDRAWN
+  BID_ACCEPTED
+  BID_REJECTED
+  PLAN_PROPOSED
+  PLAN_APPROVED
+  PLAN_RETURNED
+  PLAN_AUTHOR_CHANGED
+  STAGE_SUBMITTED
+  STAGE_ACCEPTED
+  STAGE_REWORK
+  CONTRACTOR_QUIT
+  JOB_CLOSED
+  MESSAGE
+}
+
+/// Уведомление в кабинете: событие по заказу для другой стороны. Пишется в транзакции события.
+/// Непрочитанные новые сообщения по заказу — одна строка со счётчиком (частичный уникальный
+/// индекс в миграции), прочитанные остаются в истории.
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String           @map("user_id")
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId     String           @map("job_id")
+  job       Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  kind      NotificationKind
+  /// Сколько событий собрано (новые сообщения); 1..10000 — CHECK в миграции.
+  count     Int              @default(1)
+  /// Снимок подробностей (NotificationData): объект, не больше 1 КБ — CHECK в миграции.
+  data      Json             @default("{}")
+  readAt    DateTime?        @map("read_at")
+  /// Время последнего события (у собранных сообщений сдвигается вперёд).
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  @@index([userId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([jobId])
+  // Частичные индексы Prisma не описывает, они только в SQL миграции
+  // 20261022100000_notifications: notifications_unread_idx (непрочитанные по пользователю и
+  // заказу) и notifications_message_unread_key (одна непрочитанная строка сообщений на заказ).
+  @@map("notifications")
 }
