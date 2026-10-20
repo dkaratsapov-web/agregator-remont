@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getUnreadSummary } from '@/lib/notifications-server';
 import { getCurrentUser } from '@/lib/session';
 import { AccountMenu } from './account-menu';
 import { HeaderSearch } from './header-search';
@@ -6,7 +7,7 @@ import { Wordmark } from './landing/wordmark';
 import { NavLink } from './nav-link';
 
 export async function SiteHeader() {
-  const user = await getCurrentUser();
+  const [user, summary] = await Promise.all([getCurrentUser(), getUnreadSummary()]);
   return (
     <header className="sticky top-0 z-30 bg-canvas/95 supports-[backdrop-filter]:bg-canvas/80 supports-[backdrop-filter]:backdrop-blur-xl">
       {/* Нижняя кромка — шкала рулетки; терракотовая полоса на ней — сколько страницы прокручено. */}
@@ -33,6 +34,7 @@ export async function SiteHeader() {
             {user ? (
               <AccountMenu
                 app
+                unread={summary?.unread ?? null}
                 user={{
                   name: user.name,
                   role: user.role,

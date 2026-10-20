@@ -1,11 +1,21 @@
 import { JOB_CLOSE_OUTCOME_LABELS, JOB_STATUS_LABELS, type MyBidDto } from '@agregator/shared';
 import Link from 'next/link';
 import { withdrawBidAction } from '@/app/(site)/account/bids/actions';
+import { UnreadPill } from '@/components/notifications/unread-pill';
 import { formatAmount, formatDate } from '@/lib/format';
 import { BidJobChangedNote, BidStatusBadge } from './bid-status-badge';
 import { ConfirmActionForm } from './confirm-action-form';
 
-export function MyBidList({ bids, returnTo }: { bids: MyBidDto[]; returnTo: string }) {
+/** Отклики подрядчика; unread — непрочитанные уведомления по заказам (пометка «Новое»). */
+export function MyBidList({
+  bids,
+  returnTo,
+  unread = {},
+}: {
+  bids: MyBidDto[];
+  returnTo: string;
+  unread?: Record<string, number>;
+}) {
   return (
     <ul className="divide-y divide-line">
       {bids.map((bid) => (
@@ -17,7 +27,10 @@ export function MyBidList({ bids, returnTo }: { bids: MyBidDto[]; returnTo: stri
             >
               {bid.job.title}
             </Link>
-            <BidStatusBadge status={bid.status} rejectReason={bid.rejectReason} />
+            <span className="flex items-center gap-2">
+              <UnreadPill count={unread[bid.job.id] ?? 0} />
+              <BidStatusBadge status={bid.status} rejectReason={bid.rejectReason} />
+            </span>
           </div>
           <p className="mt-1 text-sm text-ink-soft">
             {bid.job.city} · заказ{' '}

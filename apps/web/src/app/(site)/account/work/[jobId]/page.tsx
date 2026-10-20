@@ -11,6 +11,8 @@ import { StatusBadge } from '@/components/status-badge';
 import { PageHeader, secondaryLinkClass } from '@/components/ui/page-header';
 import { getMessages, getPlan, listMyBids } from '@/lib/api';
 import { requireContractorPage } from '@/lib/customer';
+import { MarkSeen } from '@/components/notifications/mark-seen';
+import { getUnreadSummary, unreadForJob } from '@/lib/notifications-server';
 
 export const metadata: Metadata = { title: 'Ход работ', robots: { index: false } };
 
@@ -55,9 +57,11 @@ export default async function WorkPage({
   }
   if (!plan || !job) notFound();
   const notice = planNotice(query.plan);
+  const summary = await getUnreadSummary();
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 pb-16 pt-10 sm:px-6 md:pt-14 lg:px-10">
+      <MarkSeen jobId={job.id} unread={unreadForJob(summary, job.id)} />
       <PageHeader
         back={{ href: '/account/bids', label: 'Мои отклики' }}
         title={job.title}

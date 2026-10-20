@@ -4,6 +4,7 @@ import { USER_ROLE_LABELS, type UserRole } from '@agregator/shared';
 import { useActionState, useEffect, useId, useRef, useState } from 'react';
 import { logoutAction, type AuthFormState } from '@/app/(site)/(auth)/actions';
 import { UserAvatar } from './account/user-avatar';
+import { NotificationBell } from './notification-bell';
 
 export interface MenuUser {
   name: string;
@@ -104,8 +105,19 @@ function LogoutItem() {
  * Иконки разделов и меню кабинета. Меню открывается наведением мыши, нажатием (телефон)
  * и с клавиатуры; закрывается уходом курсора, Escape, нажатием вне меню и уходом фокуса.
  */
-/** app — шапка приложения (прямоугольные формы, как в кабинете); без него — вид главной. */
-export function AccountMenu({ user, app = false }: { user: MenuUser; app?: boolean }) {
+/**
+ * app — шапка приложения (прямоугольные формы, как в кабинете); без него — вид главной.
+ * unread — непрочитанные уведомления: задан — показывается колокольчик (null — число неизвестно).
+ */
+export function AccountMenu({
+  user,
+  app = false,
+  unread,
+}: {
+  user: MenuUser;
+  app?: boolean;
+  unread?: number | null;
+}) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -145,6 +157,7 @@ export function AccountMenu({ user, app = false }: { user: MenuUser; app?: boole
 
   return (
     <div className="flex items-center gap-1">
+      {unread !== undefined ? <NotificationBell initial={unread} app={app} /> : null}
       <div
         className={
           app
@@ -242,6 +255,20 @@ export function AccountMenu({ user, app = false }: { user: MenuUser; app?: boole
               </span>
             </a>
 
+            {unread !== undefined ? (
+              <a
+                href="/account/notifications"
+                onClick={() => setOpen(false)}
+                className={`${itemClass} mt-2`}
+              >
+                Уведомления
+                {unread ? (
+                  <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold tabular-nums text-accent-ink">
+                    {unread > 99 ? '99+' : unread}
+                  </span>
+                ) : null}
+              </a>
+            ) : null}
             {[ROLE_LINKS[user.role], SECTION_LINKS].map((group, i) => (
               <ul key={i} className="mt-2 border-t border-line pt-2">
                 {group.map((link) => (

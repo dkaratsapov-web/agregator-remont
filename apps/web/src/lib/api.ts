@@ -24,6 +24,9 @@ import type {
   UiPreferences,
   UserDto,
   JobMessagesDto,
+  MarkNotificationsReadInput,
+  NotificationsPageDto,
+  NotificationsSummaryDto,
   JobPlanDto,
   PhotoSize,
   PlanInput,
@@ -513,6 +516,39 @@ export async function sendMessage(
     clientIp,
   });
   return expectJson<JobMessagesDto>(res, 'POST /v1/jobs/:id/messages');
+}
+
+// --- Уведомления в кабинете
+
+/** Страница уведомлений, новые сверху; cursor — nextCursor предыдущей страницы. */
+export async function getNotifications(
+  token: string,
+  cursor?: string,
+): Promise<NotificationsPageDto> {
+  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+  const res = await request(`/v1/me/notifications${query}`, { token });
+  return expectJson<NotificationsPageDto>(res, 'GET /v1/me/notifications');
+}
+
+/** Сколько непрочитанного всего и по заказам (значок в шапке, пометки в списках). */
+export async function getNotificationsSummary(token: string): Promise<NotificationsSummaryDto> {
+  const res = await request('/v1/me/notifications/summary', { token });
+  return expectJson<NotificationsSummaryDto>(res, 'GET /v1/me/notifications/summary');
+}
+
+/** Отметить прочитанным: всё, уведомления заказа или перечисленные. Возвращает сводку. */
+export async function markNotificationsRead(
+  token: string,
+  input: MarkNotificationsReadInput,
+  clientIp?: string,
+): Promise<NotificationsSummaryDto> {
+  const res = await request('/v1/me/notifications/read', {
+    method: 'POST',
+    body: input,
+    token,
+    clientIp,
+  });
+  return expectJson<NotificationsSummaryDto>(res, 'POST /v1/me/notifications/read');
 }
 
 /** Фото как есть (WebP); null — фото нет или нет доступа. */

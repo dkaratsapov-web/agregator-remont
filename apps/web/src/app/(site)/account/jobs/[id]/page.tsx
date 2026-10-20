@@ -22,6 +22,8 @@ import { JobPlanPanel } from '@/components/plan/job-plan-panel';
 import { planNotice } from '@/components/plan/plan-notice';
 import { getMessages, getMyJob, getPlan, listJobBids } from '@/lib/api';
 import { requireCustomerPage } from '@/lib/customer';
+import { MarkSeen } from '@/components/notifications/mark-seen';
+import { getUnreadSummary, unreadForJob } from '@/lib/notifications-server';
 import { formatAmount, formatBudget, formatDate } from '@/lib/format';
 import { closeJobAction, updateJobAction } from '../actions';
 
@@ -64,6 +66,7 @@ export default async function MyJobPage({
     );
   }
   if (!job) notFound();
+  const summary = await getUnreadSummary();
 
   const notice = query.created
     ? 'Заказ опубликован и появился в каталоге.'
@@ -81,6 +84,7 @@ export default async function MyJobPage({
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 pb-16 pt-10 sm:px-6 md:pt-14 lg:px-10">
+      <MarkSeen jobId={job.id} unread={unreadForJob(summary, job.id)} />
       <PageHeader
         back={{ href: '/account/jobs', label: 'Мои заказы' }}
         title={job.title}
@@ -134,7 +138,7 @@ export default async function MyJobPage({
               returnTo={`/account/jobs/${job.id}`}
             />
           ) : null}
-          <Sheet labelledBy="bids-title">
+          <Sheet labelledBy="bids-title" id="bids">
             <SheetHeader
               id="bids-title"
               title={

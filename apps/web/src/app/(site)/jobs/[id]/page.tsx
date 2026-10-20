@@ -13,6 +13,8 @@ import {
 } from '@/components/jobs/job-details';
 import { getJob, getMyJob, listMyBids } from '@/lib/api';
 import { getCurrentUser, getSessionToken } from '@/lib/session';
+import { MarkSeen } from '@/components/notifications/mark-seen';
+import { getUnreadSummary, unreadForJob } from '@/lib/notifications-server';
 import { formatBudget, formatDate } from '@/lib/format';
 import { jobsHref } from '@/lib/search-params';
 
@@ -64,7 +66,11 @@ export default async function JobPage({
   searchParams: SearchParams;
 }) {
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const [job, viewer] = await Promise.all([loadJob(id), loadViewer(id)]);
+  const [job, viewer, summary] = await Promise.all([
+    loadJob(id),
+    loadViewer(id),
+    getUnreadSummary(),
+  ]);
   if (!job) notFound();
   const own = viewer.own;
   const notice =
@@ -76,6 +82,8 @@ export default async function JobPage({
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 pt-8 sm:px-6 lg:px-10 md:pt-12">
+      {/* Отклонённый отклик ведёт сюда: уведомление прочитано, когда карточка открыта. */}
+      <MarkSeen jobId={job.id} unread={unreadForJob(summary, job.id)} />
       <nav aria-label="Навигационная цепочка" className="text-sm text-ink-soft">
         <ol className="flex flex-wrap items-center gap-1.5">
           <li>
