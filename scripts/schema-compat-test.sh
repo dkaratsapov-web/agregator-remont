@@ -68,24 +68,22 @@ before=$(q "select count(*) from jobs")/$(q "select count(*) from bids")
 (cd "$ROOT/apps/api" && DATABASE_URL=$DB pnpm exec prisma migrate deploy > /dev/null)
 check 'upgrade: rows kept' "$(q "select count(*) from jobs")/$(q "select count(*) from bids")" "$before"
 # Проверки обновления — для миграций этого PR (меняются в каждом PR, который меняет схему).
-check 'upgrade: message and photo tables created' "$(q "select count(*) from information_schema.tables where table_name in ('job_messages', 'job_photos', 'job_photo_blobs')")" 3
+check 'upgrade: notifications table created' "$(q "select count(*) from information_schema.tables where table_name = 'notifications'")" 1
+check 'upgrade: old deals have no notifications' "$(q "select count(*) from notifications")" 0
 check 'upgrade: old plan and stages kept' "$(q "select count(*) from job_plans")/$(q "select count(*) from job_stages")" 1/1
-check 'upgrade: old deals have no messages and photos' "$(q "select count(*) from job_messages")/$(q "select count(*) from job_photos")" 0/0
-# Прежний код удаляет заказ и план (отказ исполнителя): переписка и фото не должны мешать
-# (ON DELETE CASCADE), фото этапа уходят вместе с этапом.
+# Прежний код удаляет заказы и пользователей (тестовые данные, поддержка): уведомления не должны
+# мешать (ON DELETE CASCADE).
 q "insert into jobs (id, title, description, category, city, status, owner_id, updated_at) values
-   ('j-gone', 'Удаляемый', 'Заказ, который удалит прежний код', 'TILING', 'Москва', 'IN_PROGRESS', 'u-c', now());
-   insert into job_plans (id, job_id, updated_at) values ('p-gone', 'j-gone', now());
-   insert into job_stages (id, plan_id, position, title, updated_at) values ('s-gone', 'p-gone', 1, 'Этап', now());
-   insert into job_messages (id, job_id, contractor_id, author_id, body) values ('m-gone', 'j-gone', 'u-a', 'u-c', 'Сообщение');
-   insert into job_photos (id, job_id, contractor_id, uploader_id, stage_id, width, height, bytes) values ('ph-stage', 'j-gone', 'u-a', 'u-a', 's-gone', 10, 10, 1);
-   insert into job_photo_blobs (photo_id, \"full\", thumb) values ('ph-stage', '\x00', '\x00');
-   insert into job_photos (id, job_id, contractor_id, uploader_id, message_id, width, height, bytes) values ('ph-msg', 'j-gone', 'u-a', 'u-c', 'm-gone', 10, 10, 1)" > /dev/null
-q "delete from job_plans where id = 'p-gone'" > /dev/null
-check 'upgrade: deleting a plan removes stage photos, keeps the conversation' "$(q "select count(*) from job_photos where id = 'ph-stage'")/$(q "select count(*) from job_photo_blobs")/$(q "select count(*) from job_photos where id = 'ph-msg'")" 0/0/1
-q "delete from jobs where id = 'j-gone'" > /dev/null
-check 'upgrade: deleting a job removes its messages and photos' "$(q "select count(*) from job_messages")/$(q "select count(*) from job_photos")" 0/0
-check 'upgrade: a photo belongs to exactly one message or stage' "$(q "insert into job_photos (id, job_id, contractor_id, uploader_id, width, height, bytes) values ('ph-none', 'j-work', 'u-a', 'u-a', 10, 10, 1)" 2>&1 | grep -c job_photos_owner_check)" 1
+   ('j-gone', 'Удаляемый', 'Заказ, который удалит прежний код', 'TILING', 'Москва', 'OPEN', 'u-c', now());
+   insert into notifications (id, user_id, job_id, kind) values ('n-job', 'u-c', 'j-gone', 'BID_RECEIVED');
+   insert into users (id, email, name, password_hash, role, updated_at) values ('u-gone', 'gone@example.ru', 'Удаляемый', 'x', 'CONTRACTOR', now());
+   insert into notifications (id, user_id, job_id, kind) values ('n-user', 'u-gone', 'j-work', 'BID_REJECTED')" > /dev/null
+q "delete from jobs where id = 'j-gone'; delete from users where id = 'u-gone'" > /dev/null
+check 'upgrade: deleting a job or a user removes their notifications' "$(q "select count(*) from notifications")" 0
+q "insert into notifications (id, user_id, job_id, kind) values ('n-m1', 'u-a', 'j-work', 'MESSAGE')" > /dev/null
+check 'upgrade: one unread message row per user and job' "$(q "insert into notifications (id, user_id, job_id, kind) values ('n-m2', 'u-a', 'j-work', 'MESSAGE')" 2>&1 | grep -c notifications_message_unread_key)" 1
+check 'upgrade: notification data is an object' "$(q "insert into notifications (id, user_id, job_id, kind, data) values ('n-bad', 'u-a', 'j-work', 'BID_ACCEPTED', '[]')" 2>&1 | grep -c notifications_data_check)" 1
+q "delete from notifications" > /dev/null
 
 # --- 2 и 3. Прежний API на новой схеме, затем новый API на тех же данных.
 start_api() { # каталог порт

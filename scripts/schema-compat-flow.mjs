@@ -1,9 +1,10 @@
 // Сценарий для schema-compat-test.sh: node scripts/schema-compat-flow.mjs <old|new> <API_URL>
-// Описывает переход «базовый коммит → этот PR» (сейчас: переписка и фото поверх этапов).
-// old — прежний API работает на новой схеме: заказ, отклик, выбор исполнителя, план, сдача этапа
-// (без фото), закрытие с исходом, отказ исполнителя (удаление плана); пишет id в COMPAT_STATE.
-// new — текущий API читает данные прежнего: этап, сданный прежним API, без фото; переписка у
-// сделки, начатой прежним API, пустая, в неё можно писать с фото; закрытый заказ — только чтение.
+// Описывает переход «базовый коммит → этот PR» (сейчас: уведомления поверх переписки).
+// old — прежний API работает на новой схеме: заказ, отклик, выбор исполнителя, план, сдача этапа,
+// сообщение, закрытие с исходом, отказ исполнителя (удаление плана); пишет id в COMPAT_STATE.
+// Прежний API уведомлений не пишет.
+// new — текущий API читает данные прежнего: этап и переписка на месте, уведомлений у этих
+// пользователей нет; новые события в сделке прежнего API дают уведомления другой стороне.
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const [mode, API] = process.argv.slice(2);
@@ -107,6 +108,12 @@ if (mode === 'old') {
     body: { comment: 'Сдано прежним API' },
   });
   check('submits a stage on the new schema', submitted.status === 200, `got ${submitted.status}`);
+  const message = await call(`/v1/jobs/${workJob}/messages`, {
+    method: 'POST',
+    token: customer,
+    body: { body: 'Сообщение прежнего API' },
+  });
+  check('sends a message on the new schema', message.status === 200, `got ${message.status}`);
   const quitJob = await startWork(customer, contractor, false);
   await approvedPlan(customer, contractor, quitJob);
   const quit = await call(`/v1/jobs/${quitJob}/quit`, {
@@ -126,7 +133,10 @@ if (mode === 'old') {
     body: { outcome: 'COMPLETED' },
   });
   check('closes a job in progress with an outcome', closed.status === 200, `got ${closed.status}`);
-  writeFileSync(STATE, JSON.stringify({ customer, contractor, workJob, closedJob }));
+  writeFileSync(
+    STATE,
+    JSON.stringify({ customer, contractor, workJob, closedJob, stageId: plan.stages[0].id }),
+  );
 } else {
   const state = JSON.parse(readFileSync(STATE, 'utf8'));
   const mine = await call('/v1/me/jobs?limit=50', { token: state.customer });
@@ -143,38 +153,44 @@ if (mode === 'old') {
   );
   const chat = await call(`/v1/jobs/${state.workJob}/messages`, { token: state.contractor });
   check(
-    'a deal started by the old API has an empty conversation open for writing',
-    chat.status === 200 && chat.body.items.length === 0 && chat.body.canWrite === true,
+    'the conversation written by the old API is read',
+    chat.status === 200 && chat.body.items.length === 1 && chat.body.canWrite === true,
     `got ${chat.status}`,
   );
-  // PNG 1×1 — фото к сообщению через новый API.
-  const png = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-    'base64',
-  );
-  const form = new FormData();
-  form.append('body', 'Сообщение в сделке прежнего API');
-  form.append('photos', new Blob([png], { type: 'image/png' }), 'dot.png');
-  ip += 1;
-  const sent = await fetch(`${API}/v1/jobs/${state.workJob}/messages`, {
+  for (const [who, token] of [
+    ['customer', state.customer],
+    ['contractor', state.contractor],
+  ]) {
+    const list = await call('/v1/me/notifications', { token });
+    check(
+      `${who}: no notifications from old API events`,
+      list.status === 200 && list.body.items.length === 0 && list.body.unread === 0,
+      `got ${list.status}`,
+    );
+  }
+  const accepted = await call(`/v1/jobs/${state.workJob}/stages/${state.stageId}/accept`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${state.customer}`,
-      'X-Forwarded-For': `10.78.${process.pid % 250}.${ip % 250}`,
-    },
-    body: form,
+    token: state.customer,
   });
-  const sentBody = await sent.json().catch(() => null);
-  const photoId = sentBody?.items?.[0]?.photos?.[0]?.id;
+  const sent = await call(`/v1/jobs/${state.workJob}/messages`, {
+    method: 'POST',
+    token: state.customer,
+    body: { body: 'Сообщение нового API' },
+  });
+  const after = await call('/v1/me/notifications', { token: state.contractor });
   check(
-    'sends a message with a photo',
-    sent.status === 200 && Boolean(photoId),
-    `got ${sent.status}`,
+    'new events in an old deal notify the other side',
+    accepted.status === 200 &&
+      sent.status === 200 &&
+      after.body?.items.map((n) => n.kind).join(',') === 'MESSAGE,STAGE_ACCEPTED',
+    after.body?.items.map((n) => n.kind).join(','),
   );
-  const photo = await fetch(`${API}/v1/jobs/${state.workJob}/photos/${photoId}?size=thumb`, {
-    headers: { Authorization: `Bearer ${state.contractor}` },
+  const read = await call('/v1/me/notifications/read', {
+    method: 'POST',
+    token: state.contractor,
+    body: { jobId: state.workJob },
   });
-  check('the other side reads the photo', photo.status === 200, `got ${photo.status}`);
+  check('marks them read', read.status === 200 && read.body.unread === 0, `got ${read.status}`);
   const closedChat = await call(`/v1/jobs/${state.closedJob}/messages`, { token: state.customer });
   check(
     'a job closed by the old API: conversation read-only',
