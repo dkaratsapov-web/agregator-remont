@@ -1,4 +1,5 @@
 import type { JobCategory, JobCloseOutcome, JobStatus } from './jobs';
+import type { ContractorRatingDto } from './reviews';
 
 export const BID_STATUSES = ['PENDING', 'ACCEPTED', 'REJECTED', 'WITHDRAWN'] as const;
 export type BidStatus = (typeof BID_STATUSES)[number];
@@ -89,5 +90,11 @@ export interface MyBidDto extends BidDto {
 
 /** Отклик, который видит владелец заказа: подрядчик без email и других контактов. */
 export interface JobBidDto extends BidDto {
-  contractor: { name: string; profile: ContractorProfileDto | null };
+  contractor: {
+    /** Номер для публичной карточки мастера /contractors/<publicId>. */
+    publicId: number;
+    name: string;
+    profile: ContractorProfileDto | null;
+    rating: ContractorRatingDto;
+  };
 }

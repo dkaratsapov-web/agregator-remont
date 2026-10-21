@@ -11,7 +11,8 @@ import {
   JobPositionsDetails,
   jobCategoryLabels,
 } from '@/components/jobs/job-details';
-import { getJob, getMyJob, listMyBids } from '@/lib/api';
+import { getFavoriteIds, getJob, getMyJob, listMyBids } from '@/lib/api';
+import { FavoriteButton } from '@/components/jobs/favorite-button';
 import { getCurrentUser, getSessionToken } from '@/lib/session';
 import { ReportButton } from '@/components/moderation/report-button';
 import { Notice } from '@/components/notice';
@@ -40,23 +41,32 @@ interface Viewer {
   own: boolean;
   /** Отклик подрядчика на этот заказ, если есть. */
   myBid: MyBidDto | null;
+  /** Заказ в избранном у вошедшего. */
+  favorite: boolean;
 }
 
 async function loadViewer(id: string): Promise<Viewer> {
   const [user, token] = await Promise.all([getCurrentUser(), getSessionToken()]);
-  if (!user || !token) return { user: null, own: false, myBid: null };
+  if (!user || !token) return { user: null, own: false, myBid: null, favorite: false };
+  const favorite = getFavoriteIds(token)
+    .then((ids) => ids.includes(id))
+    .catch(() => false);
   try {
     if (user.role === 'CUSTOMER') {
-      return { user, own: (await getMyJob(token, id)) !== null, myBid: null };
+      const [own, isFavorite] = await Promise.all([getMyJob(token, id), favorite]);
+      return { user, own: own !== null, myBid: null, favorite: isFavorite };
     }
     if (user.role === 'CONTRACTOR') {
-      const bids = await listMyBids(token, 1, { jobId: id, limit: 1 });
-      return { user, own: false, myBid: bids.items[0] ?? null };
+      const [bids, isFavorite] = await Promise.all([
+        listMyBids(token, 1, { jobId: id, limit: 1 }),
+        favorite,
+      ]);
+      return { user, own: false, myBid: bids.items[0] ?? null, favorite: isFavorite };
     }
   } catch (error) {
     console.error('Job page: failed to load viewer state', error);
   }
-  return { user, own: false, myBid: null };
+  return { user, own: false, myBid: null, favorite: await favorite };
 }
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -178,7 +188,12 @@ export default async function JobPage({
             />
           )}
           {viewer.user && !own ? (
-            <div className="mt-4">
+            <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
+              <FavoriteButton
+                jobId={job.id}
+                favorite={viewer.favorite}
+                returnTo={`/jobs/${job.id}`}
+              />
               <ReportButton targetType="JOB" targetId={job.id} returnTo={`/jobs/${job.id}`} />
             </div>
           ) : null}

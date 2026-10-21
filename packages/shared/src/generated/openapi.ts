@@ -52,6 +52,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/flags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminModeration_listFlags"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/flags/{id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminModeration_resolveFlag"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/jobs/{id}/hidden": {
         parameters: {
             query?: never;
@@ -148,6 +180,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/reviews/{id}/hidden": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminModeration_hideReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AdminModeration_listUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/users/{id}/blocked": {
         parameters: {
             query?: never;
@@ -158,6 +222,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["AdminModeration_block"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/users/{id}/password-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AdminModeration_issuePasswordReset"];
         delete?: never;
         options?: never;
         head?: never;
@@ -260,6 +340,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/password-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Auth_resetPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/register": {
         parameters: {
             query?: never;
@@ -270,6 +366,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["Auth_register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/contractors/{publicId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ContractorsPublic_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -612,6 +724,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/favorites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Favorites_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/favorites/ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Favorites_ids"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/favorites/{jobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["Favorites_add"];
+        post?: never;
+        delete: operations["Favorites_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/jobs": {
         parameters: {
             query?: never;
@@ -686,6 +846,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["OwnerBids_accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/jobs/{jobId}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["JobReview_state"];
+        put?: never;
+        post: operations["JobReview_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -884,10 +1060,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reports/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Reports_mine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/mine/seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Reports_markSeen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AdminUserDto: {
+            bids: number;
+            blocked: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            email: string;
+            id: string;
+            jobs: number;
+            name: string;
+            /** @description Открытых жалоб на его заказы, сообщения и отклики */
+            openReports: number;
+            publicId: number;
+            role: components["schemas"]["UserRole"];
+        };
         AuthSessionDto: {
             /** Format: date-time */
             expiresAt: string;
@@ -898,6 +1120,9 @@ export interface components {
         BidContractor: {
             name: string;
             profile: components["schemas"]["ContractorProfileDto"] | null;
+            /** @description Номер публичной карточки мастера */
+            publicId: number;
+            rating: components["schemas"]["ContractorRatingDto"];
         };
         /**
          * @description Почему отклик отклонён (только у REJECTED)
@@ -924,6 +1149,24 @@ export interface components {
             /** @description Чем закончился заказ. Открытый заказ (исполнитель не выбран) можно только отменить, поле можно не передавать. Для заказа в работе поле обязательно */
             outcome?: components["schemas"]["JobCloseOutcome"];
         };
+        ContentFlagDto: {
+            author: components["schemas"]["ReportAuthorSchema"];
+            /** Format: date-time */
+            createdAt: string;
+            excerpt: string;
+            hidden: boolean;
+            id: string;
+            jobId: string;
+            jobTitle: string;
+            kinds: components["schemas"]["ContentFlagKind"][];
+            status: components["schemas"]["ReportStatus"];
+            targetId: string;
+            targetType: components["schemas"]["ContentFlagTarget"];
+        };
+        /** @enum {string} */
+        ContentFlagKind: "PHONE" | "EMAIL" | "LINK" | "MESSENGER";
+        /** @enum {string} */
+        ContentFlagTarget: "MESSAGE" | "BID";
         ContractorProfileDto: {
             about: string;
             categories: components["schemas"]["JobCategory"][];
@@ -934,6 +1177,11 @@ export interface components {
              * @description null, если профиль ещё не заполнялся
              */
             updatedAt: string | null;
+        };
+        ContractorRatingDto: {
+            /** @description Средняя оценка 1–5 с одним знаком; null — отзывов нет */
+            average: number | null;
+            count: number;
         };
         CreateBidDto: {
             comment: string;
@@ -991,6 +1239,11 @@ export interface components {
             targetId: string;
             targetType: components["schemas"]["ReportTarget"];
         };
+        CreateReviewDto: {
+            rating: number;
+            /** @default  */
+            text: string;
+        };
         /** @enum {string} */
         Currency: "RUB";
         ErrorResponse: {
@@ -999,6 +1252,13 @@ export interface components {
             error?: string;
             message: string | string[];
             statusCode: number;
+        };
+        FavoriteIdsDto: {
+            jobIds: string[];
+        };
+        FavoriteStateDto: {
+            favorite: boolean;
+            jobId: string;
         };
         Health: {
             /** @enum {string} */
@@ -1132,6 +1392,11 @@ export interface components {
             /** @description Кто смотрит */
             viewer: components["schemas"]["PlanParty"];
         };
+        JobReviewStateDto: {
+            canReview: boolean;
+            contractor: components["schemas"]["ReviewContractorSchema"] | null;
+            review: components["schemas"]["ReviewDto"] | null;
+        };
         JobStageDto: {
             /** Format: date-time */
             acceptedAt: string | null;
@@ -1218,6 +1483,21 @@ export interface components {
             status: components["schemas"]["JobStatus"];
             title: string;
         };
+        MyReportDto: {
+            /** Format: date-time */
+            createdAt: string;
+            id: string;
+            jobId: string;
+            jobTitle: string;
+            note: string | null;
+            reason: components["schemas"]["ReportReason"];
+            /** Format: date-time */
+            resolvedAt: string | null;
+            status: components["schemas"]["ReportStatus"];
+            targetType: components["schemas"]["ReportTarget"];
+            /** @description Решение есть, но ещё не просмотрено */
+            unseen: boolean;
+        };
         NotificationData: {
             /** @description Срок из отклика, дней */
             durationDays?: number;
@@ -1255,6 +1535,8 @@ export interface components {
         NotificationsSummaryDto: {
             /** @description Заказы с непрочитанным */
             jobs: components["schemas"]["NotificationsSummaryJobSchema"][];
+            /** @description Непросмотренные решения по вашим жалобам */
+            reportDecisions: number;
             /** @description Непрочитанных всего */
             unread: number;
         };
@@ -1333,6 +1615,18 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        PaginatedAdminUserDto: {
+            items: components["schemas"]["AdminUserDto"][];
+            limit: number;
+            page: number;
+            total: number;
+        };
+        PaginatedContentFlagDto: {
+            items: components["schemas"]["ContentFlagDto"][];
+            limit: number;
+            page: number;
+            total: number;
+        };
         PaginatedJobDto: {
             items: components["schemas"]["JobDto"][];
             limit: number;
@@ -1351,6 +1645,12 @@ export interface components {
             page: number;
             total: number;
         };
+        PaginatedMyReportDto: {
+            items: components["schemas"]["MyReportDto"][];
+            limit: number;
+            page: number;
+            total: number;
+        };
         PaginatedOwnJobDto: {
             items: components["schemas"]["OwnJobDto"][];
             limit: number;
@@ -1362,6 +1662,17 @@ export interface components {
             limit: number;
             page: number;
             total: number;
+        };
+        PasswordResetDto: {
+            password: string;
+            /** @description Токен из ссылки /reset/<токен> */
+            token: string;
+        };
+        PasswordResetLinkDto: {
+            /** Format: date-time */
+            expiresAt: string;
+            /** @description Токен для ссылки /reset/<токен>; показывается один раз */
+            token: string;
         };
         PhotoDto: {
             /** Format: date-time */
@@ -1388,6 +1699,17 @@ export interface components {
         PlanStatus: "DRAFT" | "PROPOSED" | "APPROVED";
         PlanVersionDto: {
             version: number;
+        };
+        PublicContractorDto: {
+            completedJobs: number;
+            hasMoreReviews: boolean;
+            /** Format: date-time */
+            memberSince: string;
+            name: string;
+            profile: components["schemas"]["ContractorProfileDto"] | null;
+            publicId: number;
+            rating: components["schemas"]["ContractorRatingDto"];
+            reviews: components["schemas"]["ReviewDto"][];
         };
         QuitJobDto: {
             reason: string;
@@ -1447,6 +1769,10 @@ export interface components {
         };
         /** @enum {string} */
         ReportTarget: "JOB" | "MESSAGE" | "BID";
+        ResolveFlagDto: {
+            /** @enum {string} */
+            status: "RESOLVED" | "DISMISSED";
+        };
         ResolveReportDto: {
             note: string;
             /** @enum {string} */
@@ -1455,6 +1781,19 @@ export interface components {
         ReturnPlanDto: {
             reason: string;
             version: number;
+        };
+        ReviewContractorSchema: {
+            name: string;
+            publicId: number;
+        };
+        ReviewDto: {
+            authorName: string;
+            /** Format: date-time */
+            createdAt: string;
+            id: string;
+            jobTitle: string;
+            rating: number;
+            text: string;
         };
         SaveDraftDto: {
             budgetMax?: number | null;
@@ -1663,6 +2002,144 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HiddenStateDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Роль не допускает операцию */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ресурса нет или он принадлежит другому пользователю */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Конфликт с текущим состоянием ресурса */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminModeration_listFlags: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                status?: "OPEN" | "RESOLVED" | "DISMISSED" | "ALL";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedContentFlagDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Роль не допускает операцию */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminModeration_resolveFlag: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveFlagDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContentFlagDto"];
                 };
             };
             /** @description Ошибка валидации запроса */
@@ -2129,6 +2606,136 @@ export interface operations {
             };
         };
     };
+    AdminModeration_hideReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HideDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HiddenStateDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Роль не допускает операцию */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ресурса нет или он принадлежит другому пользователю */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminModeration_listUsers: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+                /** @description Часть email или имени либо номер аккаунта (ID) */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedAdminUserDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Роль не допускает операцию */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     AdminModeration_block: {
         parameters: {
             query?: never;
@@ -2159,6 +2766,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Роль не допускает операцию */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ресурса нет или он принадлежит другому пользователю */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Конфликт с текущим состоянием ресурса */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminModeration_issuePasswordReset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ссылка для нового пароля */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordResetLinkDto"];
                 };
             };
             /** @description Нет действующей сессии или неверные учётные данные */
@@ -2547,6 +3221,59 @@ export interface operations {
             };
         };
     };
+    Auth_resetPassword: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-client-user-agent": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordResetDto"];
+            };
+        };
+        responses: {
+            /** @description Пароль изменён, выполнен вход */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthSessionDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Роль не допускает операцию */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     Auth_register: {
         parameters: {
             query?: never;
@@ -2581,6 +3308,56 @@ export interface operations {
             };
             /** @description Конфликт с текущим состоянием ресурса */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    ContractorsPublic_get: {
+        parameters: {
+            query?: {
+                page?: number;
+            };
+            header?: never;
+            path: {
+                publicId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicContractorDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ресурса нет или он принадлежит другому пользователю */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4439,6 +5216,198 @@ export interface operations {
             };
         };
     };
+    Favorites_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Избранные заказы, новые первыми */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedJobDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Favorites_ids: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FavoriteIdsDto"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Favorites_add: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FavoriteStateDto"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ресурса нет или он принадлежит другому пользователю */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Конфликт с текущим состоянием ресурса */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Favorites_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FavoriteStateDto"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ресурса нет или он принадлежит другому пользователю */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     MyJobs_list: {
         parameters: {
             query?: {
@@ -4846,6 +5815,142 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobBidDto"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Роль не допускает операцию */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ресурса нет или он принадлежит другому пользователю */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Конфликт с текущим состоянием ресурса */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    JobReview_state: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobReviewStateDto"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Роль не допускает операцию */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ресурса нет или он принадлежит другому пользователю */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    JobReview_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReviewDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Нет действующей сессии или неверные учётные данные */
@@ -5521,6 +6626,92 @@ export interface operations {
             };
             /** @description Ресурса нет или он принадлежит другому пользователю */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Reports_mine: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Свои жалобы и решения по ним */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedMyReportDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Reports_markSeen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Решения по своим жалобам отмечены просмотренными */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

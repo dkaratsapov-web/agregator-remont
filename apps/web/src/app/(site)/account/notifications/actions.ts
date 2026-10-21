@@ -9,7 +9,7 @@ import {
   redirectIfUnauthorized,
   requireSessionToken,
 } from '@/lib/action-helpers';
-import { markNotificationsRead } from '@/lib/api';
+import { markNotificationsRead, markReportsSeen } from '@/lib/api';
 import { getClientIp } from '@/lib/session';
 
 const PAGE = '/account/notifications';
@@ -26,7 +26,11 @@ export async function markAllReadAction(
   if (!(await isTrustedOrigin())) return { error: FOREIGN_ORIGIN };
   const token = await requireSessionToken(PAGE);
   try {
-    await markNotificationsRead(token, { all: true }, await getClientIp());
+    // «Все» — и уведомления, и решения по своим жалобам (они тоже в значке).
+    await Promise.all([
+      markNotificationsRead(token, { all: true }, await getClientIp()),
+      markReportsSeen(token),
+    ]);
   } catch (error) {
     redirectIfUnauthorized(error, PAGE);
     return { error: apiErrorMessage(error) };

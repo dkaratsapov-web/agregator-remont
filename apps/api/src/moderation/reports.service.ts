@@ -1,4 +1,9 @@
-import { REPORT_LIMITS, type ReportReceivedDto } from '@agregator/shared';
+import {
+  REPORT_LIMITS,
+  type MyReportDto,
+  type Paginated,
+  type ReportReceivedDto,
+} from '@agregator/shared';
 import {
   BadRequestException,
   HttpException,
@@ -76,6 +81,47 @@ export class ReportsService {
         },
       });
       return { id: created.id, duplicate: false };
+    });
+  }
+
+  /** Свои жалобы: новые первыми, с решением администратора. */
+  async mine(user: User, page: number): Promise<Paginated<MyReportDto>> {
+    const limit = REPORT_LIMITS.PAGE;
+    const where = { reporterId: user.id };
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.report.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { job: { select: { title: true } } },
+      }),
+      this.prisma.report.count({ where }),
+    ]);
+    return {
+      items: rows.map((r) => ({
+        id: r.id,
+        targetType: r.targetType,
+        reason: r.reason,
+        status: r.status,
+        jobId: r.jobId,
+        jobTitle: r.job.title,
+        note: r.note,
+        createdAt: r.createdAt.toISOString(),
+        resolvedAt: r.resolvedAt?.toISOString() ?? null,
+        unseen: r.status !== 'OPEN' && !r.reporterSeenAt,
+      })),
+      page,
+      limit,
+      total,
+    };
+  }
+
+  /** Решения по своим жалобам просмотрены: пропадают из значка уведомлений. */
+  async markSeen(user: User): Promise<void> {
+    await this.prisma.report.updateMany({
+      where: { reporterId: user.id, status: { not: 'OPEN' }, reporterSeenAt: null },
+      data: { reporterSeenAt: new Date() },
     });
   }
 

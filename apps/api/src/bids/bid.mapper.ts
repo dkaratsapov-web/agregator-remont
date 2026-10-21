@@ -1,4 +1,4 @@
-import type { BidDto, JobBidDto, MyBidDto } from '@agregator/shared';
+import type { BidDto, ContractorRatingDto, JobBidDto, MyBidDto } from '@agregator/shared';
 import type { Bid, ContractorProfile, Job, User } from '@prisma/client';
 import { toProfileDto } from '../contractors/profile.mapper';
 
@@ -29,15 +29,18 @@ export function toMyBidDto(bid: Bid & { job: Job }): MyBidDto {
   };
 }
 
-/** Для владельца заказа: имя и профиль подрядчика, без email и id пользователя. */
+/** Для владельца заказа: имя, профиль и рейтинг подрядчика, без email и id пользователя. */
 export function toJobBidDto(
   bid: Bid & { contractor: User & { profile: ContractorProfile | null } },
+  rating: ContractorRatingDto,
 ): JobBidDto {
   return {
     ...toBidDto(bid),
     contractor: {
+      publicId: bid.contractor.publicId,
       name: bid.contractor.name,
       profile: bid.contractor.profile ? toProfileDto(bid.contractor.profile) : null,
+      rating,
     },
   };
 }

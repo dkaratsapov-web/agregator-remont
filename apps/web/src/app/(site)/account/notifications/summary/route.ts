@@ -7,7 +7,11 @@ export async function GET(): Promise<Response> {
   if (!token) return Response.json({ unread: 0 }, { status: 401 });
   try {
     const summary = await getNotificationsSummary(token);
-    return Response.json({ unread: summary.unread }, { headers: { 'Cache-Control': 'no-store' } });
+    // В значке — и уведомления, и непросмотренные решения по своим жалобам.
+    return Response.json(
+      { unread: summary.unread + summary.reportDecisions },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       return Response.json({ unread: 0 }, { status: 401 });

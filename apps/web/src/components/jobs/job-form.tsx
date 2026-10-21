@@ -33,9 +33,13 @@ import {
 } from '@/lib/job-form';
 import { ProgressRuler } from '@/components/ui/progress-ruler';
 import { JobQuestionnaire } from './job-questionnaire';
+import { FormArgs } from '@/components/ui/form-args';
+import type { FormArg } from '@/lib/form-args';
 
 interface Props {
   action: (state: JobFormState, form: FormData) => Promise<JobFormState>;
+  /** Параметры действия скрытым полем вместо bind (lib/form-args.ts). */
+  args?: readonly FormArg[];
   initial?: Partial<JobFormValues>;
   submitLabel: string;
   pendingLabel: string;
@@ -142,6 +146,7 @@ const fitAnswers = (category: JobCategory, answers: unknown): JobDetails => {
 
 export function JobForm({
   action,
+  args,
   initial = {},
   submitLabel,
   pendingLabel,
@@ -530,6 +535,7 @@ export function JobForm({
       className="@container/form"
     >
       <FormError message={topError} login={issues.length > 0 ? undefined : state.login} />
+      {args ? <FormArgs values={args} /> : null}
       {drafts ? <input type="hidden" name="draftId" value={draftId ?? ''} /> : null}
       {publishKey ? <input type="hidden" name="requestId" value={publishKey} /> : null}
       {version ? <input type="hidden" name="expectedUpdatedAt" value={version} /> : null}

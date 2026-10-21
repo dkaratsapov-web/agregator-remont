@@ -12,6 +12,7 @@ import { placeBid, withdrawBid } from '@/lib/api';
 import { parseBidForm, type BidFormValues, type FieldErrors } from '@/lib/bid-form';
 import { safeRedirectPath } from '@/lib/redirect';
 import { getClientIp } from '@/lib/session';
+import { argString, readFormArgs } from '@/lib/form-args';
 
 export interface BidFormState {
   error?: string;
@@ -61,4 +62,18 @@ export async function withdrawBidAction(
     return { error: apiErrorMessage(error, { 404: 'Отклик не найден.', ...BID_ERRORS }) };
   }
   redirect(`${back}${back.includes('?') ? '&' : '?'}withdrawn=1`);
+}
+
+// --- Формы: параметры скрытым полем args вместо bind (lib/form-args.ts, docs/NO_JS_FORMS.md).
+
+/** args: [jobId] */
+export async function placeBidFormAction(prev: BidFormState, form: FormData) {
+  const [jobId] = readFormArgs(form);
+  return placeBidAction(argString(jobId), prev, form);
+}
+
+/** args: [bidId, returnTo] */
+export async function withdrawBidFormAction(prev: BidFormState, form: FormData) {
+  const [bidId, returnTo] = readFormArgs(form);
+  return withdrawBidAction(argString(bidId), argString(returnTo), prev, form);
 }

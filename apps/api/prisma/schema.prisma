@@ -68,6 +68,10 @@ enum AuditAction {
   CONTENT_RESTORED
   USER_BLOCKED
   USER_UNBLOCKED
+  PASSWORD_RESET_ISSUED
+  PASSWORD_RESET_DONE
+  REVIEW_CREATED
+  FLAG_RESOLVED
 }
 
 // Синхронизировано с BID_STATUSES в packages/shared/src/bids.ts.
@@ -133,6 +137,9 @@ model Job {
   /// Скрыт модератором: не виден в каталоге и посторонним, откликаться нельзя. null — виден.
   hiddenAt      DateTime?        @map("hidden_at")
   reports       Report[]
+  review        Review?
+  favorites     FavoriteJob[]
+  contentFlags  ContentFlag[]
 
   @@unique([ownerId, requestId])
   @@index([createdAt(sort: Desc), id(sort: Desc)])
@@ -210,6 +217,13 @@ model User {
   notifications    Notification[]
   reportsFiled     Report[]           @relation("ReportReporter")
   reportsResolved  Report[]           @relation("ReportResolver")
+  passwordResets   PasswordReset[]    @relation("PasswordResetUser")
+  resetsIssued     PasswordReset[]    @relation("PasswordResetIssuer")
+  reviewsWritten   Review[]           @relation("ReviewAuthor")
+  reviewsReceived  Review[]           @relation("ReviewContractor")
+  favoriteJobs     FavoriteJob[]
+  contentFlags     ContentFlag[]      @relation("ContentFlagAuthor")
+  flagsResolved    ContentFlag[]      @relation("ContentFlagResolver")
 
   @@map("users")
 }
@@ -542,24 +556,26 @@ enum ReportStatus {
 /// Жалоба пользователя на заказ, сообщение или отклик. Одна открытая жалоба автора на один
 /// предмет (частичный уникальный индекс в миграции). Разбирает администратор.
 model Report {
-  id           String       @id @default(cuid())
-  reporterId   String       @map("reporter_id")
-  reporter     User         @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  targetType   ReportTarget @map("target_type")
+  id             String       @id @default(cuid())
+  reporterId     String       @map("reporter_id")
+  reporter       User         @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetType     ReportTarget @map("target_type")
   /// id заказа, сообщения или отклика.
-  targetId     String       @map("target_id")
+  targetId       String       @map("target_id")
   /// Заказ, к которому относится предмет жалобы.
-  jobId        String       @map("job_id")
-  job          Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  reason       ReportReason
-  comment      String       @default("")
-  status       ReportStatus @default(OPEN)
+  jobId          String       @map("job_id")
+  job            Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  reason         ReportReason
+  comment        String       @default("")
+  status         ReportStatus @default(OPEN)
   /// Решение администратора.
-  note         String?
-  resolvedById String?      @map("resolved_by_id")
-  resolvedBy   User?        @relation("ReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
-  resolvedAt   DateTime?    @map("resolved_at")
-  createdAt    DateTime     @default(now()) @map("created_at")
+  note           String?
+  resolvedById   String?      @map("resolved_by_id")
+  resolvedBy     User?        @relation("ReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolvedAt     DateTime?    @map("resolved_at")
+  /// Пожаловавшийся видел решение (раздел «Мои жалобы»). null — решение ещё не просмотрено.
+  reporterSeenAt DateTime?    @map("reporter_seen_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
 
   @@index([status, createdAt(sort: Desc)])
   @@index([reporterId, createdAt])
@@ -567,4 +583,77 @@ model Report {
   // Частичный уникальный индекс reports_open_key (одна открытая жалоба автора на предмет) —
   // только в SQL миграции 20261023100000_moderation.
   @@map("reports")
+}
+
+/// Одноразовая ссылка для нового пароля (почты нет: ссылку выдаёт администратор или команда на
+/// сервере). Хранится только SHA-256 токена; срок — PASSWORD_RESET_LIMITS.TTL_HOURS.
+model PasswordReset {
+  id         String    @id @default(cuid())
+  userId     String    @map("user_id")
+  user       User      @relation("PasswordResetUser", fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique @map("token_hash") @db.VarChar(64)
+  /// Администратор, выдавший ссылку; null — выдана командой на сервере.
+  issuedById String?   @map("issued_by_id")
+  issuedBy   User?     @relation("PasswordResetIssuer", fields: [issuedById], references: [id], onDelete: SetNull)
+  expiresAt  DateTime  @map("expires_at")
+  usedAt     DateTime? @map("used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("password_resets")
+}
+
+/// Отзыв заказчика об исполнителе: один на выполненный заказ. Ограничения — CHECK в миграции.
+model Review {
+  id           String    @id @default(cuid())
+  jobId        String    @unique @map("job_id")
+  job          Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  authorId     String    @map("author_id")
+  author       User      @relation("ReviewAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  contractorId String    @map("contractor_id")
+  contractor   User      @relation("ReviewContractor", fields: [contractorId], references: [id], onDelete: Cascade)
+  rating       Int       @db.SmallInt
+  text         String    @default("")
+  /// Скрыт модератором: не показывается и не входит в рейтинг.
+  hiddenAt     DateTime? @map("hidden_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([contractorId, createdAt(sort: Desc)])
+  @@map("reviews")
+}
+
+/// Избранные заказы (закладки в каталоге).
+model FavoriteJob {
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId     String   @map("job_id")
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([userId, jobId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("favorite_jobs")
+}
+
+/// Автопроверка: в сообщении или отклике похоже на контакты (телефон, почта, ссылка, мессенджер).
+/// Текст отправляется, администратор видит пометку в очереди и решает.
+model ContentFlag {
+  id           String       @id @default(cuid())
+  targetType   ReportTarget @map("target_type")
+  targetId     String       @map("target_id")
+  jobId        String       @map("job_id")
+  job          Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  authorId     String       @map("author_id")
+  author       User         @relation("ContentFlagAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  /// Что найдено: PHONE, EMAIL, LINK, MESSENGER (через запятую).
+  kinds        String       @db.VarChar(64)
+  status       ReportStatus @default(OPEN)
+  resolvedById String?      @map("resolved_by_id")
+  resolvedBy   User?        @relation("ContentFlagResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolvedAt   DateTime?    @map("resolved_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  @@unique([targetType, targetId])
+  @@index([status, createdAt])
+  @@map("content_flags")
 }

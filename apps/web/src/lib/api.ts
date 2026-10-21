@@ -1,6 +1,16 @@
 import 'server-only';
 import type {
+  AdminUserDto,
   AuthSessionDto,
+  ContentFlagDto,
+  FavoriteIdsDto,
+  FavoriteStateDto,
+  JobReviewStateDto,
+  MyReportDto,
+  PasswordResetLinkDto,
+  PublicContractorDto,
+  ReviewDto,
+  ReviewInput,
   BidInput,
   ContractorProfileDto,
   ContractorProfileInput,
@@ -868,7 +878,7 @@ export async function resolveReport(
 /** Скрыть или вернуть заказ, сообщение или отклик. */
 export async function setContentHidden(
   token: string,
-  kind: 'jobs' | 'messages' | 'bids',
+  kind: 'jobs' | 'messages' | 'bids' | 'reviews',
   id: string,
   input: { hidden: boolean; reason: string },
   clientIp?: string,
@@ -895,4 +905,146 @@ export async function setUserBlocked(
     clientIp,
   });
   return expectJson<BlockedStateDto>(res, 'POST /v1/admin/users/:id/blocked');
+}
+
+// --- Аккаунты: новый пароль по ссылке, пользователи для администратора
+
+/** Новый пароль по ссылке; в ответе — новый вход. */
+export async function resetPassword(
+  input: { token: string; password: string },
+  clientIp?: string,
+  userAgent?: string,
+): Promise<AuthSessionDto> {
+  const res = await request('/v1/auth/password-reset', {
+    method: 'POST',
+    body: input,
+    clientIp,
+    userAgent,
+  });
+  return expectJson<AuthSessionDto>(res, 'POST /v1/auth/password-reset');
+}
+
+export async function listAdminUsers(
+  token: string,
+  q: string,
+  page: number,
+): Promise<Paginated<AdminUserDto>> {
+  const query = new URLSearchParams({ page: String(page) });
+  if (q) query.set('q', q);
+  const res = await request(`/v1/admin/users?${query}`, { token });
+  return expectJson<Paginated<AdminUserDto>>(res, 'GET /v1/admin/users');
+}
+
+export async function issuePasswordReset(
+  token: string,
+  userId: string,
+  clientIp?: string,
+): Promise<PasswordResetLinkDto> {
+  const res = await request(`/v1/admin/users/${encodeURIComponent(userId)}/password-reset`, {
+    method: 'POST',
+    token,
+    clientIp,
+  });
+  return expectJson<PasswordResetLinkDto>(res, 'POST /v1/admin/users/:id/password-reset');
+}
+
+// --- Автопроверка контактов и свои жалобы
+
+export async function listFlags(
+  token: string,
+  status: ReportFilter,
+  page: number,
+): Promise<Paginated<ContentFlagDto>> {
+  const res = await request(`/v1/admin/flags?status=${status}&page=${page}`, { token });
+  return expectJson<Paginated<ContentFlagDto>>(res, 'GET /v1/admin/flags');
+}
+
+export async function resolveFlag(
+  token: string,
+  id: string,
+  status: 'RESOLVED' | 'DISMISSED',
+  clientIp?: string,
+): Promise<ContentFlagDto> {
+  const res = await request(`/v1/admin/flags/${encodeURIComponent(id)}/resolve`, {
+    method: 'POST',
+    body: { status },
+    token,
+    clientIp,
+  });
+  return expectJson<ContentFlagDto>(res, 'POST /v1/admin/flags/:id/resolve');
+}
+
+export async function listMyReports(token: string, page: number): Promise<Paginated<MyReportDto>> {
+  const res = await request(`/v1/reports/mine?page=${page}`, { token });
+  return expectJson<Paginated<MyReportDto>>(res, 'GET /v1/reports/mine');
+}
+
+export async function markReportsSeen(token: string): Promise<void> {
+  const res = await request('/v1/reports/mine/seen', { method: 'POST', token });
+  if (res.status !== 204) {
+    throw new ApiError(`POST /v1/reports/mine/seen responded ${res.status}`, res.status);
+  }
+}
+
+// --- Отзывы и карточка мастера
+
+/** null — заказа нет или он чужой (404). */
+export async function getJobReview(
+  token: string,
+  jobId: string,
+): Promise<JobReviewStateDto | null> {
+  const res = await request(`/v1/me/jobs/${encodeURIComponent(jobId)}/review`, { token });
+  if (res.status === 404) return null;
+  return expectJson<JobReviewStateDto>(res, 'GET /v1/me/jobs/:id/review');
+}
+
+export async function createReview(
+  token: string,
+  jobId: string,
+  input: ReviewInput,
+  clientIp?: string,
+): Promise<ReviewDto> {
+  const res = await request(`/v1/me/jobs/${encodeURIComponent(jobId)}/review`, {
+    method: 'POST',
+    body: input,
+    token,
+    clientIp,
+  });
+  return expectJson<ReviewDto>(res, 'POST /v1/me/jobs/:id/review');
+}
+
+/** null — мастера нет (404). */
+export async function getContractor(
+  publicId: string,
+  page: number,
+): Promise<PublicContractorDto | null> {
+  const res = await request(`/v1/contractors/${encodeURIComponent(publicId)}?page=${page}`);
+  if (res.status === 404) return null;
+  return expectJson<PublicContractorDto>(res, 'GET /v1/contractors/:publicId');
+}
+
+// --- Избранное
+
+export async function listFavorites(token: string, page: number): Promise<Paginated<JobDto>> {
+  const res = await request(`/v1/me/favorites?page=${page}`, { token });
+  return expectJson<Paginated<JobDto>>(res, 'GET /v1/me/favorites');
+}
+
+export async function getFavoriteIds(token: string): Promise<string[]> {
+  const res = await request('/v1/me/favorites/ids', { token });
+  return (await expectJson<FavoriteIdsDto>(res, 'GET /v1/me/favorites/ids')).jobIds;
+}
+
+export async function setFavorite(
+  token: string,
+  jobId: string,
+  favorite: boolean,
+  clientIp?: string,
+): Promise<FavoriteStateDto> {
+  const res = await request(`/v1/me/favorites/${encodeURIComponent(jobId)}`, {
+    method: favorite ? 'PUT' : 'DELETE',
+    token,
+    clientIp,
+  });
+  return expectJson<FavoriteStateDto>(res, `${favorite ? 'PUT' : 'DELETE'} /v1/me/favorites/:id`);
 }

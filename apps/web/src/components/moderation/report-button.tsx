@@ -7,7 +7,8 @@ import {
   type ReportTarget,
 } from '@agregator/shared';
 import { useActionState, useEffect, useId, useState } from 'react';
-import { reportAction, type ReportFormState } from '@/app/(site)/account/reports/actions';
+import { reportFormAction, type ReportFormState } from '@/app/(site)/account/reports/actions';
+import { FormArgs } from '@/components/ui/form-args';
 
 const NOUN: Record<ReportTarget, string> = {
   JOB: 'заказ',
@@ -34,10 +35,7 @@ export function ReportButton({
   // С JS итог показывается в самой форме; без JS действие переходит на страницу с ?report=…
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
-  const [state, action, pending] = useActionState<ReportFormState, FormData>(
-    reportAction.bind(null, targetType, targetId, returnTo),
-    {},
-  );
+  const [state, action, pending] = useActionState<ReportFormState, FormData>(reportFormAction, {});
   if (state.sent) {
     return (
       <p role="status" className="text-xs text-ink-soft">
@@ -56,6 +54,7 @@ export function ReportButton({
         action={action}
         className="mt-2 space-y-3 rounded-[12px] border border-line bg-surface p-4 text-left"
       >
+        <FormArgs values={[targetType, targetId, returnTo]} />
         {hydrated ? <input type="hidden" name="js" value="1" /> : null}
         <fieldset>
           <legend className="text-sm font-semibold text-ink">

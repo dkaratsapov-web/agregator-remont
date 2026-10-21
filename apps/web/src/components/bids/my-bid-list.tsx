@@ -1,6 +1,6 @@
 import { JOB_CLOSE_OUTCOME_LABELS, JOB_STATUS_LABELS, type MyBidDto } from '@agregator/shared';
 import Link from 'next/link';
-import { withdrawBidAction } from '@/app/(site)/account/bids/actions';
+import { withdrawBidFormAction } from '@/app/(site)/account/bids/actions';
 import { UnreadPill } from '@/components/notifications/unread-pill';
 import { formatAmount, formatDate } from '@/lib/format';
 import { BidJobChangedNote, BidStatusBadge } from './bid-status-badge';
@@ -64,7 +64,8 @@ export function MyBidList({
           {bid.status === 'PENDING' ? (
             <div className="mt-3">
               <ConfirmActionForm
-                action={withdrawBidAction.bind(null, bid.id, returnTo)}
+                action={withdrawBidFormAction}
+                args={[bid.id, returnTo]}
                 summary="Отозвать отклик"
                 explanation="Заказчик больше не увидит этот отклик. Откликнуться на заказ повторно будет нельзя."
                 confirmLabel="Да, отозвать"

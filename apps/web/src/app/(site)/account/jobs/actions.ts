@@ -29,6 +29,7 @@ import {
   type JobFormValues,
 } from '@/lib/job-form';
 import { getClientIp, getSessionToken } from '@/lib/session';
+import { argString, readFormArgs } from '@/lib/form-args';
 
 export interface JobFormState {
   error?: string;
@@ -221,4 +222,30 @@ export async function deleteDraftAction(id: string): Promise<void> {
     }
   }
   redirect('/account/jobs?draftDeleted=1');
+}
+
+// --- Формы: параметры скрытым полем args вместо bind (lib/form-args.ts, docs/NO_JS_FORMS.md).
+
+/** args: [jobId] */
+export async function updateJobFormAction(prev: JobFormState, form: FormData) {
+  const [id] = readFormArgs(form);
+  return updateJobAction(argString(id), prev, form);
+}
+
+/** args: [jobId] */
+export async function closeJobFormAction(prev: JobFormState, form: FormData) {
+  const [id] = readFormArgs(form);
+  return closeJobAction(argString(id), prev, form);
+}
+
+/** args: [jobId, bidId] */
+export async function acceptBidFormAction(prev: JobFormState, form: FormData) {
+  const [jobId, bidId] = readFormArgs(form);
+  return acceptBidAction(argString(jobId), argString(bidId), prev, form);
+}
+
+/** Удалить черновик из списка; args: [draftId]. */
+export async function deleteDraftFormAction(form: FormData): Promise<void> {
+  const [id] = readFormArgs(form);
+  return deleteDraftAction(argString(id));
 }

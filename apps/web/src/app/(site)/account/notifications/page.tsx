@@ -9,6 +9,7 @@ import { Sheet, SheetHeader } from '@/components/ui/sheet';
 import { isEntityId } from '@/lib/action-helpers';
 import { getNotifications } from '@/lib/api';
 import { requireUserPage } from '@/lib/customer';
+import { getUnreadSummary } from '@/lib/notifications-server';
 
 export const metadata: Metadata = { title: 'Уведомления', robots: { index: false } };
 
@@ -27,12 +28,14 @@ export default async function NotificationsPage({
   const cursor =
     typeof query.cursor === 'string' && isEntityId(query.cursor) ? query.cursor : undefined;
 
-  let data: Awaited<ReturnType<typeof getNotifications>> | null = null;
-  try {
-    data = await getNotifications(token, cursor);
-  } catch (error) {
-    console.error('Notifications: failed to load', error);
-  }
+  const [data, summary] = await Promise.all([
+    getNotifications(token, cursor).catch((error) => {
+      console.error('Notifications: failed to load', error);
+      return null;
+    }),
+    getUnreadSummary(),
+  ]);
+  const decisions = summary?.reportDecisions ?? 0;
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 pb-16 pt-10 sm:px-6 md:pt-14 lg:px-10">
@@ -40,8 +43,18 @@ export default async function NotificationsPage({
         back={{ href: '/account', label: 'Кабинет' }}
         title="Уведомления"
         description="Что произошло по вашим заказам: отклики, план работ, этапы и сообщения. Уведомления заказа становятся прочитанными, когда вы его открываете."
-        action={data && data.unread > 0 ? <MarkAllRead /> : undefined}
+        action={data && data.unread + decisions > 0 ? <MarkAllRead /> : undefined}
       />
+      {decisions > 0 ? (
+        <div className="mt-6 max-w-3xl">
+          <Notice tone="neutral">
+            Есть решения по вашим жалобам: <span className="tabular-nums">{decisions}</span>.{' '}
+            <Link href="/account/reports" className="underline underline-offset-4">
+              Посмотреть
+            </Link>
+          </Notice>
+        </div>
+      ) : null}
       {query.read ? (
         <div className="mt-6">
           <Notice>Все уведомления отмечены прочитанными.</Notice>

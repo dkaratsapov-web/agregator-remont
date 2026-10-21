@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import type { AuthContext } from './auth.types';
 import { CurrentAuth } from './current-auth.decorator';
 import { LoginDto } from './dto/login.dto';
+import { PasswordResetDto } from './dto/password-reset.dto';
 import { RegisterDto } from './dto/register.dto';
 import { AuthRateLimited } from './rate-limit';
 import { SessionGuard } from './session.guard';
@@ -44,6 +45,18 @@ export class AuthController {
     @Headers(CLIENT_UA_HEADER) userAgent?: string,
   ): Promise<AuthSessionDto> {
     return this.auth.login(dto, userAgent);
+  }
+
+  @Post('password-reset')
+  @HttpCode(HttpStatus.OK)
+  @AuthRateLimited()
+  @ApiOkResponse({ type: AuthSessionSchema, description: 'Пароль изменён, выполнен вход' })
+  @ApiErrors(400, 403)
+  resetPassword(
+    @Body() dto: PasswordResetDto,
+    @Headers(CLIENT_UA_HEADER) userAgent?: string,
+  ): Promise<AuthSessionDto> {
+    return this.auth.resetPassword(dto, userAgent);
   }
 
   @Post('logout')

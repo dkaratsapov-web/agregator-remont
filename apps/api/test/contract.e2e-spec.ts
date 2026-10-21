@@ -986,6 +986,203 @@ describe('API contract (e2e)', () => {
     });
   });
 
+  it('account, review, favorite and flag endpoints match openapi.json', async () => {
+    const high = {
+      RATE_LIMIT_PER_MIN: '1000',
+      AUTH_RATE_LIMIT_PER_MIN: '1000',
+      WRITE_RATE_LIMIT_PER_MIN: '1000',
+    };
+    await withApp(high, async (app) => {
+      const http = () => request(app.getHttpServer());
+      const check = async (
+        method: 'get' | 'post' | 'put' | 'delete',
+        template: string,
+        req: request.Test,
+        status: number,
+      ) => {
+        const res = await req;
+        expect(res.status).toBe(status);
+        expectContract(res, method, template);
+        return res;
+      };
+      type Who = { auth: Record<string, string> } | null;
+      const as = (req: request.Test, who: Who) => (who ? req.set(who.auth) : req);
+      const owner = await signUp(app, 'CUSTOMER');
+      const contractor = await signUp(app, 'CONTRACTOR');
+      const admin = await signUpAdmin(app, prisma);
+
+      // --- сброс пароля по ссылке администратора
+      const AU = '/v1/admin/users';
+      await check('get', AU, as(http().get(`${AU}?q=Пользователь`), admin), 200);
+      await check('get', AU, as(http().get(`${AU}?page=0`), admin), 400);
+      await check('get', AU, http().get(AU), 401);
+      await check('get', AU, as(http().get(AU), owner), 403);
+      const PR = '/v1/admin/users/{id}/password-reset';
+      const issue = (id: string, who: Who) =>
+        as(http().post(`/v1/admin/users/${id}/password-reset`), who);
+      const link = await check('post', PR, issue(owner.id, admin), 201);
+      await check('post', PR, issue(owner.id, null), 401);
+      await check('post', PR, issue(owner.id, owner), 403);
+      await check('post', PR, issue('missing', admin), 404);
+      const RESET = '/v1/auth/password-reset';
+      const reset = (token: string) =>
+        http().post(RESET).send({ token, password: 'new-password-after-reset' });
+      const relogged = await check('post', RESET, reset(link.body.token), 200);
+      // Смена пароля завершила прежние входы; дальше — с новым.
+      owner.auth.Authorization = `Bearer ${relogged.body.token}`;
+      await check('post', RESET, reset(link.body.token), 400);
+      const blockedLink = await issue(contractor.id, admin).expect(201);
+      await http()
+        .post(`/v1/admin/users/${contractor.id}/blocked`)
+        .set(admin.auth)
+        .send({ blocked: true, reason: 'Проверка блокировки' })
+        .expect(200);
+      await check('post', RESET, reset(blockedLink.body.token), 403);
+      await check('post', PR, issue(contractor.id, admin), 409);
+      await http()
+        .post(`/v1/admin/users/${contractor.id}/blocked`)
+        .set(admin.auth)
+        .send({ blocked: false, reason: 'Проверка завершена' })
+        .expect(200);
+      const worker = await http()
+        .post('/v1/auth/login')
+        .send({
+          email: (await prisma.user.findUniqueOrThrow({ where: { id: contractor.id } })).email,
+          password: 'correct-horse-battery',
+        })
+        .expect(200);
+      const workerAuth = { auth: { Authorization: `Bearer ${worker.body.token}` } };
+      const customer = await signUp(app, 'CUSTOMER');
+
+      // --- сделка с контактами в отклике → пометка автопроверки; выполнение → отзыв
+      const { body: created } = await http().post('/v1/me/jobs').set(customer.auth).send(job);
+      const { body: placed } = await http()
+        .post(`/v1/jobs/${created.id}/bids`)
+        .set(workerAuth.auth)
+        .send({ ...bid, comment: 'Звоните +7 999 123-45-67, договоримся напрямую.' })
+        .expect(201);
+      const REV = '/v1/me/jobs/{jobId}/review';
+      const review = (who: Who, body: object, id = created.id) =>
+        as(http().post(`/v1/me/jobs/${id}/review`), who).send(body);
+      const state = (who: Who, id = created.id) =>
+        as(http().get(`/v1/me/jobs/${id}/review`), who);
+      await check('post', REV, review(customer, { rating: 5, text: 'Рано' }), 409);
+      await http()
+        .post(`/v1/me/jobs/${created.id}/bids/${placed.id}/accept`)
+        .set(customer.auth)
+        .expect(200);
+      await http()
+        .post(`/v1/me/jobs/${created.id}/close`)
+        .set(customer.auth)
+        .send({ outcome: 'COMPLETED' })
+        .expect(200);
+      await check('get', REV, state(customer), 200);
+      await check('get', REV, state(null), 401);
+      await check('get', REV, state(workerAuth), 403);
+      await check('get', REV, state(customer, 'missing'), 404);
+      await check('post', REV, review(customer, { rating: 9 }), 400);
+      const written = await check(
+        'post',
+        REV,
+        review(customer, { rating: 5, text: 'Всё сделано в срок, аккуратно.' }),
+        201,
+      );
+      await check('post', REV, review(customer, { rating: 4 }), 409);
+      await check('post', REV, review(null, { rating: 4 }), 401);
+      await check('post', REV, review(workerAuth, { rating: 4 }), 403);
+      await check('post', REV, review(customer, { rating: 4 }, 'missing'), 404);
+
+      const workerUser = await prisma.user.findUniqueOrThrow({ where: { id: contractor.id } });
+      const PC = '/v1/contractors/{publicId}';
+      await check('get', PC, http().get(`/v1/contractors/${workerUser.publicId}`), 200);
+      await check('get', PC, http().get(`/v1/contractors/${workerUser.publicId}?page=0`), 400);
+      await check('get', PC, http().get('/v1/contractors/1'), 404);
+
+      const RH = '/v1/admin/reviews/{id}/hidden';
+      const hideReview = (id: string, who: Who, body: object) =>
+        as(http().post(`/v1/admin/reviews/${id}/hidden`), who).send(body);
+      const hide = { hidden: true, reason: 'Отзыв с оскорблениями' };
+      await check('post', RH, hideReview(written.body.id, admin, hide), 200);
+      await check('post', RH, hideReview(written.body.id, admin, {}), 400);
+      await check('post', RH, hideReview(written.body.id, null, hide), 401);
+      await check('post', RH, hideReview(written.body.id, owner, hide), 403);
+      await check('post', RH, hideReview('missing', admin, hide), 404);
+
+      const FL = '/v1/admin/flags';
+      const flags = await check('get', FL, as(http().get(FL), admin), 200);
+      expect(flags.body.items).toEqual(
+        expect.arrayContaining([expect.objectContaining({ targetId: placed.id })]),
+      );
+      await check('get', FL, as(http().get(`${FL}?status=WRONG`), admin), 400);
+      await check('get', FL, http().get(FL), 401);
+      await check('get', FL, as(http().get(FL), owner), 403);
+      const flagId = flags.body.items.find((f: { targetId: string }) => f.targetId === placed.id)
+        .id as string;
+      const FR = '/v1/admin/flags/{id}/resolve';
+      const resolveFlag = (id: string, who: Who, body: object) =>
+        as(http().post(`/v1/admin/flags/${id}/resolve`), who).send(body);
+      await check('post', FR, resolveFlag(flagId, admin, { status: 'RESOLVED' }), 200);
+      await check('post', FR, resolveFlag(flagId, admin, { status: 'RESOLVED' }), 409);
+      await check('post', FR, resolveFlag(flagId, admin, { status: 'OPEN' }), 400);
+      await check('post', FR, resolveFlag(flagId, null, { status: 'RESOLVED' }), 401);
+      await check('post', FR, resolveFlag(flagId, owner, { status: 'RESOLVED' }), 403);
+      await check('post', FR, resolveFlag('missing', admin, { status: 'RESOLVED' }), 404);
+
+      // --- свои жалобы и решения
+      const { body: second } = await http().post('/v1/me/jobs').set(customer.auth).send(job);
+      const { body: filed } = await http()
+        .post('/v1/reports')
+        .set(owner.auth)
+        .send({ targetType: 'JOB', targetId: second.id, reason: 'FAKE' })
+        .expect(201);
+      await http()
+        .post(`/v1/admin/reports/${filed.id}/resolve`)
+        .set(admin.auth)
+        .send({ status: 'DISMISSED', note: 'Заказ настоящий' })
+        .expect(200);
+      const MINE = '/v1/reports/mine';
+      const mine = await check('get', MINE, as(http().get(MINE), owner), 200);
+      expect(mine.body.items[0]).toMatchObject({ id: filed.id, unseen: true });
+      await check('get', MINE, as(http().get(`${MINE}?page=0`), owner), 400);
+      await check('get', MINE, http().get(MINE), 401);
+      const SEEN = '/v1/reports/mine/seen';
+      await check('post', SEEN, as(http().post(SEEN), owner), 204);
+      await check('post', SEEN, http().post(SEEN), 401);
+
+      // --- избранное
+      const FAV = '/v1/me/favorites';
+      const FJ = '/v1/me/favorites/{jobId}';
+      await check('put', FJ, as(http().put(`${FAV}/${second.id}`), owner), 200);
+      await check('put', FJ, http().put(`${FAV}/${second.id}`), 401);
+      await check('put', FJ, as(http().put(`${FAV}/missing`), owner), 404);
+      await prisma.favoriteJob.createMany({
+        data: (
+          await prisma.job.createMany({
+            data: Array.from({ length: 200 }, (_, i) => ({
+              ...job,
+              title: `Заказ для избранного ${i}`,
+              category: 'ELECTRICAL' as const,
+              ownerId: customer.id,
+            })),
+          }).then(() => prisma.job.findMany({
+            where: { ownerId: customer.id, title: { startsWith: 'Заказ для избранного' } },
+            select: { id: true },
+          }))
+        ).map((j) => ({ userId: workerUser.id, jobId: j.id })),
+      });
+      await check('put', FJ, as(http().put(`${FAV}/${second.id}`), workerAuth), 409);
+      await check('get', FAV, as(http().get(FAV), owner), 200);
+      await check('get', FAV, as(http().get(`${FAV}?page=0`), owner), 400);
+      await check('get', FAV, http().get(FAV), 401);
+      const IDS = '/v1/me/favorites/ids';
+      await check('get', IDS, as(http().get(IDS), owner), 200);
+      await check('get', IDS, http().get(IDS), 401);
+      await check('delete', FJ, as(http().delete(`${FAV}/${second.id}`), owner), 200);
+      await check('delete', FJ, http().delete(`${FAV}/${second.id}`), 401);
+      await check('delete', FJ, as(http().delete(`${FAV}/bad%20id`), owner), 404);
+    });
+  });
+
   it('lead endpoints match openapi.json', async () => {
     const high = {
       RATE_LIMIT_PER_MIN: '1000',

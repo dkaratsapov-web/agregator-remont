@@ -31,7 +31,8 @@ export function writeAudit(
       | 'contractor_profile'
       | 'lead'
       | 'user'
-      | 'report';
+      | 'report'
+      | 'review';
     entityId: string;
     changes: FieldChanges;
   },

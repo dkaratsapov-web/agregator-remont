@@ -34,7 +34,7 @@ export async function SiteHeader() {
             {user ? (
               <AccountMenu
                 app
-                unread={summary?.unread ?? null}
+                unread={summary ? summary.unread + summary.reportDecisions : null}
                 user={{
                   name: user.name,
                   role: user.role,

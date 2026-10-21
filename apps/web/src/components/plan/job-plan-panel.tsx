@@ -6,14 +6,14 @@ import {
   type PlanParty,
 } from '@agregator/shared';
 import {
-  acceptStageAction,
-  approvePlanAction,
-  quitJobAction,
-  returnPlanAction,
-  reworkStageAction,
-  savePlanAction,
-  setPlanAuthorAction,
-  submitStageAction,
+  acceptStageFormAction,
+  approvePlanFormAction,
+  quitJobFormAction,
+  returnPlanFormAction,
+  reworkStageFormAction,
+  savePlanFormAction,
+  setPlanAuthorFormAction,
+  submitStageFormAction,
 } from '@/app/(site)/account/plan/actions';
 import { ConfirmActionForm } from '@/components/bids/confirm-action-form';
 import { PhotoGrid } from '@/components/chat/photo-grid';
@@ -91,7 +91,8 @@ export function JobPlanPanel({
 
         {jobOpen && status === 'DRAFT' && viewer === 'OWNER' ? (
           <ConfirmActionForm
-            action={setPlanAuthorAction.bind(null, jobId, version, other(author), returnTo)}
+            action={setPlanAuthorFormAction}
+            args={[jobId, version, other(author), returnTo]}
             summary={author === 'OWNER' ? 'Пусть план составит исполнитель' : 'Составлю план сам'}
             explanation={
               author === 'OWNER'
@@ -105,7 +106,8 @@ export function JobPlanPanel({
 
         {jobOpen && status === 'DRAFT' && isAuthor ? (
           <PlanEditor
-            action={savePlanAction.bind(null, jobId, version, returnTo)}
+            action={savePlanFormAction}
+            args={[jobId, version, returnTo]}
             stages={plan.stages}
             sequential={plan.sequential}
           />
@@ -157,7 +159,8 @@ export function JobPlanPanel({
                 {jobOpen && viewer === 'CONTRACTOR' && submittable.has(stage.id) ? (
                   <div className="mt-3">
                     <CommentActionForm
-                      action={submitStageAction.bind(null, jobId, stage.id, returnTo)}
+                      action={submitStageFormAction}
+                      args={[jobId, stage.id, returnTo]}
                       summary={stage.status === 'REWORK' ? 'Сдать после доработки' : 'Этап сдан'}
                       label="Что сделано"
                       hint="Заказчик увидит комментарий и фото и примет этап или вернёт на доработку."
@@ -171,14 +174,16 @@ export function JobPlanPanel({
                 {jobOpen && viewer === 'OWNER' && stage.status === 'SUBMITTED' ? (
                   <div className="mt-3 flex flex-wrap items-start gap-3">
                     <ConfirmActionForm
-                      action={acceptStageAction.bind(null, jobId, stage.id, returnTo)}
+                      action={acceptStageFormAction}
+                      args={[jobId, stage.id, returnTo]}
                       summary="Принять этап"
                       explanation="Этап будет отмечен как принятый. Вернуть его на доработку после этого нельзя."
                       confirmLabel="Да, принять"
                       pendingLabel="Принимаем…"
                     />
                     <CommentActionForm
-                      action={reworkStageAction.bind(null, jobId, stage.id, returnTo)}
+                      action={reworkStageFormAction}
+                      args={[jobId, stage.id, returnTo]}
                       summary="На доработку"
                       label="Что доработать"
                       submitLabel="Вернуть на доработку"
@@ -195,14 +200,16 @@ export function JobPlanPanel({
         {jobOpen && status === 'PROPOSED' && !isAuthor ? (
           <div className="flex flex-wrap items-start gap-3">
             <ConfirmActionForm
-              action={approvePlanAction.bind(null, jobId, version, returnTo)}
+              action={approvePlanFormAction}
+              args={[jobId, version, returnTo]}
               summary="Согласовать план"
               explanation="После согласования план не меняется, исполнитель начнёт сдавать этапы."
               confirmLabel="Да, согласовать"
               pendingLabel="Согласуем…"
             />
             <CommentActionForm
-              action={returnPlanAction.bind(null, jobId, version, returnTo)}
+              action={returnPlanFormAction}
+              args={[jobId, version, returnTo]}
               name="reason"
               summary="Нужно изменить"
               label="Что изменить в плане"
@@ -216,7 +223,8 @@ export function JobPlanPanel({
         {jobOpen && viewer === 'CONTRACTOR' ? (
           <div className="border-t border-line pt-4">
             <CommentActionForm
-              action={quitJobAction.bind(null, jobId, returnTo)}
+              action={quitJobFormAction}
+              args={[jobId, returnTo]}
               name="reason"
               summary="Отказаться от заказа"
               label="Почему вы отказываетесь"

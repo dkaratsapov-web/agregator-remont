@@ -3,10 +3,23 @@
  * с типами, сгенерированными из apps/api/openapi.json. Расхождение ломает `pnpm typecheck`.
  * После PR C интерфейсы станут псевдонимами сгенерированных типов и файл можно удалить.
  */
-import type { AuthSessionDto, SessionDto, UserDto } from './auth';
+import type {
+  AdminUserDto,
+  AuthSessionDto,
+  PasswordResetLinkDto,
+  SessionDto,
+  UserDto,
+} from './auth';
 import type { ContractorProfileDto, JobBidDto, MyBidDto } from './bids';
 import type { components } from './generated/openapi';
-import type { JobDraftDto, JobDto, JobItemDto, OwnJobDto } from './jobs';
+import type {
+  FavoriteIdsDto,
+  FavoriteStateDto,
+  JobDraftDto,
+  JobDto,
+  JobItemDto,
+  OwnJobDto,
+} from './jobs';
 import type { LeadDto } from './leads';
 import type { JobMessageDto, JobMessagesDto, PhotoDto } from './messages';
 import type {
@@ -17,13 +30,21 @@ import type {
 } from './notifications';
 import type {
   BlockedStateDto,
+  ContentFlagDto,
   HiddenStateDto,
+  MyReportDto,
   ReportDto,
   ReportReceivedDto,
   ReportSubjectDto,
 } from './moderation';
 import type { Paginated } from './pagination';
 import type { JobPlanDto, JobStageDto } from './plans';
+import type {
+  ContractorRatingDto,
+  JobReviewStateDto,
+  PublicContractorDto,
+  ReviewDto,
+} from './reviews';
 
 type Schemas = components['schemas'];
 
@@ -64,4 +85,18 @@ export type ContractChecks = [
   Expect<Equal<JobItemDto, Schemas['JobItemDto']>>,
   Expect<Equal<LeadDto, Schemas['LeadDto']>>,
   Expect<Equal<Paginated<LeadDto>, Schemas['PaginatedLeadDto']>>,
+  // Аккаунты и доверие: сброс пароля, пользователи, отзывы, избранное, автопроверка.
+  Expect<Equal<PasswordResetLinkDto, Schemas['PasswordResetLinkDto']>>,
+  Expect<Equal<AdminUserDto, Schemas['AdminUserDto']>>,
+  Expect<Equal<Paginated<AdminUserDto>, Schemas['PaginatedAdminUserDto']>>,
+  Expect<Equal<ContractorRatingDto, Schemas['ContractorRatingDto']>>,
+  Expect<Equal<ReviewDto, Schemas['ReviewDto']>>,
+  Expect<Equal<PublicContractorDto, Schemas['PublicContractorDto']>>,
+  Expect<Equal<JobReviewStateDto, Schemas['JobReviewStateDto']>>,
+  Expect<Equal<FavoriteStateDto, Schemas['FavoriteStateDto']>>,
+  Expect<Equal<FavoriteIdsDto, Schemas['FavoriteIdsDto']>>,
+  Expect<Equal<MyReportDto, Schemas['MyReportDto']>>,
+  Expect<Equal<Paginated<MyReportDto>, Schemas['PaginatedMyReportDto']>>,
+  Expect<Equal<ContentFlagDto, Schemas['ContentFlagDto']>>,
+  Expect<Equal<Paginated<ContentFlagDto>, Schemas['PaginatedContentFlagDto']>>,
 ];

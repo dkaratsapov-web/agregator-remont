@@ -3,6 +3,8 @@
 import { useActionState } from 'react';
 import type { JobFormState } from '@/app/(site)/account/jobs/actions';
 import { FormError } from '@/components/auth/form-error';
+import { FormArgs } from '@/components/ui/form-args';
+import type { FormArg } from '@/lib/form-args';
 
 const OUTCOMES = [
   {
@@ -22,10 +24,13 @@ const OUTCOMES = [
  * Заказ без исполнителя можно только отменить; у заказа в работе человек выбирает исход.
  */
 export function CloseJobForm({
+  args,
   action,
   inProgress,
 }: {
   action: (state: JobFormState, form: FormData) => Promise<JobFormState>;
+  /** Параметры действия скрытым полем вместо bind (lib/form-args.ts). */
+  args?: readonly FormArg[];
   /** Исполнитель выбран: нужен исход (выполнен или отменён). */
   inProgress: boolean;
 }) {
@@ -46,6 +51,7 @@ export function CloseJobForm({
         </svg>
       </summary>
       <form action={formAction} className="space-y-3 border-t border-line px-5 py-4 sm:px-6">
+        {args ? <FormArgs values={args} /> : null}
         <FormError message={state.error} />
         {inProgress ? (
           <fieldset className="space-y-2">

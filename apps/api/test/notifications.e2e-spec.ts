@@ -326,7 +326,7 @@ describe('Notifications (e2e)', () => {
           .send({ jobId: first })
           .expect(200)
       ).body;
-      expect(s).toEqual({ unread: 2, jobs: [{ jobId: second, unread: 2 }] });
+      expect(s).toEqual({ unread: 2, jobs: [{ jobId: second, unread: 2 }], reportDecisions: 0 });
 
       const [one] = (await list(owner)).body.items.filter(
         (n: { jobId: string }) => n.jobId === second,
@@ -347,7 +347,7 @@ describe('Notifications (e2e)', () => {
           .send({ all: true })
           .expect(200)
       ).body;
-      expect(s).toEqual({ unread: 0, jobs: [] });
+      expect(s).toEqual({ unread: 0, jobs: [], reportDecisions: 0 });
       // Повтор — без ошибок и без изменений.
       await http()
         .post('/v1/me/notifications/read')

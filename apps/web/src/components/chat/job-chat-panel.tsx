@@ -1,6 +1,6 @@
 import { PLAN_PARTY_LABELS, type JobMessagesDto } from '@agregator/shared';
 import Link from 'next/link';
-import { sendMessageAction } from '@/app/(site)/account/plan/actions';
+import { sendMessageFormAction } from '@/app/(site)/account/plan/actions';
 import { Sheet, SheetBody, SheetHeader } from '@/components/ui/sheet';
 import { ReportButton } from '@/components/moderation/report-button';
 import { formatDateTime } from '@/lib/format';
@@ -94,7 +94,7 @@ export function JobChatPanel({
         )}
         {chat.canWrite && !earlier ? (
           <>
-            <MessageForm action={sendMessageAction.bind(null, chat.jobId, requestId, returnTo)} />
+            <MessageForm action={sendMessageFormAction} args={[chat.jobId, requestId, returnTo]} />
             <AutoRefresh />
           </>
         ) : null}

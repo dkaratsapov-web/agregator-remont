@@ -25,6 +25,7 @@ import {
   updateProfile,
 } from '@/lib/api';
 import { getClientIp } from '@/lib/session';
+import { argString, readFormArgs } from '@/lib/form-args';
 
 const SETTINGS = '/account/settings';
 
@@ -144,4 +145,12 @@ export async function revokeOthersAction(
     redirectIfUnauthorized(error, SETTINGS);
     return { error: apiErrorMessage(error) };
   }
+}
+
+// --- Формы: параметры скрытым полем args вместо bind (lib/form-args.ts, docs/NO_JS_FORMS.md).
+
+/** args: [sessionId] */
+export async function revokeSessionFormAction(prev: SettingsState, form: FormData) {
+  const [id] = readFormArgs(form);
+  return revokeSessionAction(argString(id), prev, form);
 }

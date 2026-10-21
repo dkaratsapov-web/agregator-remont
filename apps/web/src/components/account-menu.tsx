@@ -32,15 +32,17 @@ const ROLE_LINKS: Record<UserRole, MenuLink[]> = {
   ],
   ADMIN: [
     { href: '/admin/reports', label: 'Жалобы' },
+    { href: '/admin/users', label: 'Пользователи' },
     { href: '/admin/leads', label: 'Заявки на тестирование' },
     { href: '/jobs', label: 'Каталог заказов' },
   ],
 };
 
-/** Разделы в разработке: страницы есть и честно говорят, что раздел скоро появится. */
+/** Общие разделы; «Корзина» — в разработке, страница честно говорит, что раздел скоро появится. */
 const SECTION_LINKS: MenuLink[] = [
-  { href: '/account/favorites', label: 'Избранное', soon: true },
-  { href: '/account/chats', label: 'Чаты', soon: true },
+  { href: '/account/favorites', label: 'Избранное' },
+  { href: '/account/chats', label: 'Переписки' },
+  { href: '/account/reports', label: 'Мои жалобы' },
   { href: '/account/cart', label: 'Корзина', soon: true },
 ];
 
@@ -75,7 +77,7 @@ function Icon({ name }: { name: keyof typeof ICONS }) {
 
 const QUICK = [
   { href: '/account/favorites', label: 'Избранное', icon: 'favorites' },
-  { href: '/account/chats', label: 'Чаты', icon: 'chats' },
+  { href: '/account/chats', label: 'Переписки', icon: 'chats' },
   { href: '/account/cart', label: 'Корзина', icon: 'cart' },
 ] as const;
 

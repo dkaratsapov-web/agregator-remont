@@ -230,9 +230,12 @@ describe('Contractor profiles and bids (e2e)', () => {
 
       const res = await http().get(`/v1/me/jobs/${jobId}/bids`).set(customer.auth).expect(200);
       expect(res.body).toHaveLength(1);
+      // Номер публичной карточки и рейтинг — да; email и id пользователя — нет.
       expect(res.body[0].contractor).toEqual({
+        publicId: expect.any(Number),
         name: expect.any(String),
         profile: expect.objectContaining({ categories: ['FLOORING', 'FINISHING'] }),
+        rating: { average: null, count: 0 },
       });
       const raw = JSON.stringify(res.body);
       expect(raw).not.toContain('@example.ru');

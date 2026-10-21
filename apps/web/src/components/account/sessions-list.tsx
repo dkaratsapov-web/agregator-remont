@@ -4,10 +4,11 @@ import type { SessionDto } from '@agregator/shared';
 import { useActionState } from 'react';
 import {
   revokeOthersAction,
-  revokeSessionAction,
+  revokeSessionFormAction,
   type SettingsState,
 } from '@/app/(site)/account/settings/actions';
 import { FormStatus } from './form-status';
+import { FormArgs } from '@/components/ui/form-args';
 
 const dateFormat = new Intl.DateTimeFormat('ru-RU', {
   day: 'numeric',
@@ -47,7 +48,7 @@ function DeviceIcon({ device }: { device: string | null }) {
 
 function RevokeButton({ id }: { id: string }) {
   const [state, action, pending] = useActionState<SettingsState, FormData>(
-    revokeSessionAction.bind(null, id),
+    revokeSessionFormAction,
     {},
   );
   // Подтверждение отдельным раскрытием, как у «Закрыть заказ» (AUDIT_FINDINGS UX-10).
@@ -57,6 +58,7 @@ function RevokeButton({ id }: { id: string }) {
         Завершить
       </summary>
       <form action={action} className="mt-2 flex flex-col items-end gap-1.5 text-right">
+        <FormArgs values={[id]} />
         <p className="max-w-[16rem] text-sm text-ink-soft">
           На этом устройстве придётся войти заново.
         </p>

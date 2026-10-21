@@ -1,6 +1,7 @@
 import { JOB_CATEGORY_LABELS, type JobBidDto } from '@agregator/shared';
-import { acceptBidAction } from '@/app/(site)/account/jobs/actions';
+import { acceptBidFormAction } from '@/app/(site)/account/jobs/actions';
 import { ReportButton } from '@/components/moderation/report-button';
+import { RatingLine } from '@/components/reviews/rating-line';
 import { formatAmount, formatDate, formatYears } from '@/lib/format';
 import { BidJobChangedNote, BidStatusBadge } from './bid-status-badge';
 import { ConfirmActionForm } from './confirm-action-form';
@@ -27,6 +28,9 @@ export function JobBidList({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="break-words font-semibold">{bid.contractor.name}</p>
+                <div className="mt-0.5">
+                  <RatingLine rating={bid.contractor.rating} publicId={bid.contractor.publicId} />
+                </div>
                 {profile ? (
                   <p className="mt-0.5 text-sm text-ink-soft">
                     {[
@@ -79,7 +83,8 @@ export function JobBidList({
             {canAccept && bid.status === 'PENDING' ? (
               <div className="mt-4">
                 <ConfirmActionForm
-                  action={acceptBidAction.bind(null, jobId, bid.id)}
+                  action={acceptBidFormAction}
+                  args={[jobId, bid.id]}
                   summary="Выбрать исполнителем"
                   explanation="Заказ перейдёт в работу, остальные отклики будут отклонены. Отменить выбор нельзя."
                   confirmLabel={`Да, выбрать: ${bid.contractor.name}`}

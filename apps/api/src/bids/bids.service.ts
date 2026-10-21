@@ -16,7 +16,9 @@ import { Job, Prisma } from '@prisma/client';
 import { writeAudit } from '../audit/audit';
 import { notify } from '../notifications/notify';
 import { ENTITY_ID_PATTERN } from '../common/text';
+import { flagContacts } from '../moderation/content-flags';
 import { PrismaService } from '../prisma/prisma.service';
+import { ratingsFor } from '../reviews/ratings';
 import { toJobBidDto, toMyBidDto } from './bid.mapper';
 import { CreateBidDto } from './dto/create-bid.dto';
 import { ListMyBidsQuery } from './dto/list-my-bids.query';
@@ -93,6 +95,13 @@ export class BidsService {
             durationDays: { from: null, to: created.durationDays },
             status: { from: null, to: created.status },
           },
+        });
+        await flagContacts(tx, {
+          type: 'BID',
+          id: created.id,
+          jobId,
+          authorId: contractorId,
+          text: dto.comment,
         });
         await notify(tx, {
           actorId: contractorId,
@@ -177,7 +186,11 @@ export class BidsService {
       include: { contractor: { include: { profile: true } } },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     });
-    return bids.map(toJobBidDto);
+    const ratings = await ratingsFor(
+      this.prisma,
+      bids.map((b) => b.contractorId),
+    );
+    return bids.map((b) => toJobBidDto(b, ratings.get(b.contractorId)!));
   }
 
   /**
@@ -238,7 +251,8 @@ export class BidsService {
       });
       return updated;
     });
-    return toJobBidDto(accepted);
+    const ratings = await ratingsFor(this.prisma, [accepted.contractorId]);
+    return toJobBidDto(accepted, ratings.get(accepted.contractorId)!);
   }
 
   /**

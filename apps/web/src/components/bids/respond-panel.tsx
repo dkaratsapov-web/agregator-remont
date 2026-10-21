@@ -1,6 +1,6 @@
 import type { JobDto, MyBidDto, UserRole } from '@agregator/shared';
 import Link from 'next/link';
-import { placeBidAction, withdrawBidAction } from '@/app/(site)/account/bids/actions';
+import { placeBidFormAction, withdrawBidFormAction } from '@/app/(site)/account/bids/actions';
 import { Notice } from '@/components/notice';
 import { formatAmount } from '@/lib/format';
 import { BidForm } from './bid-form';
@@ -60,7 +60,8 @@ export function RespondPanel({ job, viewerRole, myBid, notice }: Props) {
           </p>
           {myBid.status === 'PENDING' ? (
             <ConfirmActionForm
-              action={withdrawBidAction.bind(null, myBid.id, path)}
+              action={withdrawBidFormAction}
+              args={[myBid.id, path]}
               summary="Отозвать отклик"
               explanation="Заказчик больше не увидит этот отклик. Откликнуться повторно будет нельзя."
               confirmLabel="Да, отозвать"
@@ -75,7 +76,7 @@ export function RespondPanel({ job, viewerRole, myBid, notice }: Props) {
           </Link>
         </div>
       ) : job.status === 'OPEN' ? (
-        <BidForm action={placeBidAction.bind(null, job.id)} />
+        <BidForm action={placeBidFormAction} args={[job.id]} />
       ) : (
         <p className="text-sm leading-relaxed text-ink-soft">Заказ уже не принимает отклики.</p>
       )}

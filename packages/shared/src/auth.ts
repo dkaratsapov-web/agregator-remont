@@ -99,3 +99,47 @@ export interface AuthSessionDto {
   /** ISO 8601 */
   expiresAt: string;
 }
+
+/**
+ * Новый пароль по одноразовой ссылке. Почты пока нет: ссылку выдаёт администратор
+ * (`/admin/users`) или команда на сервере (`docs/ACCOUNTS.md`). Ссылка действует TTL_HOURS часов
+ * и один раз; новая ссылка отменяет прежние; после смены пароля все входы завершаются.
+ */
+export const PASSWORD_RESET_LIMITS = {
+  TTL_HOURS: 24,
+} as const;
+
+export interface PasswordResetInput {
+  /** Токен из ссылки `/reset/<токен>`. */
+  token: string;
+  password: string;
+}
+
+/** Выданная ссылка: токен показывается один раз, в базе только его хеш. */
+export interface PasswordResetLinkDto {
+  token: string;
+  /** ISO 8601 */
+  expiresAt: string;
+}
+
+/** Пользователь в списке администратора. */
+export interface AdminUserDto {
+  id: string;
+  publicId: number;
+  email: string;
+  name: string;
+  role: UserRole;
+  blocked: boolean;
+  /** ISO 8601 */
+  createdAt: string;
+  /** Заказов как заказчик и откликов как подрядчик. */
+  jobs: number;
+  bids: number;
+  /** Жалоб на его заказы, сообщения и отклики, ждущих разбора. */
+  openReports: number;
+}
+
+export const ADMIN_USER_LIMITS = {
+  PAGE: 20,
+  QUERY_MAX: 100,
+} as const;
