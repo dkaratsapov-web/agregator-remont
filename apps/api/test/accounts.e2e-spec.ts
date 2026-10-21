@@ -151,6 +151,27 @@ describe('Accounts and trust (e2e)', () => {
     });
   });
 
+  describe('blocking in the database', () => {
+    it('no new session for a blocked account, whatever writes it (old API after a rollback)', async () => {
+      const user = await signUp(app, 'CUSTOMER');
+      await prisma.user.update({ where: { id: user.id }, data: { blockedAt: new Date() } });
+      await expect(
+        prisma.session.create({
+          data: {
+            userId: user.id,
+            tokenHash: 'f'.repeat(64),
+            expiresAt: new Date(Date.now() + 60_000),
+          },
+        }),
+      ).rejects.toThrow(/blocked/);
+      await prisma.user.update({ where: { id: user.id }, data: { blockedAt: null } });
+      await http()
+        .post('/v1/auth/login')
+        .send({ email: await email(user), password: PASSWORD })
+        .expect(200);
+    });
+  });
+
   describe('admin users', () => {
     it('finds people by email, name or account number and counts open complaints', async () => {
       const admin = await signUpAdmin(app, prisma);

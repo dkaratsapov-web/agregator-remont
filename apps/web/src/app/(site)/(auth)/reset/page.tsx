@@ -3,11 +3,9 @@ import Link from 'next/link';
 import { ResetPasswordForm } from '@/components/auth/reset-password-form';
 import { readResetToken } from '@/lib/password-reset';
 
-export const metadata: Metadata = {
-  title: 'Новый пароль',
-  robots: { index: false },
-  referrer: 'no-referrer',
-};
+// Без referrer: no-referrer — с ним браузер шлёт форму с Origin: null, и Next.js её отвергает.
+// Токена в адресе этой страницы нет: его забирает /reset/<токен> (там Referrer-Policy строже).
+export const metadata: Metadata = { title: 'Новый пароль', robots: { index: false } };
 
 export default async function ResetPasswordPage() {
   const token = await readResetToken();

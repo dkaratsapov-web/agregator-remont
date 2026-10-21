@@ -54,6 +54,9 @@ if [ "$1" = compose ]; then
   case " $* " in
     # Откат: применённые миграции живой базы (DB_MIGRATIONS, по одной в строке).
     *" exec "*_prisma_migrations*) [ "${EXEC_FAIL:-0}" = 1 ] && exit 1; printf '%b' "${DB_MIGRATIONS:-}" ;;
+    # Откат на версию без модерации: столбцы hidden_at в базе и число скрытого.
+    *" exec "*information_schema*) [ "${EXEC_FAIL:-0}" = 1 ] && exit 1; printf '%s' "${DB_MODERATION_COLUMNS:-0}" ;;
+    *" exec "*hidden_at*) printf '%s' "${DB_HIDDEN:-0}" ;;
     *" exec "*) [ "${EXEC_FAIL:-0}" = 1 ] && exit 1; printf 'PGDMP-stub' ;;
     *" build "*) [ "${BUILD_FAIL:-0}" = 1 ] && exit 1 ;;
     *" up "*) [ "${UP_FAIL:-0}" = 1 ] && exit 1 ;;
@@ -68,10 +71,11 @@ STUB
 # curl: GitHub API из файлов в $API_DIR; сайт — коды из переменных, главная со ссылками на статику.
 cat > "$WORK/bin/curl" << 'STUB'
 #!/usr/bin/env bash
-url='' out=''
+url='' out='' head=0
 while [ $# -gt 0 ]; do
   case "$1" in
     -o) out=$2; shift ;;
+    -sI) head=1 ;;
     # Адрес из stdin (notify.sh, heartbeat): строка «url = "..."».
     -K) [ "$2" = - ] && url=$(sed -n 's/^url = "\(.*\)"$/\1/p'); shift ;;
     http*) url=$1 ;;
@@ -92,21 +96,47 @@ case "$url" in
           printf '[{"number":1,"merged_at":"2026-10-19T00:00:00Z","merge_commit_sha":"%s","base":{"ref":"main"}}]' "$sha"
         fi ;;
       */jobs\?*page=2*) cat "$API_DIR/jobs2.json" ;;
+      */rules/branches/*) cat "$API_DIR/rules.json" 2> /dev/null || echo '[]' ;;
+      */commits/main) printf '{"sha":"%s"}' "${REMOTE_SHA:-}" ;;
       */jobs\?*) cat "$API_DIR/jobs1.json" ;;
     esac
     exit 0 ;;
 esac
 case "$url" in
   *hooks.invalid*) exit 0 ;;
-  */jobs) code=${PRIVATE_CODE:-401} ;;
+  */jobs | */account) code=${PRIVATE_CODE:-401} ;;
+  http://*) code=${HTTP_CODE:-308} ;;
   */_next/static/*|*/landing/*) code=${ASSET_CODE:-200} ;;
   *) code=${HOME_CODE:-200}
      [ -n "$out" ] && [ "$out" != /dev/null ] &&
        printf '<script src="/_next/static/chunks/app.js"></script><img src="/landing/flight-v3/desktop-poster.avif">' > "$out" ;;
 esac
+if [ "$head" = 1 ]; then
+  printf 'HTTP/2 %s\r\n' "$code"
+  [ "${NO_HSTS:-0}" = 1 ] || printf 'Strict-Transport-Security: max-age=31536000\r\n'
+  printf 'X-Frame-Options: DENY\r\nX-Content-Type-Options: nosniff\r\nContent-Security-Policy: default-src self\r\n'
+  exit 0
+fi
 printf '%s' "$code"
 STUB
-chmod +x "$WORK/bin/docker" "$WORK/bin/curl"
+# systemctl и openssl для readiness.sh: таймеры работают (TIMERS_DOWN=1 — нет), сертификат
+# действует долго.
+cat > "$WORK/bin/systemctl" << 'STUB'
+#!/usr/bin/env bash
+case "$1" in
+  is-active) [ "${TIMERS_DOWN:-0}" = 1 ] && exit 3; exit 0 ;;
+  is-failed) exit 1 ;;
+esac
+exit 0
+STUB
+cat > "$WORK/bin/openssl" << 'STUB'
+#!/usr/bin/env bash
+case "$1" in
+  x509) echo 'notAfter=Dec 31 00:00:00 2099 GMT' ;;
+esac
+exit 0
+STUB
+chmod +x "$WORK/bin/docker" "$WORK/bin/curl" "$WORK/bin/systemctl" "$WORK/bin/openssl"
 
 export PATH="$WORK/bin:$PATH"
 export REPO_DIR="$WORK/server" STATE_DIR="$WORK/state" LOCK_FILE="$WORK/lock"
@@ -630,6 +660,38 @@ run
 marked=$(deployed)
 DB_MIGRATIONS='0_init\n3\n4' rollback
 check 'rollback over rollback-safe migration: allowed' "$(logged '^exit') $(failed)" "0 $marked"
+# Откат на версию без модерации, когда в базе есть скрытое модератором: отказ и варианты.
+all_green
+rm -f "$WORK/state/failed"
+run
+hiding=$(deployed)
+DB_MODERATION_COLUMNS=3 DB_HIDDEN=2 DB_MIGRATIONS='0_init\n3\n4' rollback
+check 'rollback to a version without moderation with hidden content: refused' \
+  "$(logged 'раскрыл бы скрытое') $(logged 'скрыто модератором: 2') $(deployed) $(docker_calls 'up -d')" "1 1 $hiding 0"
+DB_MODERATION_COLUMNS=3 DB_HIDDEN=0 DB_MIGRATIONS='0_init\n3\n4' rollback
+check 'rollback without hidden content: allowed' "$(logged '^exit') $(failed)" "0 $hiding"
+
+# 15. Готовность сервера (readiness.sh): всё настроено — GO; не хватает — NO-GO с действиями;
+# значения из deploy/.env не печатаются.
+ready() { bash "$ROOT/deploy/autodeploy/readiness.sh" > "$WORK/out.log" 2>&1 || echo "exit $?" >> "$WORK/out.log"; }
+cp "$WORK/server/deploy/.env" "$WORK/env.saved"
+printf 'NOTIFY_TELEGRAM_TOKEN=secret-token-value\nNOTIFY_TELEGRAM_CHAT=42\nMONITOR_HEARTBEAT_URL=https://hc.invalid/secret-ping\n' >> "$WORK/server/deploy/.env"
+printf '[{"type":"deletion"},{"type":"non_fast_forward"},{"type":"pull_request"},{"type":"required_status_checks","parameters":{"required_status_checks":[{"context":"a"},{"context":"b"},{"context":"c"},{"context":"d"}]}}]' > "$API_DIR/rules.json"
+write_state() { mkdir -p "$WORK/state" && printf '%s\n' "${@:2}" "at=$(date +%s)" > "$WORK/state/$1"; }
+write_state backup-status mode=offsite-hash-checked
+write_state restore-status result=ok
+rm -f "$WORK/state/notify-status"
+DB_MIGRATIONS=0 REMOTE_SHA=$(deployed) ready
+check 'readiness: everything set up — GO' "$(logged '^Итог: GO') $(logged '^НУЖНО') $(logged '^exit')" '1 0 0'
+check 'readiness: no secret values printed' "$(grep -c 'secret-token-value\|secret-ping' "$WORK/out.log" || true)" 0
+rm -f "$API_DIR/rules.json"
+write_state backup-status mode=local-only
+TIMERS_DOWN=1 NO_HSTS=1 DB_MIGRATIONS=0 REMOTE_SHA=$(deployed) ready
+check 'readiness: gaps — NO-GO with the steps' \
+  "$(logged '^Итог: NO-GO') $(logged 'Защита main') $(logged 'копии только на сервере') $(logged 'Таймер agregator-backup не работает') $(logged 'нет strict-transport-security') $(logged '^exit 1')" \
+  '1 1 1 1 1 1'
+cp "$WORK/env.saved" "$WORK/server/deploy/.env"
+rm -f "$WORK/state/backup-status" "$WORK/state/restore-status"
 
 # Секреты не попадают в журнал (в .env на сервере их нет, но проверяем, что .env не печатается).
 check 'no .env in log' "$(grep -c 'DOMAIN=' "$WORK/out.log" || true)" 0

@@ -127,7 +127,10 @@ try {
 
   // Скрыть сообщение → заблокировать автора → закрыть жалобу.
   await moderate(onMessage, 'Скрыть сообщение', 'Просьба о предоплате в обход сервиса');
-  await adminPage.getByText('Сообщение скрыто').waitFor();
+  await cards
+    .filter({ hasText: 'Сообщение: Мошенничество' })
+    .getByText('Сообщение скрыто', { exact: true })
+    .waitFor();
   await moderate(
     cards.filter({ hasText: 'Сообщение: Мошенничество' }),
     'Заблокировать автора',
@@ -170,7 +173,11 @@ try {
   // --- Скрыть заказ по жалобе: в каталоге его нет, владелец видит пометку.
   const onJob = cards.filter({ hasText: 'Заказ: Ненастоящий' });
   await moderate(onJob, 'Скрыть заказ', 'Проверка: заказ скрыт по жалобе');
-  await adminPage.getByText('Заказ скрыт').waitFor();
+  // Внутри своей карточки: в очереди могут быть скрытые заказы прежних прогонов.
+  await cards
+    .filter({ hasText: 'Заказ: Ненастоящий' })
+    .getByText('Заказ скрыт', { exact: true })
+    .waitFor();
   const gone = await reporterPage.goto(`${WEB}/jobs/${jobId}`);
   check('a hidden job is gone from the catalog', gone.status() === 404, `${gone.status()}`);
   await ownerPage.reload({ waitUntil: 'networkidle' });

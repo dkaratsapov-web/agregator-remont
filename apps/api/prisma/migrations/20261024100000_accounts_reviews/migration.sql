@@ -127,3 +127,20 @@ ALTER TABLE "content_flags" ADD CONSTRAINT "content_flags_author_id_fkey" FOREIG
 -- AddForeignKey
 ALTER TABLE "content_flags" ADD CONSTRAINT "content_flags_resolved_by_id_fkey" FOREIGN KEY ("resolved_by_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
+
+-- Блокировка на уровне базы: заблокированному аккаунту новый сеанс не создаётся, какой бы версии
+-- ни был API. Так блокировка действует и после отката на версию, которая о ней не знает
+-- (docs/MODERATION.md, «Откат»). Текущий API проверяет блокировку раньше и сюда не доходит.
+-- rollback-safe: новая функция, прежний API её не вызывает
+CREATE FUNCTION "refuse_session_for_blocked_user"() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM "users" WHERE "id" = NEW."user_id" AND "blocked_at" IS NOT NULL) THEN
+    RAISE EXCEPTION 'user is blocked' USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END
+$$;
+
+-- rollback-safe: прежний API создаёт сеансы только при входе и регистрации; заблокированному он отказать не умеет — отказывает база
+CREATE TRIGGER "sessions_refuse_blocked_user" BEFORE INSERT ON "sessions"
+  FOR EACH ROW EXECUTE FUNCTION "refuse_session_for_blocked_user"();

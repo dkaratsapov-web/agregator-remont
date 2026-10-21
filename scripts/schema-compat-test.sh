@@ -68,23 +68,28 @@ before=$(q "select count(*) from jobs")/$(q "select count(*) from bids")
 (cd "$ROOT/apps/api" && DATABASE_URL=$DB pnpm exec prisma migrate deploy > /dev/null)
 check 'upgrade: rows kept' "$(q "select count(*) from jobs")/$(q "select count(*) from bids")" "$before"
 # Проверки обновления — для миграций этого PR (меняются в каждом PR, который меняет схему).
-check 'upgrade: reports table created' "$(q "select count(*) from information_schema.tables where table_name = 'reports'")" 1
-check 'upgrade: old rows are not hidden or blocked' "$(q "select count(*) from jobs where hidden_at is not null")/$(q "select count(*) from bids where hidden_at is not null")/$(q "select count(*) from users where blocked_at is not null")" 0/0/0
-# Прежний код удаляет заказы и пользователей: жалобы не должны мешать (ON DELETE CASCADE /
-# SET NULL у решившего администратора).
-q "insert into jobs (id, title, description, category, city, status, owner_id, updated_at) values
-   ('j-gone', 'Удаляемый', 'Заказ, который удалит прежний код', 'TILING', 'Москва', 'OPEN', 'u-c', now());
-   insert into users (id, email, name, password_hash, role, updated_at) values ('u-gone', 'gone@example.ru', 'Удаляемый', 'x', 'CONTRACTOR', now());
+check 'upgrade: new tables created' "$(q "select count(*) from information_schema.tables where table_name in ('password_resets', 'reviews', 'favorite_jobs', 'content_flags')")" 4
+check 'upgrade: old reports keep no seen mark' "$(q "select count(*) from reports where reporter_seen_at is not null")" 0
+# Прежний код удаляет заказы и пользователей: новые строки не должны мешать (ON DELETE CASCADE /
+# SET NULL у выдавшего ссылку и разобравшего пометку администратора).
+q "insert into jobs (id, title, description, category, city, status, owner_id, close_outcome, updated_at) values
+   ('j-gone', 'Удаляемый', 'Заказ, который удалит прежний код', 'TILING', 'Москва', 'CLOSED', 'u-c', 'COMPLETED', now());
    insert into users (id, email, name, password_hash, role, updated_at) values ('u-adm', 'adm@example.ru', 'Администратор', 'x', 'ADMIN', now());
-   insert into reports (id, reporter_id, target_type, target_id, job_id, reason) values ('r-job', 'u-a', 'JOB', 'j-gone', 'j-gone', 'SPAM');
-   insert into reports (id, reporter_id, target_type, target_id, job_id, reason) values ('r-user', 'u-gone', 'JOB', 'j-open', 'j-open', 'FAKE');
-   insert into reports (id, reporter_id, target_type, target_id, job_id, reason, status, note, resolved_by_id, resolved_at)
-     values ('r-done', 'u-a', 'JOB', 'j-open', 'j-open', 'FAKE', 'DISMISSED', 'Нарушения нет', 'u-adm', now())" > /dev/null
-q "delete from jobs where id = 'j-gone'; delete from users where id in ('u-gone', 'u-adm')" > /dev/null
-check 'upgrade: deleting a job or a reporter removes their reports, a resolver is forgotten' "$(q "select count(*) || '/' || count(resolved_by_id) from reports")" 1/0
-check 'upgrade: one open report per reporter and target' "$(q "insert into reports (id, reporter_id, target_type, target_id, job_id, reason) values ('r-1', 'u-a', 'JOB', 'j-open', 'j-open', 'SPAM'); insert into reports (id, reporter_id, target_type, target_id, job_id, reason) values ('r-2', 'u-a', 'JOB', 'j-open', 'j-open', 'SPAM')" 2>&1 | grep -c reports_open_key)" 1
-check 'upgrade: an open report has no resolution' "$(q "insert into reports (id, reporter_id, target_type, target_id, job_id, reason, resolved_at) values ('r-bad', 'u-c', 'JOB', 'j-open', 'j-open', 'SPAM', now())" 2>&1 | grep -c reports_resolution_check)" 1
-q "delete from reports" > /dev/null
+   insert into reviews (id, job_id, author_id, contractor_id, rating) values ('rv-gone', 'j-gone', 'u-c', 'u-a', 5);
+   insert into favorite_jobs (user_id, job_id) values ('u-b', 'j-gone');
+   insert into content_flags (id, target_type, target_id, job_id, author_id, kinds, status, resolved_by_id, resolved_at)
+     values ('f-gone', 'BID', 'b-x', 'j-gone', 'u-a', 'PHONE', 'RESOLVED', 'u-adm', now());
+   insert into password_resets (id, user_id, token_hash, issued_by_id, expires_at) values ('pr-1', 'u-b', repeat('a', 64), 'u-adm', now() + interval '1 day')" > /dev/null
+q "delete from users where id = 'u-adm'" > /dev/null
+check 'upgrade: deleting an admin forgets them as issuer and resolver' "$(q "select count(issued_by_id) from password_resets")/$(q "select count(resolved_by_id) from content_flags")" 0/0
+q "delete from jobs where id = 'j-gone'" > /dev/null
+check 'upgrade: deleting a job removes its review, favorites and flags' "$(q "select count(*) from reviews")/$(q "select count(*) from favorite_jobs")/$(q "select count(*) from content_flags")" 0/0/0
+check 'upgrade: a rating is 1 to 5' "$(q "insert into reviews (id, job_id, author_id, contractor_id, rating) values ('rv-bad', 'j-closed', 'u-c', 'u-b', 6)" 2>&1 | grep -c reviews_rating_check)" 1
+check 'upgrade: a flag names known kinds only' "$(q "insert into content_flags (id, target_type, target_id, job_id, author_id, kinds) values ('f-bad', 'BID', 'b-x', 'j-open', 'u-a', 'PHONE,SKYPE')" 2>&1 | grep -c content_flags_kinds_check)" 1
+# Блокировка держится базой при любой версии API: сеанс заблокированному не создаётся.
+q "update users set blocked_at = now() where id = 'u-b'" > /dev/null
+check 'upgrade: the database refuses a session for a blocked account' "$(q "insert into sessions (id, token_hash, user_id, expires_at) values ('s-blocked', repeat('b', 64), 'u-b', now() + interval '1 day')" 2>&1 | grep -c 'user is blocked')" 1
+q "update users set blocked_at = null where id = 'u-b'; delete from password_resets" > /dev/null
 
 # --- 2 и 3. Прежний API на новой схеме, затем новый API на тех же данных.
 start_api() { # каталог порт

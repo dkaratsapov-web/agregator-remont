@@ -10,6 +10,7 @@ import {
 } from '@/lib/action-helpers';
 import { issuePasswordReset } from '@/lib/api';
 import { safeRedirectPath } from '@/lib/redirect';
+import { parsePublicOrigin } from '@/lib/same-origin';
 import { getClientIp } from '@/lib/session';
 import { argString, readFormArgs } from '@/lib/form-args';
 
@@ -20,8 +21,13 @@ export interface ResetLinkState {
   expiresAt?: string;
 }
 
-/** Адрес сайта для ссылки: как его видит браузер администратора (Caddy передаёт Host). */
+/**
+ * Адрес сайта для ссылки: WEB_PUBLIC_ORIGIN (обязателен в production), иначе — как его видит
+ * браузер администратора (локальная разработка).
+ */
 async function siteOrigin(): Promise<string> {
+  const configured = parsePublicOrigin(process.env.WEB_PUBLIC_ORIGIN);
+  if (configured) return configured;
   const list = await headers();
   const host = list.get('x-forwarded-host') ?? list.get('host') ?? 'localhost:3000';
   const proto =
