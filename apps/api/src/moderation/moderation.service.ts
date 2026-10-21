@@ -277,7 +277,9 @@ export class ModerationService {
         targetId: row.targetId,
         kinds: row.kinds
           .split(',')
-          .filter((k): k is ContentFlagKind => (CONTENT_FLAG_KINDS as readonly string[]).includes(k)),
+          .filter((k): k is ContentFlagKind =>
+            (CONTENT_FLAG_KINDS as readonly string[]).includes(k),
+          ),
         status: row.status,
         jobId: row.jobId,
         jobTitle: row.job.title,

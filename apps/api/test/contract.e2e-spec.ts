@@ -1064,8 +1064,7 @@ describe('API contract (e2e)', () => {
       const REV = '/v1/me/jobs/{jobId}/review';
       const review = (who: Who, body: object, id = created.id) =>
         as(http().post(`/v1/me/jobs/${id}/review`), who).send(body);
-      const state = (who: Who, id = created.id) =>
-        as(http().get(`/v1/me/jobs/${id}/review`), who);
+      const state = (who: Who, id = created.id) => as(http().get(`/v1/me/jobs/${id}/review`), who);
       await check('post', REV, review(customer, { rating: 5, text: 'Рано' }), 409);
       await http()
         .post(`/v1/me/jobs/${created.id}/bids/${placed.id}/accept`)
@@ -1157,17 +1156,21 @@ describe('API contract (e2e)', () => {
       await check('put', FJ, as(http().put(`${FAV}/missing`), owner), 404);
       await prisma.favoriteJob.createMany({
         data: (
-          await prisma.job.createMany({
-            data: Array.from({ length: 200 }, (_, i) => ({
-              ...job,
-              title: `Заказ для избранного ${i}`,
-              category: 'ELECTRICAL' as const,
-              ownerId: customer.id,
-            })),
-          }).then(() => prisma.job.findMany({
-            where: { ownerId: customer.id, title: { startsWith: 'Заказ для избранного' } },
-            select: { id: true },
-          }))
+          await prisma.job
+            .createMany({
+              data: Array.from({ length: 200 }, (_, i) => ({
+                ...job,
+                title: `Заказ для избранного ${i}`,
+                category: 'ELECTRICAL' as const,
+                ownerId: customer.id,
+              })),
+            })
+            .then(() =>
+              prisma.job.findMany({
+                where: { ownerId: customer.id, title: { startsWith: 'Заказ для избранного' } },
+                select: { id: true },
+              }),
+            )
         ).map((j) => ({ userId: workerUser.id, jobId: j.id })),
       });
       await check('put', FJ, as(http().put(`${FAV}/${second.id}`), workerAuth), 409);

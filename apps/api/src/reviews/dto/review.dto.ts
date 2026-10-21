@@ -8,7 +8,11 @@ export class CreateReviewDto {
   @IsInt({ message: 'Поставьте оценку от 1 до 5' })
   @Min(REVIEW_LIMITS.RATING_MIN, { message: 'Поставьте оценку от 1 до 5' })
   @Max(REVIEW_LIMITS.RATING_MAX, { message: 'Поставьте оценку от 1 до 5' })
-  @ApiProperty({ type: 'integer', minimum: REVIEW_LIMITS.RATING_MIN, maximum: REVIEW_LIMITS.RATING_MAX })
+  @ApiProperty({
+    type: 'integer',
+    minimum: REVIEW_LIMITS.RATING_MIN,
+    maximum: REVIEW_LIMITS.RATING_MAX,
+  })
   rating!: number;
 
   @Transform(trimText)

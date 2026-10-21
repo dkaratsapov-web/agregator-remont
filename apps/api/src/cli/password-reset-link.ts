@@ -12,7 +12,9 @@ async function main(): Promise<number> {
   const [emailArg, siteArg] = process.argv.slice(2);
   const email = emailArg?.trim().toLowerCase();
   if (!email) {
-    console.error('Укажите email: node dist/cli/password-reset-link.js user@example.ru [https://домен]');
+    console.error(
+      'Укажите email: node dist/cli/password-reset-link.js user@example.ru [https://домен]',
+    );
     return 2;
   }
   const prisma = new PrismaClient();

@@ -101,7 +101,10 @@ describe('Accounts and trust (e2e)', () => {
       await reset(link.token, 'another-password-3').expect(400);
       expect(
         await prisma.auditLog.count({
-          where: { entityId: user.id, action: { in: ['PASSWORD_RESET_ISSUED', 'PASSWORD_RESET_DONE'] } },
+          where: {
+            entityId: user.id,
+            action: { in: ['PASSWORD_RESET_ISSUED', 'PASSWORD_RESET_DONE'] },
+          },
         }),
       ).toBe(2);
     });
@@ -190,7 +193,13 @@ describe('Accounts and trust (e2e)', () => {
           .set(admin.auth)
           .expect(200);
         expect(body.items).toEqual([
-          expect.objectContaining({ id: owner.id, jobs: 1, bids: 0, openReports: 1, blocked: false }),
+          expect.objectContaining({
+            id: owner.id,
+            jobs: 1,
+            bids: 0,
+            openReports: 1,
+            blocked: false,
+          }),
         ]);
       }
       const { body: all } = await http().get('/v1/admin/users').set(admin.auth).expect(200);
@@ -246,7 +255,10 @@ describe('Accounts and trust (e2e)', () => {
       const { body: next } = await http().post('/v1/me/jobs').set(customer.auth).send(jobBody);
       await http().post(`/v1/jobs/${next.id}/bids`).set(contractor.auth).send(bidBody).expect(201);
       const bids = await http().get(`/v1/me/jobs/${next.id}/bids`).set(customer.auth).expect(200);
-      expect(bids.body[0].contractor).toMatchObject({ publicId, rating: { average: 4.5, count: 2 } });
+      expect(bids.body[0].contractor).toMatchObject({
+        publicId,
+        rating: { average: 4.5, count: 2 },
+      });
 
       // Скрытый модератором отзыв не считается.
       const admin = await signUpAdmin(app, prisma);
@@ -383,7 +395,11 @@ describe('Accounts and trust (e2e)', () => {
         .expect(200);
       expect((await summary()).body.reportDecisions).toBe(1);
       const { body: mine } = await http().get('/v1/reports/mine').set(reporter.auth).expect(200);
-      expect(mine.items[0]).toMatchObject({ status: 'RESOLVED', note: 'Заказ скрыт', unseen: true });
+      expect(mine.items[0]).toMatchObject({
+        status: 'RESOLVED',
+        note: 'Заказ скрыт',
+        unseen: true,
+      });
       await http().post('/v1/reports/mine/seen').set(reporter.auth).expect(204);
       expect((await summary()).body.reportDecisions).toBe(0);
       const { body: other } = await http().get('/v1/reports/mine').set(owner.auth).expect(200);

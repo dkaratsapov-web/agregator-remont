@@ -7,11 +7,7 @@ import { WriteRateLimited } from '../auth/rate-limit';
 import { SessionGuard } from '../auth/session.guard';
 import { PaginationQuery } from '../jobs/dto/list-jobs.query';
 import { ApiErrors, ApiSession } from '../openapi/decorators';
-import {
-  FavoriteIdsSchema,
-  FavoriteStateSchema,
-  PaginatedJobSchema,
-} from '../openapi/schemas';
+import { FavoriteIdsSchema, FavoriteStateSchema, PaginatedJobSchema } from '../openapi/schemas';
 import { FavoritesService } from './favorites.service';
 
 @ApiTags('favorites')
