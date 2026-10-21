@@ -29,7 +29,6 @@ GITHUB_API=${GITHUB_API:-https://api.github.com/repos/dkaratsapov-web/agregator-
 STATE_DIR=${STATE_DIR:-/var/lib/agregator-deploy}
 LOCK_FILE=${LOCK_FILE:-/run/agregator-deploy.lock}
 REQUIRED_WORKFLOW=${REQUIRED_WORKFLOW:-.github/workflows/ci.yml}
-REQUIRED_JOBS=${REQUIRED_JOBS:-Lint, typecheck, test, build|Docker stack (compose)|Docker stack behind Caddy (proxy)|Disaster drills (backup, restore, broken release, rollback)}
 HEALTH_ATTEMPTS=${HEALTH_ATTEMPTS:-30}
 HEALTH_DELAY=${HEALTH_DELAY:-5}
 # Сколько раз пробовать коммит при сбое сборки, переключения или проверки (сеть apt/npm, медленный
@@ -43,6 +42,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GATE="$SCRIPT_DIR/ci_gate.py"
 # shellcheck source=deploy/autodeploy/lib.sh
 . "$SCRIPT_DIR/lib.sh"
+REQUIRED_JOBS=${REQUIRED_JOBS:-$REQUIRED_JOBS_DEFAULT}
 
 log() { echo "[agregator-deploy] $*"; }
 

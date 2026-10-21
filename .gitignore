@@ -40,3 +40,4 @@ deploy/.env
 # временные копии репозитория для параллельной работы агентов Claude Code
 .claude/worktrees/
 drafts-e2e-failure.png
+__pycache__/

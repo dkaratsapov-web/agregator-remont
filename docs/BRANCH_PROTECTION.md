@@ -52,6 +52,11 @@ for id in $(gh api repos/dkaratsapov-web/agregator-remont/rules/branches/main --
 done
 ```
 
+На сервере то же проверяет `readiness.sh` (`deploy/autodeploy/ruleset_check.py`): четыре
+проверки — точно по имени, ruleset `active`, список обхода пуст. Список обхода GitHub
+показывает только с токеном (`READINESS_GITHUB_TOKEN`, порядок ввода —
+`docs/OWNER_RELEASE_ACTIONS.md`); без него итог — NO-GO с причиной «список обхода не виден».
+
 Практическая проверка: попытка `git push origin HEAD:main` с любым коммитом должна получить
 отказ `GH013: Repository rule violations found`, а PR без зелёных четырёх проверок — неактивную
 кнопку «Merge».

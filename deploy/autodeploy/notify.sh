@@ -39,11 +39,15 @@ if [ -n "$webhook" ]; then
   fi
 fi
 
+# Итог доставки — в STATE_DIR/notify-status (readiness.sh требует свежую успешную доставку).
 if [ "$sent" -eq 0 ] && [ "$failed" -eq 0 ]; then
   # Не настроено — не «всё хорошо»: код 3, monitor.sh сообщит об этом внешнему монитору.
   echo '[agregator-notify] каналы не настроены (NOTIFY_* в deploy/.env), только журнал' >&2
+  write_status notify-status result=unconfigured
   exit 3
 elif [ "$failed" -gt 0 ]; then
   echo "[agregator-notify] не удалось отправить в $failed канал(а)" >&2
+  write_status notify-status result=failed
   exit 1
 fi
+write_status notify-status result=ok

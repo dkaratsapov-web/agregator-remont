@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Готовность сервера к запуску одной командой, только чтение:
 #   sudo bash deploy/autodeploy/readiness.sh
-# Проверяет то, что CI проверить не может: защиту main в GitHub, копии вне сервера и проверку
-# восстановления, каналы уведомлений и внешний монитор, таймеры, контейнеры, HTTPS и ответы
-# сайта через Caddy, версию, миграции и место на диске. По каждому пункту — ГОТОВО или НУЖНО и
+# Проверяет то, что CI проверить не может: защиту main в GitHub (четыре обязательные задачи CI
+# по имени, ruleset включён и без обхода — полностью только с READINESS_GITHUB_TOKEN), копии вне
+# сервера и проверку восстановления, подтверждённую доставку уведомлений и свежий принятый
+# сигнал внешнего монитора, таймеры, контейнеры, HTTPS и ответы сайта через Caddy, совпадение
+# развёрнутой версии с main, миграции и место на диске. По каждому пункту — ГОТОВО или НУЖНО и
 # что сделать (docs/OWNER_RELEASE_ACTIONS.md); в конце итог GO / NO-GO, код выхода 0 / 1.
 # Ничего не меняет и не печатает значения из deploy/.env (только задано / не задано).
 set -uo pipefail
@@ -16,8 +18,9 @@ BACKUP_MAX_AGE_HOURS=${BACKUP_MAX_AGE_HOURS:-26}
 RESTORE_MAX_AGE_DAYS=${RESTORE_MAX_AGE_DAYS:-8}
 MIN_FREE_GB=${MIN_FREE_GB:-5}
 CERT_MIN_DAYS=${CERT_MIN_DAYS:-14}
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=deploy/autodeploy/lib.sh
-. "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+. "$SCRIPT_DIR/lib.sh"
 
 cd "$REPO_DIR" || { echo "Нет $REPO_DIR"; exit 1; }
 compose=(docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml)
@@ -37,27 +40,33 @@ now=$(date +%s)
 echo "Готовность сервера, $(date -u '+%Y-%m-%d %H:%M UTC')"
 echo
 
-# --- GitHub: правила main (чтение без токена).
-rules=$(curl -fsS --max-time 15 -H 'Accept: application/vnd.github+json' "$GITHUB_API/rules/branches/$BRANCH" 2> /dev/null)
+# --- GitHub: правила main. Без токена GitHub не показывает список обхода, поэтому полную
+# проверку даёт только READINESS_GITHUB_TOKEN (токен на чтение администрирования репозитория,
+# в командной строке: READINESS_GITHUB_TOKEN=… sudo -E bash …). Токен не печатается и не
+# попадает в аргументы curl (заголовок читается из stdin).
+github() {
+  if [ -n "${READINESS_GITHUB_TOKEN:-}" ]; then
+    printf 'header = "Authorization: Bearer %s"\n' "$READINESS_GITHUB_TOKEN" |
+      curl -fsS --max-time 15 -K - -H 'Accept: application/vnd.github+json' "$GITHUB_API/$1"
+  else
+    curl -fsS --max-time 15 -H 'Accept: application/vnd.github+json' "$GITHUB_API/$1"
+  fi
+}
+rules=$(github "rules/branches/$BRANCH" 2> /dev/null)
 if [ -z "$rules" ]; then
   need 'Защита main: GitHub не ответил' 'повторите позже; проверка вручную — docs/BRANCH_PROTECTION.md'
 else
-  verdict=$(printf '%s' "$rules" | python3 -c '
-import json, sys
-rules = json.load(sys.stdin)
-types = {r.get("type") for r in rules}
-checks = set()
-for r in rules:
-    for c in (r.get("parameters") or {}).get("required_status_checks") or []:
-        checks.add(c.get("context"))
-need = ["deletion", "non_fast_forward", "pull_request", "required_status_checks"]
-lost = [t for t in need if t not in types]
-print("ok" if not lost and len(checks) >= 4 else "нет правил: " + ", ".join(lost or ["меньше четырёх проверок CI"]))
-' 2> /dev/null || echo 'ответ GitHub не разобран')
+  rulesets='[]'
+  for id in $(printf '%s' "$rules" | python3 -c 'import json,sys; print(" ".join(sorted({str(r["ruleset_id"]) for r in json.load(sys.stdin) if r.get("ruleset_id") is not None})))' 2> /dev/null); do
+    one=$(github "rulesets/$id" 2> /dev/null) || one='{}'
+    rulesets=$(printf '%s\n%s' "$rulesets" "$one" | python3 -c 'import json,sys; a,b=sys.stdin.read().split("\n",1); print(json.dumps(json.loads(a)+[json.loads(b)]))' 2> /dev/null || echo "$rulesets")
+  done
+  verdict=$(printf '{"rules": %s, "rulesets": %s}' "$rules" "$rulesets" |
+    python3 "$SCRIPT_DIR/ruleset_check.py" "$REQUIRED_JOBS_DEFAULT" 2> /dev/null || echo 'проверка не выполнилась')
   if [ "$verdict" = ok ]; then
-    ok 'Защита main: PR, четыре проверки CI, запрет force-push и удаления'
+    ok 'Защита main: PR, четыре обязательные проверки CI по имени, без обхода, запрет force-push и удаления'
   else
-    need "Защита main ($verdict)" 'Settings → Rules → Rulesets по docs/BRANCH_PROTECTION.md'
+    need "Защита main: $verdict" 'Settings → Rules → Rulesets по docs/BRANCH_PROTECTION.md'
   fi
 fi
 
@@ -84,20 +93,41 @@ else
   ok "Проверка восстановления: прошла $(((now - restore_at) / 86400)) дн. назад"
 fi
 
-# --- Уведомления и внешний монитор (только задано / не задано).
-if is_set NOTIFY_WEBHOOK_URL || { is_set NOTIFY_TELEGRAM_TOKEN && is_set NOTIFY_TELEGRAM_CHAT; }; then
-  if [ "$(status_value notify-status result)" = failed ]; then
-    need 'Уведомления: последнее не дошло' 'sudo bash deploy/autodeploy/notify.sh "проверка" — сообщение должно прийти'
-  else
-    ok 'Уведомления: канал задан'
-  fi
-else
+# --- Уведомления и внешний монитор: заданы, доставка подтверждена и свежая.
+NOTIFY_MAX_AGE_DAYS=${NOTIFY_MAX_AGE_DAYS:-30}
+MONITOR_MAX_AGE_MIN=${MONITOR_MAX_AGE_MIN:-120}
+if ! is_set NOTIFY_WEBHOOK_URL && ! { is_set NOTIFY_TELEGRAM_TOKEN && is_set NOTIFY_TELEGRAM_CHAT; }; then
   need 'Уведомления о сбоях: канал не задан' 'NOTIFY_TELEGRAM_TOKEN + NOTIFY_TELEGRAM_CHAT или NOTIFY_WEBHOOK_URL в deploy/.env'
-fi
-if is_set MONITOR_HEARTBEAT_URL; then
-  ok 'Внешний монитор: адрес heartbeat задан'
 else
+  notify_at=$(status_value notify-status at)
+  case "$(status_value notify-status result)" in
+    ok)
+      if [ $(((now - notify_at) / 86400)) -gt "$NOTIFY_MAX_AGE_DAYS" ]; then
+        need "Уведомления: последняя доставка $(((now - notify_at) / 86400)) дн. назад" 'sudo bash deploy/autodeploy/notify.sh "проверка" — сообщение должно прийти'
+      else
+        ok "Уведомления: доставка подтверждена $(((now - notify_at) / 86400)) дн. назад"
+      fi
+      ;;
+    failed) need 'Уведомления: последнее не доставлено' 'проверьте канал: sudo bash deploy/autodeploy/notify.sh "проверка"' ;;
+    *) need 'Уведомления: канал задан, доставка не проверялась' 'sudo bash deploy/autodeploy/notify.sh "проверка" — сообщение должно прийти' ;;
+  esac
+fi
+if ! is_set MONITOR_HEARTBEAT_URL; then
   need 'Внешний монитор: не задан' 'healthchecks.io (период 1 ч) → MONITOR_HEARTBEAT_URL в deploy/.env'
+else
+  monitor_at=$(status_value monitor-status at)
+  heartbeat=$(status_value monitor-status heartbeat)
+  if [ -z "$monitor_at" ]; then
+    need 'Внешний монитор: почасовая проверка ещё не отправляла «жив»' 'sudo systemctl start agregator-monitor; journalctl -u agregator-monitor -n 30'
+  elif [ $(((now - monitor_at) / 60)) -gt "$MONITOR_MAX_AGE_MIN" ]; then
+    need "Внешний монитор: последний сигнал $(((now - monitor_at) / 60)) мин назад" 'systemctl list-timers agregator-monitor; journalctl -u agregator-monitor -n 30'
+  elif [ "$heartbeat" != accepted ]; then
+    need "Внешний монитор: сигнал не принят ($heartbeat)" 'проверьте MONITOR_HEARTBEAT_URL и journalctl -u agregator-monitor -n 30'
+  elif [ "$(status_value monitor-status problems)" != 0 ]; then
+    need "Внешний монитор: почасовая проверка видит проблем: $(status_value monitor-status problems)" 'journalctl -u agregator-monitor -n 30'
+  else
+    ok "Внешний монитор: «жив» принят $(((now - monitor_at) / 60)) мин назад, проблем нет"
+  fi
 fi
 
 # --- Таймеры и последние запуски.
@@ -168,21 +198,22 @@ else
   esac
 fi
 
-# --- Версия, миграции, место.
+# --- Версия, миграции, место. GO только когда развёрнут ровно тот коммит, что в main:
+# обновление в пути, неудачное или неизвестное состояние — не GO.
 deployed=$(cat "$STATE_DIR/deployed" 2> /dev/null || true)
-remote=$(curl -fsS --max-time 15 -H 'Accept: application/vnd.github+json' "$GITHUB_API/commits/$BRANCH" 2> /dev/null |
+failed=$(cat "$STATE_DIR/failed" 2> /dev/null || true)
+remote=$(github "commits/$BRANCH" 2> /dev/null |
   python3 -c 'import json,sys; print(json.load(sys.stdin)["sha"])' 2> /dev/null || true)
 if [ -z "$deployed" ]; then
   need 'Версия: автообновление ещё ничего не развернуло' 'sudo systemctl start agregator-deploy; journalctl -u agregator-deploy -n 50'
-elif [ -n "$remote" ] && [ "$remote" != "$deployed" ]; then
-  failed=$(cat "$STATE_DIR/failed" 2> /dev/null || true)
-  if [ "$failed" = "$remote" ]; then
-    need "Версия: ${remote:0:12} из main не развернулась (помечена неудачной)" 'journalctl -u agregator-deploy -n 100; deploy/README.md «Если обновление не прошло»'
-  else
-    ok "Версия: развёрнута ${deployed:0:12}, в main уже ${remote:0:12} (обновление в пути)"
-  fi
-else
+elif [ -z "$remote" ]; then
+  need 'Версия: GitHub не ответил, не сверить с main' 'повторите позже'
+elif [ "$remote" = "$deployed" ]; then
   ok "Версия: развёрнута ${deployed:0:12}, совпадает с main"
+elif [ "$failed" = "$remote" ]; then
+  need "Версия: ${remote:0:12} из main не развернулась (помечена неудачной)" 'journalctl -u agregator-deploy -n 100; deploy/README.md «Если обновление не прошло»'
+else
+  need "Версия: развёрнута ${deployed:0:12}, в main уже ${remote:0:12} (обновление в пути или отстало)" 'дождитесь обновления (journalctl -u agregator-deploy -f) и повторите проверку'
 fi
 # shellcheck disable=SC2016 # переменные раскрываются внутри контейнера db
 broken=$("${compose[@]}" exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -XtAc "select count(*) from _prisma_migrations where finished_at is null or rolled_back_at is not null"' 2> /dev/null | tr -d '[:space:]')
