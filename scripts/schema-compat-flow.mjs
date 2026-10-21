@@ -187,7 +187,9 @@ if (mode === 'old') {
     report.status === 201 && report.body.duplicate === false,
     `got ${report.status}`,
   );
-  const reviewState = await call(`/v1/me/jobs/${state.closedJob}/review`, { token: state.customer });
+  const reviewState = await call(`/v1/me/jobs/${state.closedJob}/review`, {
+    token: state.customer,
+  });
   check(
     'a job completed with the old API can be reviewed',
     reviewState.status === 200 && reviewState.body.canReview === true,
@@ -210,7 +212,11 @@ if (mode === 'old') {
     method: 'PUT',
     token: reporter,
   });
-  check('a job of the old API goes to favorites', favorite.status === 200, `got ${favorite.status}`);
+  check(
+    'a job of the old API goes to favorites',
+    favorite.status === 200,
+    `got ${favorite.status}`,
+  );
   const closedChat = await call(`/v1/jobs/${state.closedJob}/messages`, { token: state.customer });
   check(
     'a job closed by the old API: conversation read-only',

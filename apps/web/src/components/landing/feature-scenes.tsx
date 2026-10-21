@@ -652,7 +652,7 @@ export function ProtectionScene() {
     { label: 'Защита от перебора паролей', state: 'Работает', ok: true },
     { label: 'Ограничение частоты запросов', state: 'Работает', ok: true },
     { label: 'Данные на серверах в России', state: 'Работает', ok: true },
-    { label: 'Модерация заказов и отзывов', state: 'В разработке', ok: false },
+    { label: 'Модерация заказов и отзывов', state: 'Работает', ok: true },
   ];
   return (
     <div className="absolute inset-0">

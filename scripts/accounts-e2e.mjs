@@ -81,7 +81,9 @@ const watch = (page) => page.on('pageerror', (e) => errors.push(e.message));
 /** Сервер отвечает: обычная страница открывается быстро. */
 async function serverResponsive() {
   const started = Date.now();
-  const res = await fetch(`${WEB}/offline`, { signal: AbortSignal.timeout(5000) }).catch(() => null);
+  const res = await fetch(`${WEB}/offline`, { signal: AbortSignal.timeout(5000) }).catch(
+    () => null,
+  );
   return res?.status === 200 && Date.now() - started < 3000;
 }
 
@@ -131,7 +133,10 @@ try {
     await noJs.getByLabel('Новый пароль').fill('third-password-2026');
     await noJs.getByLabel('Пароль ещё раз').fill('third-password-2026');
     await noJs.getByRole('button', { name: 'Сохранить и войти' }).click();
-    await noJs.getByText(/устарела|недействительна/).first().waitFor({ timeout: 8000 });
+    await noJs
+      .getByText(/устарела|недействительна/)
+      .first()
+      .waitFor({ timeout: 8000 });
     check('a used link is refused', true);
     await noJs.context().close();
     await adminPage.context().close();
@@ -179,7 +184,9 @@ try {
     const noJs = await (await contextFor(other, { javaScriptEnabled: false })).newPage();
     await noJs.goto(`${WEB}/jobs/${nextJob}`);
     await noJs.getByLabel('Ваша цена, ₽').fill('дорого');
-    await noJs.getByLabel('Комментарий для заказчика').fill('Сделаю быстро и аккуратно, есть опыт.');
+    await noJs
+      .getByLabel('Комментарий для заказчика')
+      .fill('Сделаю быстро и аккуратно, есть опыт.');
     const started = Date.now();
     await noJs.getByRole('button', { name: 'Откликнуться' }).click();
     await noJs.locator('[aria-invalid="true"], [role="alert"]').first().waitFor({ timeout: 8000 });
@@ -261,7 +268,9 @@ try {
     await page.goto(`${WEB}/account/reports`, { waitUntil: 'networkidle' });
     check(
       'my reports show the decision',
-      await page.getByText('Решение администратора: Заказ настоящий, заказчик подтвердил').isVisible(),
+      await page
+        .getByText('Решение администратора: Заказ настоящий, заказчик подтвердил')
+        .isVisible(),
     );
     await page.waitForFunction(
       () =>
@@ -283,7 +292,9 @@ try {
     [other, '/account/favorites'],
     [master, '/account/chats'],
   ]) {
-    const narrow = await (await contextFor(who, { viewport: { width: 320, height: 700 } })).newPage();
+    const narrow = await (
+      await contextFor(who, { viewport: { width: 320, height: 700 } })
+    ).newPage();
     await narrow.goto(`${WEB}${path}`, { waitUntil: 'networkidle' });
     const [scroll, inner] = await narrow.evaluate(() => [
       document.documentElement.scrollWidth,
@@ -295,7 +306,11 @@ try {
 
   check('no JavaScript errors', errors.length === 0, errors.join(' | '));
 } catch (error) {
-  check('accounts scenario finished', false, error instanceof Error ? error.message : String(error));
+  check(
+    'accounts scenario finished',
+    false,
+    error instanceof Error ? error.message : String(error),
+  );
 } finally {
   await browser.close();
 }
