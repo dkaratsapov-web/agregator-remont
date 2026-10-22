@@ -19,6 +19,10 @@ import {
   USER_ROLES,
   type AuthSessionDto,
   type AdminUserDto,
+  ANALYTICS_METRICS,
+  type AnalyticsDto,
+  type AnalyticsMetric,
+  type AnalyticsSeriesDto,
   type ContactExchangeDto,
   type ContentFlagDto,
   type PartyContactsDto,
@@ -678,6 +682,21 @@ export class ContactExchangeSchema implements ContactExchangeDto {
     description: 'Контакты второй стороны; null — она их не открывала',
   })
   theirs!: PartyContactsSchema | null;
+}
+
+@ApiSchema({ name: 'AnalyticsSeriesDto' })
+export class AnalyticsSeriesSchema implements AnalyticsSeriesDto {
+  @ApiProperty({ enum: ANALYTICS_METRICS, enumName: 'AnalyticsMetric' }) metric!: AnalyticsMetric;
+  @ApiProperty({ type: 'integer', minimum: 0 }) total!: number;
+  @ApiProperty({ type: 'integer', isArray: true, description: 'По дням, в порядке days' })
+  perDay!: number[];
+}
+
+@ApiSchema({ name: 'AnalyticsDto' })
+export class AnalyticsSchema implements AnalyticsDto {
+  @ApiProperty({ type: String, isArray: true, description: 'YYYY-MM-DD по Москве, по возрастанию' })
+  days!: string[];
+  @ApiProperty({ type: AnalyticsSeriesSchema, isArray: true }) series!: AnalyticsSeriesSchema[];
 }
 
 @ApiSchema({ name: 'FavoriteStateDto' })

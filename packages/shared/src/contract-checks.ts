@@ -37,6 +37,7 @@ import type {
   ReportReceivedDto,
   ReportSubjectDto,
 } from './moderation';
+import type { AnalyticsDto, AnalyticsSeriesDto } from './analytics';
 import type { ContactExchangeDto, PartyContactsDto } from './contacts';
 import type { Paginated } from './pagination';
 import type { JobPlanDto, JobStageDto } from './plans';
@@ -103,4 +104,7 @@ export type ContractChecks = [
   // Обмен контактами по согласию сторон.
   Expect<Equal<PartyContactsDto, Schemas['PartyContactsDto']>>,
   Expect<Equal<ContactExchangeDto, Schemas['ContactExchangeDto']>>,
+  // Аналитика без персональных данных.
+  Expect<Equal<AnalyticsSeriesDto, Schemas['AnalyticsSeriesDto']>>,
+  Expect<Equal<AnalyticsDto, Schemas['AnalyticsDto']>>,
 ];

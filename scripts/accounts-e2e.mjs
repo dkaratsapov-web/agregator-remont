@@ -329,9 +329,37 @@ try {
     await ownerNoJs.context().close();
   }
 
+  // --- Аналитика: администратор видит числа за период, остальным раздел закрыт.
+  {
+    const adminPage = await (await contextFor(admin)).newPage();
+    watch(adminPage);
+    await adminPage.goto(`${WEB}/admin/analytics?days=7`, { waitUntil: 'networkidle' });
+    check(
+      'analytics: the 7-day period is selected',
+      (await adminPage.getByRole('link', { name: '7 дней' }).getAttribute('aria-current')) ===
+        'page',
+    );
+    const published = adminPage.locator('li', { hasText: 'Опубликованные заказы' });
+    const total = Number(await published.locator('p.text-2xl').textContent());
+    check('analytics: published jobs are counted', total > 0, String(total));
+    check(
+      'analytics: each day has a bar with a hint',
+      (await published.locator('svg rect').count()) === 7,
+    );
+    await adminPage.context().close();
+    const customerPage = await (await contextFor(other)).newPage();
+    await customerPage.goto(`${WEB}/admin/analytics`, { waitUntil: 'networkidle' });
+    check(
+      'analytics: closed to non-admins',
+      await customerPage.getByText('Раздел доступен только администратору.').isVisible(),
+    );
+    await customerPage.context().close();
+  }
+
   // --- 320 px: новые страницы без горизонтальной прокрутки.
   for (const [who, path] of [
     [admin, '/admin/users'],
+    [admin, '/admin/analytics?days=90'],
     [other, `/contractors/${masterUser.publicId}`],
     [other, '/account/reports'],
     [other, '/account/favorites'],

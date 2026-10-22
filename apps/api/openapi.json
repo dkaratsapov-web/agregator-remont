@@ -55,6 +55,75 @@
         ],
         "type": "object"
       },
+      "AnalyticsDto": {
+        "additionalProperties": false,
+        "properties": {
+          "days": {
+            "description": "YYYY-MM-DD по Москве, по возрастанию",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsSeriesDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "days",
+          "series"
+        ],
+        "type": "object"
+      },
+      "AnalyticsMetric": {
+        "enum": [
+          "CUSTOMERS_REGISTERED",
+          "CONTRACTORS_REGISTERED",
+          "CATALOG_VIEWS",
+          "JOB_VIEWS",
+          "DRAFTS_STARTED",
+          "JOBS_PUBLISHED",
+          "BIDS_PLACED",
+          "CONTRACTORS_CHOSEN",
+          "MESSAGES_SENT",
+          "JOBS_COMPLETED",
+          "REVIEWS_LEFT",
+          "CONTACTS_SHARED"
+        ],
+        "type": "string"
+      },
+      "AnalyticsSeriesDto": {
+        "additionalProperties": false,
+        "properties": {
+          "metric": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AnalyticsMetric"
+              }
+            ]
+          },
+          "perDay": {
+            "description": "По дням, в порядке days",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "total": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "metric",
+          "total",
+          "perDay"
+        ],
+        "type": "object"
+      },
       "AuthSessionDto": {
         "additionalProperties": false,
         "properties": {
@@ -3433,6 +3502,88 @@
         },
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/v1/admin/analytics": {
+      "get": {
+        "operationId": "Analytics_report",
+        "parameters": [
+          {
+            "description": "Период, дней",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "enum": [
+                7,
+                30,
+                90
+              ],
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "admin"
         ]
       }
     },

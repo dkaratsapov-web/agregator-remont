@@ -286,6 +286,7 @@ model AuditLog {
 
   @@index([entityType, entityId, createdAt])
   @@index([actorId, createdAt])
+  @@index([action, createdAt])
   @@map("audit_logs")
 }
 
@@ -651,6 +652,17 @@ model ContactShare {
   @@id([bidId, userId])
   @@index([userId])
   @@map("contact_shares")
+}
+
+/// Счётчики шагов, которых нет в других таблицах (просмотры каталога и карточек, начатые
+/// черновики): число за день по Москве, без людей, адресов и cookie (docs/ANALYTICS.md).
+model UsageCounter {
+  day    DateTime @db.Date
+  metric String   @db.VarChar(40)
+  count  Int      @default(0)
+
+  @@id([day, metric])
+  @@map("usage_counters")
 }
 
 /// Автопроверка: в сообщении или отклике похоже на контакты (телефон, почта, ссылка, мессенджер).

@@ -1,6 +1,8 @@
 import 'server-only';
 import type {
   AdminUserDto,
+  AnalyticsDto,
+  AnalyticsPeriod,
   AuthSessionDto,
   ContactExchangeDto,
   ContentFlagDto,
@@ -1073,4 +1075,10 @@ export async function setContactsShared(
     clientIp,
   });
   return expectJson<ContactExchangeDto>(res, `${shared ? 'PUT' : 'DELETE'} /v1/jobs/:id/contacts`);
+}
+
+/** Воронка по дням для администратора (только числа). */
+export async function getAnalytics(token: string, days: AnalyticsPeriod): Promise<AnalyticsDto> {
+  const res = await request(`/v1/admin/analytics?days=${days}`, { token });
+  return expectJson<AnalyticsDto>(res, 'GET /v1/admin/analytics');
 }

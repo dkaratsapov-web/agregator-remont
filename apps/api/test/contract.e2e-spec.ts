@@ -1121,6 +1121,12 @@ describe('API contract (e2e)', () => {
       await check('post', RH, hideReview(written.body.id, owner, hide), 403);
       await check('post', RH, hideReview('missing', admin, hide), 404);
 
+      const AN = '/v1/admin/analytics';
+      await check('get', AN, as(http().get(`${AN}?days=7`), admin), 200);
+      await check('get', AN, as(http().get(`${AN}?days=5`), admin), 400);
+      await check('get', AN, http().get(AN), 401);
+      await check('get', AN, as(http().get(AN), owner), 403);
+
       const FL = '/v1/admin/flags';
       const flags = await check('get', FL, as(http().get(FL), admin), 200);
       expect(flags.body.items).toEqual(

@@ -36,6 +36,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Analytics_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/bids/{id}/hidden": {
         parameters: {
             query?: never;
@@ -1126,6 +1142,19 @@ export interface components {
             publicId: number;
             role: components["schemas"]["UserRole"];
         };
+        AnalyticsDto: {
+            /** @description YYYY-MM-DD по Москве, по возрастанию */
+            days: string[];
+            series: components["schemas"]["AnalyticsSeriesDto"][];
+        };
+        /** @enum {string} */
+        AnalyticsMetric: "CUSTOMERS_REGISTERED" | "CONTRACTORS_REGISTERED" | "CATALOG_VIEWS" | "JOB_VIEWS" | "DRAFTS_STARTED" | "JOBS_PUBLISHED" | "BIDS_PLACED" | "CONTRACTORS_CHOSEN" | "MESSAGES_SENT" | "JOBS_COMPLETED" | "REVIEWS_LEFT" | "CONTACTS_SHARED";
+        AnalyticsSeriesDto: {
+            metric: components["schemas"]["AnalyticsMetric"];
+            /** @description По дням, в порядке days */
+            perDay: number[];
+            total: number;
+        };
         AuthSessionDto: {
             /** Format: date-time */
             expiresAt: string;
@@ -2007,6 +2036,64 @@ export interface operations {
             };
             /** @description Функция временно выключена */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Analytics_report: {
+        parameters: {
+            query?: {
+                /** @description Период, дней */
+                days?: 7 | 30 | 90;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyticsDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Роль не допускает операцию */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

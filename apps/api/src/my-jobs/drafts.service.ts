@@ -2,6 +2,7 @@ import { DRAFT_LIMITS, type JobDraftDto } from '@agregator/shared';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { ENTITY_ID_PATTERN } from '../common/text';
+import { countUsage } from '../analytics/usage';
 import { PrismaService } from '../prisma/prisma.service';
 import { draftDetails, draftItems, toJobDraftDto } from './draft.mapper';
 import { SaveDraftDto } from './dto/draft-input.dto';
@@ -42,6 +43,7 @@ export class DraftsService {
       }
       return tx.jobDraft.create({ data: { ...toData(dto), ownerId } });
     });
+    await countUsage(this.prisma, 'DRAFTS_STARTED');
     return toJobDraftDto(draft);
   }
 
