@@ -6,11 +6,14 @@
 # - зависшее соединение рвётся через 20 с, apt повторяет загрузку и переходит к следующему
 #   зеркалу списка (Acquire::http::Timeout, Acquire::Retries);
 # - основной архив Ubuntu ставится в списке зеркал первым;
-# - каждая попытка ограничена по времени, попыток две; не вышло — понятная ошибка этого шага.
+# - каждая попытка ограничена по времени, попыток две; не вышло — понятная ошибка этого шага;
+# - после оборванной попытки её apt-get останавливается и блокировка dpkg освобождается:
+#   playwright запускает apt-get отдельным процессом через sudo, и timeout его не трогает
+#   (на 6159586 вторая попытка упала на чужой блокировке).
 set -euo pipefail
 
 ATTEMPTS=${ATTEMPTS:-2}
-ATTEMPT_SECONDS=${ATTEMPT_SECONDS:-480}
+ATTEMPT_SECONDS=${ATTEMPT_SECONDS:-600}
 MIRRORS=${APT_MIRRORS_FILE:-/etc/apt/apt-mirrors.txt}
 SUDO=$([ "$(id -u)" -eq 0 ] && echo '' || echo sudo)
 
@@ -25,12 +28,23 @@ if [ -f "$MIRRORS" ]; then
   $SUDO mv "$MIRRORS.ci" "$MIRRORS"
 fi
 
+# Остановить apt оборванной попытки и дождаться, пока dpkg освободит блокировку (до минуты).
+stop_apt() {
+  $SUDO pkill -TERM -x apt-get 2> /dev/null || true
+  for _ in $(seq 1 30); do
+    pgrep -x apt-get > /dev/null || pgrep -x dpkg > /dev/null || return 0
+    sleep 2
+  done
+  $SUDO pkill -KILL -x apt-get 2> /dev/null || true
+}
+
 for attempt in $(seq 1 "$ATTEMPTS"); do
-  if timeout "$ATTEMPT_SECONDS" pnpm exec playwright install --with-deps chromium webkit; then
+  if timeout --kill-after=20 "$ATTEMPT_SECONDS" pnpm exec playwright install --with-deps chromium webkit; then
     exit 0
   fi
   echo "playwright install: попытка $attempt из $ATTEMPTS не уложилась или не удалась" >&2
-  # Оборванная загрузка не трогает dpkg, но на всякий случай доводим прерванную установку.
+  stop_apt
+  # Прерванная установка пакетов доводится до целого состояния.
   $SUDO dpkg --configure -a || true
 done
 echo 'Браузеры не установлены: зеркало пакетов Ubuntu недоступно или очень медленное. Перезапустите задачу позже.' >&2
