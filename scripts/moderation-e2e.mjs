@@ -115,8 +115,15 @@ try {
   // --- Очередь администратора.
   const adminPage = await (await contextFor(admin)).newPage();
   watch(adminPage);
-  await adminPage.goto(`${WEB}/admin/reports`, { waitUntil: 'networkidle' });
   const cards = adminPage.locator('main ul > li').filter({ hasText: jobTitle });
+  // Очередь — старые первыми, по 20 на страницу: в базе, где уже есть открытые жалобы
+  // (повторный прогон, стенд), свои могут оказаться дальше первой страницы.
+  for (let page = 1; page <= 10; page += 1) {
+    await adminPage.goto(`${WEB}/admin/reports${page > 1 ? `?page=${page}` : ''}`, {
+      waitUntil: 'networkidle',
+    });
+    if ((await cards.count()) > 0) break;
+  }
   check('admin sees both complaints in the queue', (await cards.count()) === 2);
   const onMessage = cards.filter({ hasText: 'Сообщение: Мошенничество' });
   check(
@@ -204,7 +211,8 @@ try {
       'without JS the page says the complaint was sent',
       await noJs.getByText('Жалоба отправлена. Администратор разберёт её.').isVisible(),
     );
-    const { body: queue } = await api(admin, '/v1/admin/reports');
+    // Все жалобы — новые первыми: своя на первой странице, сколько бы открытых ни было в базе.
+    const { body: queue } = await api(admin, '/v1/admin/reports?status=ALL');
     check(
       'without JS a complaint about a bid is sent',
       queue.items.some((r) => r.targetType === 'BID' && r.subject.jobId === second),
