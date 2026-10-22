@@ -2,6 +2,7 @@ import 'server-only';
 import type {
   AdminUserDto,
   AuthSessionDto,
+  ContactExchangeDto,
   ContentFlagDto,
   FavoriteIdsDto,
   FavoriteStateDto,
@@ -1047,4 +1048,29 @@ export async function setFavorite(
     clientIp,
   });
   return expectJson<FavoriteStateDto>(res, `${favorite ? 'PUT' : 'DELETE'} /v1/me/favorites/:id`);
+}
+
+/** Обмен контактами в сделке; null — сделки нет или заказ не виден (404). */
+export async function getContacts(
+  token: string,
+  jobId: string,
+): Promise<ContactExchangeDto | null> {
+  const res = await request(`/v1/jobs/${encodeURIComponent(jobId)}/contacts`, { token });
+  if (res.status === 404) return null;
+  return expectJson<ContactExchangeDto>(res, 'GET /v1/jobs/:id/contacts');
+}
+
+/** Открыть (shared) или скрыть свои контакты второй стороне сделки. */
+export async function setContactsShared(
+  token: string,
+  jobId: string,
+  shared: boolean,
+  clientIp?: string,
+): Promise<ContactExchangeDto> {
+  const res = await request(`/v1/jobs/${encodeURIComponent(jobId)}/contacts`, {
+    method: shared ? 'PUT' : 'DELETE',
+    token,
+    clientIp,
+  });
+  return expectJson<ContactExchangeDto>(res, `${shared ? 'PUT' : 'DELETE'} /v1/jobs/:id/contacts`);
 }

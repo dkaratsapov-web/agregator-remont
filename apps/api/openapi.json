@@ -194,6 +194,49 @@
         },
         "type": "object"
       },
+      "ContactExchangeDto": {
+        "additionalProperties": false,
+        "properties": {
+          "counterpartName": {
+            "type": "string"
+          },
+          "myPhoneSet": {
+            "type": "boolean"
+          },
+          "mySharedAt": {
+            "description": "Когда я открыл свои контакты; null — не открывал",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "theirs": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PartyContactsDto"
+              }
+            ],
+            "description": "Контакты второй стороны; null — она их не открывала",
+            "nullable": true,
+            "type": "object"
+          },
+          "viewer": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlanParty"
+              }
+            ],
+            "description": "Кто смотрит"
+          }
+        },
+        "required": [
+          "viewer",
+          "counterpartName",
+          "mySharedAt",
+          "myPhoneSet",
+          "theirs"
+        ],
+        "type": "object"
+      },
       "ContentFlagDto": {
         "additionalProperties": false,
         "properties": {
@@ -2247,6 +2290,29 @@
           "page",
           "limit",
           "total"
+        ],
+        "type": "object"
+      },
+      "PartyContactsDto": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "description": "null — телефон в профиле не указан",
+            "nullable": true,
+            "pattern": "^\\+7[3489][0-9]{9}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "phone",
+          "email"
         ],
         "type": "object"
       },
@@ -5560,6 +5626,197 @@
         ],
         "tags": [
           "bids"
+        ]
+      }
+    },
+    "/v1/jobs/{jobId}/contacts": {
+      "delete": {
+        "operationId": "Contacts_hide",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactExchangeDto"
+                }
+              }
+            },
+            "description": "Мои контакты снова скрыты"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "contacts"
+        ]
+      },
+      "get": {
+        "operationId": "Contacts_state",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactExchangeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "contacts"
+        ]
+      },
+      "put": {
+        "operationId": "Contacts_share",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactExchangeDto"
+                }
+              }
+            },
+            "description": "Мои контакты открыты второй стороне"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "contacts"
         ]
       }
     },

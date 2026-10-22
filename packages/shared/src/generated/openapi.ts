@@ -436,6 +436,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/jobs/{jobId}/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Contacts_state"];
+        put: operations["Contacts_share"];
+        post?: never;
+        delete: operations["Contacts_hide"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/jobs/{jobId}/messages": {
         parameters: {
             query?: never;
@@ -1149,6 +1165,19 @@ export interface components {
             /** @description Чем закончился заказ. Открытый заказ (исполнитель не выбран) можно только отменить, поле можно не передавать. Для заказа в работе поле обязательно */
             outcome?: components["schemas"]["JobCloseOutcome"];
         };
+        ContactExchangeDto: {
+            counterpartName: string;
+            myPhoneSet: boolean;
+            /**
+             * Format: date-time
+             * @description Когда я открыл свои контакты; null — не открывал
+             */
+            mySharedAt: string | null;
+            /** @description Контакты второй стороны; null — она их не открывала */
+            theirs: components["schemas"]["PartyContactsDto"] | null;
+            /** @description Кто смотрит */
+            viewer: components["schemas"]["PlanParty"];
+        };
         ContentFlagDto: {
             author: components["schemas"]["ReportAuthorSchema"];
             /** Format: date-time */
@@ -1662,6 +1691,12 @@ export interface components {
             limit: number;
             page: number;
             total: number;
+        };
+        PartyContactsDto: {
+            email: string;
+            name: string;
+            /** @description null — телефон в профиле не указан */
+            phone: string | null;
         };
         PasswordResetDto: {
             password: string;
@@ -3522,6 +3557,152 @@ export interface operations {
             };
             /** @description Конфликт с текущим состоянием ресурса */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Contacts_state: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactExchangeDto"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ресурса нет или он принадлежит другому пользователю */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Contacts_share: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Мои контакты открыты второй стороне */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactExchangeDto"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ресурса нет или он принадлежит другому пользователю */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Contacts_hide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Мои контакты снова скрыты */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactExchangeDto"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Ресурса нет или он принадлежит другому пользователю */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

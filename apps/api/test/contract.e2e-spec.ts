@@ -1076,6 +1076,20 @@ describe('API contract (e2e)', () => {
         .send({ outcome: 'COMPLETED' })
         .expect(200);
       await check('get', REV, state(customer), 200);
+
+      // --- обмен контактами по согласию сторон сделки
+      const CT = '/v1/jobs/{jobId}/contacts';
+      const contactsAt = (method: 'get' | 'put' | 'delete', who: Who, id = created.id) =>
+        as(http()[method](`/v1/jobs/${id}/contacts`), who);
+      for (const method of ['get', 'put', 'delete'] as const) {
+        await check(method, CT, contactsAt(method, workerAuth), 200);
+        await check(method, CT, contactsAt(method, null), 401);
+        await check(method, CT, contactsAt(method, owner), 404);
+      }
+      const opened = await check('put', CT, contactsAt('put', workerAuth), 200);
+      expect(opened.body.mySharedAt).toEqual(expect.any(String));
+      const seen = await check('get', CT, contactsAt('get', customer), 200);
+      expect(seen.body.theirs).toEqual(expect.objectContaining({ phone: null }));
       await check('get', REV, state(null), 401);
       await check('get', REV, state(workerAuth), 403);
       await check('get', REV, state(customer, 'missing'), 404);

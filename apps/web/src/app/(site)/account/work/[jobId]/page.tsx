@@ -10,7 +10,8 @@ import { planNotice } from '@/components/plan/plan-notice';
 import { StatusBadge } from '@/components/status-badge';
 import { PageHeader, secondaryLinkClass } from '@/components/ui/page-header';
 import { historyCursor, reportNotice } from '@/lib/search-params';
-import { getMessages, getPlan, listMyBids } from '@/lib/api';
+import { getContacts, getMessages, getPlan, listMyBids } from '@/lib/api';
+import { ContactsPanel } from '@/components/contacts/contacts-panel';
 import { requireContractorPage } from '@/lib/customer';
 import { MarkSeen } from '@/components/notifications/mark-seen';
 import { getUnreadSummary, unreadForJob } from '@/lib/notifications-server';
@@ -36,18 +37,21 @@ export default async function WorkPage({
 
   let plan: Awaited<ReturnType<typeof getPlan>>;
   let chat: Awaited<ReturnType<typeof getMessages>> = null;
+  let contacts: Awaited<ReturnType<typeof getContacts>> = null;
   let job:
     | { id: string; title: string; city: string; status: 'OPEN' | 'IN_PROGRESS' | 'CLOSED' }
     | undefined;
   try {
     plan = /^[A-Za-z0-9_-]{1,64}$/.test(jobId) ? await getPlan(token, jobId) : null;
     if (plan) {
-      const [bids, messages] = await Promise.all([
+      const [bids, messages, shared] = await Promise.all([
         listMyBids(token, 1, { jobId, limit: 1 }),
         getMessages(token, jobId, before),
+        getContacts(token, jobId),
       ]);
       job = bids.items[0]?.job;
       chat = messages;
+      contacts = shared;
     }
   } catch (error) {
     console.error('Work: failed to load', error);
@@ -91,6 +95,7 @@ export default async function WorkPage({
       ) : null}
       <div className="mt-8 flex max-w-4xl flex-col gap-8">
         <JobPlanPanel plan={plan} jobOpen={job.status === 'IN_PROGRESS'} returnTo={path} />
+        {contacts ? <ContactsPanel jobId={job.id} contacts={contacts} returnTo={path} /> : null}
         {chat ? (
           <JobChatPanel
             chat={chat}

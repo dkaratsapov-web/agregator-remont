@@ -72,6 +72,8 @@ enum AuditAction {
   PASSWORD_RESET_DONE
   REVIEW_CREATED
   FLAG_RESOLVED
+  CONTACTS_SHARED
+  CONTACTS_HIDDEN
 }
 
 // Синхронизировано с BID_STATUSES в packages/shared/src/bids.ts.
@@ -224,6 +226,7 @@ model User {
   favoriteJobs     FavoriteJob[]
   contentFlags     ContentFlag[]      @relation("ContentFlagAuthor")
   flagsResolved    ContentFlag[]      @relation("ContentFlagResolver")
+  contactShares    ContactShare[]
 
   @@map("users")
 }
@@ -302,25 +305,26 @@ model ContractorProfile {
 
 /// Отклик подрядчика на заказ. Один отклик подрядчика на заказ (уникальный индекс).
 model Bid {
-  id           String           @id @default(cuid())
-  jobId        String           @map("job_id")
-  job          Job              @relation(fields: [jobId], references: [id], onDelete: Restrict)
-  contractorId String           @map("contractor_id")
-  contractor   User             @relation(fields: [contractorId], references: [id], onDelete: Restrict)
+  id            String           @id @default(cuid())
+  jobId         String           @map("job_id")
+  job           Job              @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  contractorId  String           @map("contractor_id")
+  contractor    User             @relation(fields: [contractorId], references: [id], onDelete: Restrict)
   /// Целые рубли.
-  price        Int
-  durationDays Int?             @map("duration_days")
-  comment      String
-  status       BidStatus        @default(PENDING)
-  createdAt    DateTime         @default(now()) @map("created_at")
-  updatedAt    DateTime         @updatedAt @map("updated_at")
+  price         Int
+  durationDays  Int?             @map("duration_days")
+  comment       String
+  status        BidStatus        @default(PENDING)
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
   /// Когда заказчик изменил заказ после этого отклика (описание, бюджет, анкету…): подрядчик
   /// видит пометку «заказ изменён после вашего отклика». null — не менялся.
-  jobChangedAt DateTime?        @map("job_changed_at")
+  jobChangedAt  DateTime?        @map("job_changed_at")
   /// Почему отклик отклонён: выбран другой исполнитель или заказ закрыт. null — не отклонён.
-  rejectReason BidRejectReason? @map("reject_reason")
+  rejectReason  BidRejectReason? @map("reject_reason")
   /// Скрыт модератором: заказчик его не видит и не может выбрать. null — виден.
-  hiddenAt     DateTime?        @map("hidden_at")
+  hiddenAt      DateTime?        @map("hidden_at")
+  contactShares ContactShare[]
 
   @@unique([jobId, contractorId])
   @@index([contractorId, createdAt(sort: Desc)])
@@ -633,6 +637,20 @@ model FavoriteJob {
   @@id([userId, jobId])
   @@index([userId, createdAt(sort: Desc)])
   @@map("favorite_jobs")
+}
+
+/// Согласие стороны сделки показать свои телефон и email второй стороне. Привязано к выбранному
+/// отклику: после отказа исполнителя или выбора другого не действует. Нет строки — не показаны.
+model ContactShare {
+  bidId     String   @map("bid_id")
+  bid       Bid      @relation(fields: [bidId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([bidId, userId])
+  @@index([userId])
+  @@map("contact_shares")
 }
 
 /// Автопроверка: в сообщении или отклике похоже на контакты (телефон, почта, ссылка, мессенджер).

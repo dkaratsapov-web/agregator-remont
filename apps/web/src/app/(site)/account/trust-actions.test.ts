@@ -31,6 +31,7 @@ const fetchMock = vi.fn();
 const { resetPasswordAction } = await import('../(auth)/actions');
 const { createReviewAction } = await import('./reviews/actions');
 const { favoriteFormAction } = await import('./favorites/actions');
+const { contactsFormAction } = await import('./contacts/actions');
 const { markReportsSeenAction, reportFormAction } = await import('./reports/actions');
 const { issueResetLinkFormAction } = await import('../admin/users/actions');
 const {
@@ -219,6 +220,48 @@ describe('favorites and my reports', () => {
     );
     fetchMock.mockImplementation(async () => json(404, {}));
     expect((await favoriteFormAction({}, form({}, ['job1', true, '/']))).error).toMatch(/скрыт/);
+  });
+
+  it('opens and hides own contacts in a deal, then returns to the panel', async () => {
+    const exchange = {
+      viewer: 'OWNER',
+      counterpartName: 'Иван',
+      mySharedAt: null,
+      myPhoneSet: false,
+      theirs: null,
+    };
+    fetchMock.mockImplementation(async () => json(200, exchange));
+    await expect(
+      contactsFormAction({}, form({}, ['job1', true, '/account/jobs/job1'])),
+    ).rejects.toThrow('NEXT_REDIRECT');
+    expect(lastCall()).toMatchObject({
+      url: 'http://api.test/v1/jobs/job1/contacts',
+      method: 'PUT',
+    });
+    expect(state.redirectedTo).toBe('/account/jobs/job1#contacts');
+    await expect(
+      contactsFormAction({}, form({}, ['job1', false, '/account/work/job1'])),
+    ).rejects.toThrow('NEXT_REDIRECT');
+    expect(lastCall().method).toBe('DELETE');
+    // Подделанные параметры: чужой адрес возврата заменяется безопасным, кривой id — отказ.
+    await expect(
+      contactsFormAction({}, form({}, ['job1', true, 'https://evil.example/'])),
+    ).rejects.toThrow('NEXT_REDIRECT');
+    expect(state.redirectedTo?.startsWith('/')).toBe(true);
+    expect((await contactsFormAction({}, form({}, ['../x', true, '/']))).error).toMatch(
+      /не найден/,
+    );
+    expect((await contactsFormAction({}, form({}))).error).toMatch(/не найден/);
+    fetchMock.mockImplementation(async () => json(404, {}));
+    expect((await contactsFormAction({}, form({}, ['job1', true, '/']))).error).toMatch(
+      /исполнитель не выбран/,
+    );
+  });
+
+  it('formats a Russian phone number for display', async () => {
+    const { formatPhone } = await import('@/lib/format');
+    expect(formatPhone('+79001234567')).toBe('+7 900 123-45-67');
+    expect(formatPhone('12345')).toBe('12345');
   });
 
   it('marks decisions seen and reports through the form wrapper', async () => {

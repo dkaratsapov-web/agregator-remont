@@ -24,6 +24,7 @@ import { PlansModule } from './plans/plans.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { FavoritesModule } from './favorites/favorites.module';
+import { ContactsModule } from './contacts/contacts.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { FavoritesModule } from './favorites/favorites.module';
     PhotosModule,
     ReviewsModule,
     FavoritesModule,
+    ContactsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

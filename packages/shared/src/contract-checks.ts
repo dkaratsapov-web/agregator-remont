@@ -37,6 +37,7 @@ import type {
   ReportReceivedDto,
   ReportSubjectDto,
 } from './moderation';
+import type { ContactExchangeDto, PartyContactsDto } from './contacts';
 import type { Paginated } from './pagination';
 import type { JobPlanDto, JobStageDto } from './plans';
 import type {
@@ -99,4 +100,7 @@ export type ContractChecks = [
   Expect<Equal<Paginated<MyReportDto>, Schemas['PaginatedMyReportDto']>>,
   Expect<Equal<ContentFlagDto, Schemas['ContentFlagDto']>>,
   Expect<Equal<Paginated<ContentFlagDto>, Schemas['PaginatedContentFlagDto']>>,
+  // Обмен контактами по согласию сторон.
+  Expect<Equal<PartyContactsDto, Schemas['PartyContactsDto']>>,
+  Expect<Equal<ContactExchangeDto, Schemas['ContactExchangeDto']>>,
 ];

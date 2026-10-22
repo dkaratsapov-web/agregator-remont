@@ -284,6 +284,51 @@ try {
     await page.context().close();
   }
 
+  // --- Контакты по согласию: без JS заказчик показывает свои, мастер видит, затем скрыть.
+  {
+    const contactJob = await deal(`Контакты ${RUN}: кухня`);
+    const phoneSet = await api(owner, '/v1/me', {
+      method: 'PATCH',
+      body: { phone: '+79001234567' },
+    });
+    if (phoneSet.status !== 200) throw new Error(`owner phone not saved: ${phoneSet.status}`);
+    const masterPage = await (await contextFor(master)).newPage();
+    watch(masterPage);
+    const contacts = masterPage.locator('#contacts');
+    await masterPage.goto(`${WEB}/account/work/${contactJob}`, { waitUntil: 'networkidle' });
+    check(
+      'contacts stay hidden until their owner shares them',
+      await contacts.getByText('Контакты пока скрыты.').isVisible(),
+    );
+    const ownerNoJs = await (await contextFor(owner, { javaScriptEnabled: false })).newPage();
+    const mine = ownerNoJs.locator('#contacts');
+    await ownerNoJs.goto(`${WEB}/account/jobs/${contactJob}`);
+    await mine.getByRole('button', { name: 'Показать мои контакты' }).click();
+    await mine.getByRole('button', { name: 'Скрыть мои контакты' }).waitFor();
+    check('without JS the owner shares contacts', true);
+    check('the server keeps answering', await serverResponsive());
+    await masterPage.reload({ waitUntil: 'networkidle' });
+    check(
+      'the contractor sees the shared phone',
+      await contacts.locator('a[href="tel:+79001234567"]').isVisible(),
+    );
+    await mine.getByRole('button', { name: 'Скрыть мои контакты' }).click();
+    await mine.getByRole('button', { name: 'Показать мои контакты' }).waitFor();
+    await masterPage.reload({ waitUntil: 'networkidle' });
+    check(
+      'hidden again, the phone disappears',
+      (await contacts.locator('a[href^="tel:"]').count()) === 0,
+    );
+    await masterPage.setViewportSize({ width: 320, height: 700 });
+    const [scroll, inner] = await masterPage.evaluate(() => [
+      document.documentElement.scrollWidth,
+      window.innerWidth,
+    ]);
+    check('320 px: the work page with contacts fits', scroll <= inner, `${scroll} > ${inner}`);
+    await masterPage.context().close();
+    await ownerNoJs.context().close();
+  }
+
   // --- 320 px: новые страницы без горизонтальной прокрутки.
   for (const [who, path] of [
     [admin, '/admin/users'],

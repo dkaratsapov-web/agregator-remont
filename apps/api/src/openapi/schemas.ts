@@ -19,7 +19,9 @@ import {
   USER_ROLES,
   type AuthSessionDto,
   type AdminUserDto,
+  type ContactExchangeDto,
   type ContentFlagDto,
+  type PartyContactsDto,
   type ContentFlagKind,
   type ContractorRatingDto,
   type FavoriteIdsDto,
@@ -642,6 +644,40 @@ export class JobReviewStateSchema implements JobReviewStateDto {
   @ApiProperty({ type: ReviewSchema, nullable: true }) review!: ReviewSchema | null;
   @ApiProperty({ type: ReviewContractorSchema, nullable: true })
   contractor!: ReviewContractorSchema | null;
+}
+
+@ApiSchema({ name: 'PartyContactsDto' })
+export class PartyContactsSchema implements PartyContactsDto {
+  @ApiProperty() name!: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    pattern: '^\\+7[3489][0-9]{9}$',
+    description: 'null — телефон в профиле не указан',
+  })
+  phone!: string | null;
+  @ApiProperty() email!: string;
+}
+
+@ApiSchema({ name: 'ContactExchangeDto' })
+export class ContactExchangeSchema implements ContactExchangeDto {
+  @ApiProperty({ enum: PLAN_PARTIES, enumName: 'PlanParty', description: 'Кто смотрит' })
+  viewer!: PlanParty;
+  @ApiProperty() counterpartName!: string;
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'Когда я открыл свои контакты; null — не открывал',
+  })
+  mySharedAt!: string | null;
+  @ApiProperty() myPhoneSet!: boolean;
+  @ApiProperty({
+    type: PartyContactsSchema,
+    nullable: true,
+    description: 'Контакты второй стороны; null — она их не открывала',
+  })
+  theirs!: PartyContactsSchema | null;
 }
 
 @ApiSchema({ name: 'FavoriteStateDto' })

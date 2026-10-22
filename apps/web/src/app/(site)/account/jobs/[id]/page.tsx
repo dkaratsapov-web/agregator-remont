@@ -21,7 +21,8 @@ import { JobChatPanel } from '@/components/chat/job-chat-panel';
 import { JobPlanPanel } from '@/components/plan/job-plan-panel';
 import { planNotice } from '@/components/plan/plan-notice';
 import { historyCursor, reportNotice } from '@/lib/search-params';
-import { getJobReview, getMessages, getMyJob, getPlan, listJobBids } from '@/lib/api';
+import { getContacts, getJobReview, getMessages, getMyJob, getPlan, listJobBids } from '@/lib/api';
+import { ContactsPanel } from '@/components/contacts/contacts-panel';
 import { ReviewPanel } from '@/components/reviews/review-panel';
 import { requireCustomerPage } from '@/lib/customer';
 import { MarkSeen } from '@/components/notifications/mark-seen';
@@ -51,16 +52,19 @@ export default async function MyJobPage({
   let plan: Awaited<ReturnType<typeof getPlan>> = null;
   let chat: Awaited<ReturnType<typeof getMessages>> = null;
   let review: Awaited<ReturnType<typeof getJobReview>> = null;
+  let contacts: Awaited<ReturnType<typeof getContacts>> = null;
   try {
     job = await getMyJob(token, id);
     if (job) {
-      [bids, plan, chat, review] = await Promise.all([
+      [bids, plan, chat, review, contacts] = await Promise.all([
         listJobBids(token, job.id),
         // План и переписка есть только у заказа с выбранным исполнителем.
         job.status === 'OPEN' ? Promise.resolve(null) : getPlan(token, job.id),
         job.status === 'OPEN' ? Promise.resolve(null) : getMessages(token, job.id, before),
         // Отзыв — только у выполненного заказа.
         job.closeOutcome === 'COMPLETED' ? getJobReview(token, job.id) : Promise.resolve(null),
+        // Контакты — у сделки с выбранным исполнителем, по согласию сторон.
+        job.status === 'OPEN' ? Promise.resolve(null) : getContacts(token, job.id),
       ]);
     }
   } catch (error) {
@@ -151,6 +155,13 @@ export default async function MyJobPage({
             <JobPlanPanel
               plan={plan}
               jobOpen={job.status === 'IN_PROGRESS'}
+              returnTo={`/account/jobs/${job.id}`}
+            />
+          ) : null}
+          {contacts ? (
+            <ContactsPanel
+              jobId={job.id}
+              contacts={contacts}
               returnTo={`/account/jobs/${job.id}`}
             />
           ) : null}
