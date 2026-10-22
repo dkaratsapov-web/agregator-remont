@@ -747,6 +747,38 @@ state_at monitor-status 0 heartbeat=failed problems=0
 no_go 'monitor heartbeat not accepted' 'сигнал не принят (failed)'
 state_at monitor-status 0 heartbeat=accepted problems=2
 no_go 'monitor sees problems' 'видит проблем: 2'
+# Закрыто по умолчанию: правила без ruleset_id не доказывают отсутствие обхода.
+python3 - "$REQUIRED" > "$API_DIR/rules.json" << 'PY'
+import json, sys
+checks = [{"context": c} for c in sys.argv[1].split("|")]
+rules = [{"type": t} for t in ("deletion", "non_fast_forward", "pull_request")]
+rules.append({"type": "required_status_checks", "parameters": {"required_status_checks": checks}})
+print(json.dumps(rules))
+PY
+no_go 'all rules and names present but no ruleset_id' 'правила без ruleset_id'
+rules_with "$REQUIRED"
+printf '%s\n' '{"rules": "not a list"}' > "$WORK/odd.json"
+check 'ruleset check: empty required list, odd format and a full page are not ok' \
+  "$(python3 "$ROOT/deploy/autodeploy/ruleset_check.py" '' < "$API_DIR/rules.json") | $(python3 "$ROOT/deploy/autodeploy/ruleset_check.py" "$REQUIRED" < "$WORK/odd.json") | $(python3 -c 'import json; print(json.dumps({"rules": [{"type": "deletion", "ruleset_id": 7}] * 100, "rulesets": [{"id": 7, "enforcement": "active", "bypass_actors": []}]}))' | python3 "$ROOT/deploy/autodeploy/ruleset_check.py" "$REQUIRED" | grep -o 'ответ мог быть неполным')" \
+  'список обязательных задач CI пуст | ответ GitHub о правилах в неожиданном формате | ответ мог быть неполным'
+# Время из будущего, мусор и пропущенное время не считаются свежими, даже при result=ok.
+state_at notify-status -86400 result=ok
+no_go 'notification time in the future' 'Уведомления: время в файле состояния неверное или в будущем'
+printf 'result=ok\nat=soon\n' > "$WORK/state/notify-status"
+no_go 'notification time is garbage' 'Уведомления: время в файле состояния неверное'
+printf 'result=ok\n' > "$WORK/state/notify-status"
+no_go 'notification without a time' 'Уведомления: время в файле состояния неверное'
+state_at monitor-status -86400 heartbeat=accepted problems=0
+no_go 'monitor time in the future' 'Внешний монитор: время в файле состояния неверное'
+state_at backup-status -86400 mode=offsite-hash-checked
+no_go 'backup time in the future' 'Копии базы: время в файле состояния неверное'
+state_at restore-status -86400 result=ok
+no_go 'restore check time in the future' 'Проверка восстановления: время в файле состояния неверное'
+# Небольшое расхождение часов (до 5 минут) — ещё GO.
+state_at notify-status -120 result=ok
+DB_MIGRATIONS=0 REMOTE_SHA=$current ready
+check 'readiness: a clock 2 minutes ahead is tolerated — GO' "$(logged '^Итог: GO')" 1
+good
 rm -f "$API_DIR/rules.json" "$API_DIR/ruleset-7.json"
 state_at backup-status 0 mode=local-only
 TIMERS_DOWN=1 NO_HSTS=1 DB_MIGRATIONS=0 REMOTE_SHA=$current ready

@@ -52,7 +52,7 @@ github() {
     curl -fsS --max-time 15 -H 'Accept: application/vnd.github+json' "$GITHUB_API/$1"
   fi
 }
-rules=$(github "rules/branches/$BRANCH" 2> /dev/null)
+rules=$(github "rules/branches/$BRANCH?per_page=100" 2> /dev/null)
 if [ -z "$rules" ]; then
   need 'Защита main: GitHub не ответил' 'повторите позже; проверка вручную — docs/BRANCH_PROTECTION.md'
 else
@@ -70,27 +70,51 @@ else
   fi
 fi
 
+# Возраст отметки at из файла состояния в секундах: пусто — отметки нет; bad — не число или
+# в будущем больше чем на CLOCK_SKEW_SEC (сбитые часы, испорченный файл). Такая отметка не
+# считается свежей.
+CLOCK_SKEW_SEC=${CLOCK_SKEW_SEC:-300}
+status_age() {
+  local at
+  at=$(status_value "$1" at)
+  if [ -z "$at" ]; then
+    return 0
+  elif ! [[ "$at" =~ ^[0-9]{1,12}$ ]] || [ "$at" -gt $((now + CLOCK_SKEW_SEC)) ]; then
+    echo bad
+  elif [ "$at" -gt "$now" ]; then
+    echo 0
+  else
+    echo $((now - at))
+  fi
+}
+BAD_TIME='время в файле состояния неверное или в будущем (часы сервера?)'
+BAD_TIME_FIX='timedatectl; затем запустите проверку заново'
+
 # --- Резервные копии и восстановление (итоги backup.sh и restore-check.sh).
-backup_at=$(status_value backup-status at)
+backup_age=$(status_age backup-status)
 mode=$(status_value backup-status mode)
-if [ -z "$backup_at" ]; then
+if [ -z "$backup_age" ]; then
   need 'Копии базы: копий ещё не было' 'sudo bash deploy/autodeploy/install.sh (таймеры), затем sudo systemctl start agregator-backup'
-elif [ $(((now - backup_at) / 3600)) -gt "$BACKUP_MAX_AGE_HOURS" ]; then
-  need "Копии базы: последняя $(((now - backup_at) / 3600)) ч назад" 'journalctl -u agregator-backup -n 50; deploy/README.md «Резервные копии»'
+elif [ "$backup_age" = bad ]; then
+  need "Копии базы: $BAD_TIME" "$BAD_TIME_FIX: sudo systemctl start agregator-backup"
+elif [ $((backup_age / 3600)) -gt "$BACKUP_MAX_AGE_HOURS" ]; then
+  need "Копии базы: последняя $((backup_age / 3600)) ч назад" 'journalctl -u agregator-backup -n 50; deploy/README.md «Резервные копии»'
 elif [[ "$mode" != offsite-* ]]; then
   need 'Копии вне сервера: копии только на сервере' 'BACKUP_AGE_RECIPIENT, BACKUP_RCLONE_REMOTE, BACKUP_REQUIRE_OFFSITE=true в deploy/.env'
 else
-  ok "Копии базы: вне сервера ($mode), $(((now - backup_at) / 3600)) ч назад"
+  ok "Копии базы: вне сервера ($mode), $((backup_age / 3600)) ч назад"
 fi
-restore_at=$(status_value restore-status at)
-if [ -z "$restore_at" ]; then
+restore_age=$(status_age restore-status)
+if [ -z "$restore_age" ]; then
   need 'Проверка восстановления: ещё не было' 'sudo systemctl start agregator-restore-check'
+elif [ "$restore_age" = bad ]; then
+  need "Проверка восстановления: $BAD_TIME" "$BAD_TIME_FIX: sudo systemctl start agregator-restore-check"
 elif [ "$(status_value restore-status result)" != ok ]; then
   need 'Проверка восстановления: не прошла' 'journalctl -u agregator-restore-check -n 50'
-elif [ $(((now - restore_at) / 86400)) -gt "$RESTORE_MAX_AGE_DAYS" ]; then
-  need "Проверка восстановления: $(((now - restore_at) / 86400)) дн. назад" 'systemctl list-timers agregator-restore-check'
+elif [ $((restore_age / 86400)) -gt "$RESTORE_MAX_AGE_DAYS" ]; then
+  need "Проверка восстановления: $((restore_age / 86400)) дн. назад" 'systemctl list-timers agregator-restore-check'
 else
-  ok "Проверка восстановления: прошла $(((now - restore_at) / 86400)) дн. назад"
+  ok "Проверка восстановления: прошла $((restore_age / 86400)) дн. назад"
 fi
 
 # --- Уведомления и внешний монитор: заданы, доставка подтверждена и свежая.
@@ -99,13 +123,15 @@ MONITOR_MAX_AGE_MIN=${MONITOR_MAX_AGE_MIN:-120}
 if ! is_set NOTIFY_WEBHOOK_URL && ! { is_set NOTIFY_TELEGRAM_TOKEN && is_set NOTIFY_TELEGRAM_CHAT; }; then
   need 'Уведомления о сбоях: канал не задан' 'NOTIFY_TELEGRAM_TOKEN + NOTIFY_TELEGRAM_CHAT или NOTIFY_WEBHOOK_URL в deploy/.env'
 else
-  notify_at=$(status_value notify-status at)
+  notify_age=$(status_age notify-status)
   case "$(status_value notify-status result)" in
     ok)
-      if [ $(((now - notify_at) / 86400)) -gt "$NOTIFY_MAX_AGE_DAYS" ]; then
-        need "Уведомления: последняя доставка $(((now - notify_at) / 86400)) дн. назад" 'sudo bash deploy/autodeploy/notify.sh "проверка" — сообщение должно прийти'
+      if [ -z "$notify_age" ] || [ "$notify_age" = bad ]; then
+        need "Уведомления: $BAD_TIME" "$BAD_TIME_FIX: sudo bash deploy/autodeploy/notify.sh \"проверка\""
+      elif [ $((notify_age / 86400)) -gt "$NOTIFY_MAX_AGE_DAYS" ]; then
+        need "Уведомления: последняя доставка $((notify_age / 86400)) дн. назад" 'sudo bash deploy/autodeploy/notify.sh "проверка" — сообщение должно прийти'
       else
-        ok "Уведомления: доставка подтверждена $(((now - notify_at) / 86400)) дн. назад"
+        ok "Уведомления: канал принял сообщение $((notify_age / 86400)) дн. назад (что оно прочитано, проверяет человек)"
       fi
       ;;
     failed) need 'Уведомления: последнее не доставлено' 'проверьте канал: sudo bash deploy/autodeploy/notify.sh "проверка"' ;;
@@ -115,18 +141,20 @@ fi
 if ! is_set MONITOR_HEARTBEAT_URL; then
   need 'Внешний монитор: не задан' 'healthchecks.io (период 1 ч) → MONITOR_HEARTBEAT_URL в deploy/.env'
 else
-  monitor_at=$(status_value monitor-status at)
+  monitor_age=$(status_age monitor-status)
   heartbeat=$(status_value monitor-status heartbeat)
-  if [ -z "$monitor_at" ]; then
+  if [ -z "$monitor_age" ]; then
     need 'Внешний монитор: почасовая проверка ещё не отправляла «жив»' 'sudo systemctl start agregator-monitor; journalctl -u agregator-monitor -n 30'
-  elif [ $(((now - monitor_at) / 60)) -gt "$MONITOR_MAX_AGE_MIN" ]; then
-    need "Внешний монитор: последний сигнал $(((now - monitor_at) / 60)) мин назад" 'systemctl list-timers agregator-monitor; journalctl -u agregator-monitor -n 30'
+  elif [ "$monitor_age" = bad ]; then
+    need "Внешний монитор: $BAD_TIME" "$BAD_TIME_FIX: sudo systemctl start agregator-monitor"
+  elif [ $((monitor_age / 60)) -gt "$MONITOR_MAX_AGE_MIN" ]; then
+    need "Внешний монитор: последний сигнал $((monitor_age / 60)) мин назад" 'systemctl list-timers agregator-monitor; journalctl -u agregator-monitor -n 30'
   elif [ "$heartbeat" != accepted ]; then
     need "Внешний монитор: сигнал не принят ($heartbeat)" 'проверьте MONITOR_HEARTBEAT_URL и journalctl -u agregator-monitor -n 30'
   elif [ "$(status_value monitor-status problems)" != 0 ]; then
     need "Внешний монитор: почасовая проверка видит проблем: $(status_value monitor-status problems)" 'journalctl -u agregator-monitor -n 30'
   else
-    ok "Внешний монитор: «жив» принят $(((now - monitor_at) / 60)) мин назад, проблем нет"
+    ok "Внешний монитор: «жив» принят $((monitor_age / 60)) мин назад, проблем нет (оповещения самого монитора проверяет человек)"
   fi
 fi
 
