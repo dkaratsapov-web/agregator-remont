@@ -4,7 +4,6 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { Prisma, User } from '@prisma/client';
 import { writeAudit } from '../audit/audit';
@@ -22,6 +21,7 @@ import {
   isWellFormedSessionToken,
   SESSION_TTL_MS,
 } from './session-token';
+import { ApiError } from '../common/api-error';
 
 const INVALID_CREDENTIALS = 'Неверный email или пароль';
 const RESET_INVALID =
@@ -51,7 +51,7 @@ export class AuthService {
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Пользователь с таким email уже зарегистрирован');
+        throw new ApiError(409, 'EMAIL_TAKEN', 'Пользователь с таким email уже зарегистрирован');
       }
       throw error;
     }
@@ -62,7 +62,7 @@ export class AuthService {
     // Пароль проверяется и для несуществующего email, чтобы не раскрывать его по времени ответа.
     const valid = await verifyPassword(user?.passwordHash ?? (await getDummyHash()), dto.password);
     if (!user || !valid) {
-      throw new UnauthorizedException(INVALID_CREDENTIALS);
+      throw new ApiError(401, 'INVALID_CREDENTIALS', INVALID_CREDENTIALS);
     }
     // О блокировке говорим только после верного пароля: иначе по ответу можно было бы
     // узнавать заблокированные адреса.
@@ -73,7 +73,7 @@ export class AuthService {
       const [row] = await tx.$queryRaw<{ password_hash: string }[]>`
         SELECT password_hash FROM users WHERE id = ${user.id} FOR UPDATE`;
       if (row?.password_hash !== user.passwordHash) {
-        throw new UnauthorizedException(INVALID_CREDENTIALS);
+        throw new ApiError(401, 'INVALID_CREDENTIALS', INVALID_CREDENTIALS);
       }
       await tx.session.deleteMany({ where: { userId: user.id, expiresAt: { lte: new Date() } } });
       return this.createSession(tx, user, userAgent);

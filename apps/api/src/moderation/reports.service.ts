@@ -4,18 +4,13 @@ import {
   type Paginated,
   type ReportReceivedDto,
 } from '@agregator/shared';
-import {
-  BadRequestException,
-  HttpException,
-  HttpStatus,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { User } from '@prisma/client';
 import { writeAudit } from '../audit/audit';
 import { findDeal } from '../plans/deal';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReportDto } from './dto/moderation.dto';
+import { QuotaExceeded } from '../common/api-error';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -49,13 +44,18 @@ export class ReportsService {
         select: { id: true },
       });
       if (open) return { id: open.id, duplicate: true };
-      const today = await tx.report.count({
-        where: { reporterId: user.id, createdAt: { gt: new Date(Date.now() - DAY_MS) } },
-      });
+      const window = { reporterId: user.id, createdAt: { gt: new Date(Date.now() - DAY_MS) } };
+      const today = await tx.report.count({ where: window });
       if (today >= REPORT_LIMITS.PER_DAY) {
-        throw new HttpException(
+        const oldest = await tx.report.findFirst({
+          where: window,
+          orderBy: { createdAt: 'asc' },
+          select: { createdAt: true },
+        });
+        throw new QuotaExceeded(
           `Можно отправить не больше ${REPORT_LIMITS.PER_DAY} жалоб за сутки`,
-          HttpStatus.TOO_MANY_REQUESTS,
+          oldest?.createdAt,
+          DAY_MS,
         );
       }
       const created = await tx.report.create({

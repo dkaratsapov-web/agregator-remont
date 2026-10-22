@@ -5,13 +5,7 @@ import {
   type MyBidDto,
   type Paginated,
 } from '@agregator/shared';
-import {
-  ConflictException,
-  HttpException,
-  HttpStatus,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Job, Prisma } from '@prisma/client';
 import { writeAudit } from '../audit/audit';
 import { notify } from '../notifications/notify';
@@ -22,6 +16,7 @@ import { ratingsFor } from '../reviews/ratings';
 import { toJobBidDto, toMyBidDto } from './bid.mapper';
 import { CreateBidDto } from './dto/create-bid.dto';
 import { ListMyBidsQuery } from './dto/list-my-bids.query';
+import { ApiError, QuotaExceeded } from '../common/api-error';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const JOB_NOT_FOUND = 'Заказ не найден';
@@ -58,9 +53,15 @@ export class BidsService {
           where: { contractorId, createdAt: { gt: new Date(Date.now() - DAY_MS) } },
         });
         if (today >= BID_LIMITS.CREATED_PER_DAY) {
-          throw new HttpException(
+          const oldest = await tx.bid.findFirst({
+            where: { contractorId, createdAt: { gt: new Date(Date.now() - DAY_MS) } },
+            orderBy: { createdAt: 'asc' },
+            select: { createdAt: true },
+          });
+          throw new QuotaExceeded(
             `Можно оставить не больше ${BID_LIMITS.CREATED_PER_DAY} откликов за сутки`,
-            HttpStatus.TOO_MANY_REQUESTS,
+            oldest?.createdAt,
+            DAY_MS,
           );
         }
 
@@ -71,7 +72,7 @@ export class BidsService {
         // Скрытый модератором заказ для откликающегося — как несуществующий.
         if (locked.length === 0 || locked[0].hidden_at) throw new NotFoundException(JOB_NOT_FOUND);
         if (locked[0].status !== 'OPEN') {
-          throw new ConflictException('Заказ уже не принимает отклики');
+          throw new ApiError(409, 'JOB_NOT_OPEN', 'Заказ уже не принимает отклики');
         }
 
         const created = await tx.bid.create({
@@ -115,7 +116,7 @@ export class BidsService {
       return toMyBidDto(bid);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Вы уже откликнулись на этот заказ');
+        throw new ApiError(409, 'BID_ALREADY_EXISTS', 'Вы уже откликнулись на этот заказ');
       }
       throw error;
     }
@@ -151,7 +152,7 @@ export class BidsService {
       if (locked.length === 0) throw new NotFoundException(BID_NOT_FOUND);
       const current = await tx.bid.findUniqueOrThrow({ where: { id: bidId } });
       if (current.status !== 'PENDING') {
-        throw new ConflictException('Отозвать можно только отклик на рассмотрении');
+        throw new ApiError(409, 'BID_NOT_PENDING', 'Отозвать можно только отклик на рассмотрении');
       }
       const updated = await tx.bid.update({
         where: { id: bidId },
@@ -205,7 +206,11 @@ export class BidsService {
     const accepted = await this.prisma.$transaction(async (tx) => {
       const job = await this.lockOwnedJob(tx, ownerId, jobId);
       if (job.status !== 'OPEN') {
-        throw new ConflictException('Исполнителя можно выбрать только для открытого заказа');
+        throw new ApiError(
+          409,
+          'JOB_NOT_OPEN',
+          'Исполнителя можно выбрать только для открытого заказа',
+        );
       }
       // Отклик тоже блокируется: параллельный отзыв не может изменить его между проверкой и записью.
       const lockedBid = await tx.$queryRaw<{ id: string }[]>`
@@ -214,7 +219,7 @@ export class BidsService {
       const bid = await tx.bid.findUniqueOrThrow({ where: { id: bidId } });
       if (bid.hiddenAt) throw new NotFoundException(BID_NOT_FOUND);
       if (bid.status !== 'PENDING') {
-        throw new ConflictException('Этот отклик уже нельзя выбрать');
+        throw new ApiError(409, 'BID_NOT_PENDING', 'Этот отклик уже нельзя выбрать');
       }
 
       const updated = await tx.bid.update({

@@ -7,8 +7,6 @@ import {
 } from '@agregator/shared';
 import {
   BadRequestException,
-  HttpException,
-  HttpStatus,
   Inject,
   Injectable,
   NotFoundException,
@@ -22,6 +20,7 @@ import type { CreateLeadDto } from './dto/create-lead.dto';
 import type { ListLeadsQuery } from './dto/admin-leads.dto';
 import { toLeadDto } from './lead.mapper';
 import { LEADS_ENABLED } from './leads.config';
+import { QuotaExceeded } from '../common/api-error';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Ключ advisory-блокировки: заявки записываются по одной (их мало), без гонок за лимитом. */
@@ -61,9 +60,15 @@ export class LeadsService {
       if (repeated) return;
       const today = await tx.lead.count({ where: { createdAt: { gt: since } } });
       if (today >= LEAD_LIMITS.PER_DAY_MAX) {
-        throw new HttpException(
+        const oldest = await tx.lead.findFirst({
+          where: { createdAt: { gt: since } },
+          orderBy: { createdAt: 'asc' },
+          select: { createdAt: true },
+        });
+        throw new QuotaExceeded(
           'Сейчас слишком много заявок, попробуйте завтра',
-          HttpStatus.TOO_MANY_REQUESTS,
+          oldest?.createdAt,
+          DAY_MS,
         );
       }
       await tx.lead.create({

@@ -1305,9 +1305,11 @@ export interface components {
         /** @enum {string} */
         Currency: "RUB";
         ErrorResponse: {
-            /** @description Код ошибки для программы (вход через банк: OAUTH_*) */
-            code?: string;
-            error?: string;
+            /** @description Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_* */
+            code: string;
+            /** @description Текстовое имя статуса */
+            error: string;
+            fieldErrors?: components["schemas"]["FieldError"][];
             message: string | string[];
             statusCode: number;
         };
@@ -1318,6 +1320,14 @@ export interface components {
             favorite: boolean;
             jobId: string;
         };
+        FieldError: {
+            code: components["schemas"]["FieldErrorCode"];
+            message: string;
+            /** @description Путь к полю через точку: title, items.2.category */
+            path: string;
+        };
+        /** @enum {string} */
+        FieldErrorCode: "INVALID" | "REQUIRED" | "TOO_SHORT" | "TOO_LONG" | "OUT_OF_RANGE" | "UNKNOWN_FIELD";
         Health: {
             /** @enum {string} */
             status: "ok";
@@ -1623,9 +1633,11 @@ export interface components {
             role: components["schemas"]["SelfServiceRole"];
         };
         OAuthNeedRoleError: {
-            /** @description Код ошибки для программы (вход через банк: OAUTH_*) */
-            code?: string;
-            error?: string;
+            /** @description Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_* */
+            code: string;
+            /** @description Текстовое имя статуса */
+            error: string;
+            fieldErrors?: components["schemas"]["FieldError"][];
             message: string | string[];
             /** @description Имя из профиля банка */
             name: string | null;

@@ -1,4 +1,3 @@
-import { ConflictException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from './auth.service';
@@ -54,6 +53,9 @@ describe('AuthService.register', () => {
       session: { create: jest.fn() },
     };
     const { service } = serviceWith(tx);
-    await expect(service.register(dto)).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.register(dto)).rejects.toMatchObject({
+      code: 'EMAIL_TAKEN',
+      status: 409,
+    });
   });
 });

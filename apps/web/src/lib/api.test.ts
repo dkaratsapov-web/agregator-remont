@@ -110,3 +110,47 @@ describe('auth calls', () => {
     await expect(logoutSession('tok')).resolves.toBe('failed');
   });
 });
+
+describe('API error codes (ADR 0002)', () => {
+  it('keeps the machine code and the first validation message', async () => {
+    fetchMock.mockResolvedValue(
+      json(409, {
+        statusCode: 409,
+        code: 'EMAIL_TAKEN',
+        message: 'Пользователь с таким email уже зарегистрирован',
+        error: 'Conflict',
+      }),
+    );
+    await expect(
+      registerUser({ email: 'a@b.ru', password: 'x'.repeat(10), name: 'Иван', role: 'CUSTOMER' }),
+    ).rejects.toMatchObject({
+      status: 409,
+      code: 'EMAIL_TAKEN',
+      userMessage: 'Пользователь с таким email уже зарегистрирован',
+    });
+    fetchMock.mockResolvedValue(
+      json(400, {
+        statusCode: 400,
+        code: 'VALIDATION_FAILED',
+        message: ['Укажите корректный email', 'Имя: от 2 до 80 символов'],
+        error: 'Bad Request',
+        fieldErrors: [],
+      }),
+    );
+    await expect(
+      registerUser({ email: 'x', password: 'x'.repeat(10), name: 'Иван', role: 'CUSTOMER' }),
+    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED', userMessage: 'Укажите корректный email' });
+  });
+
+  it('an old-format or non-JSON error still works without a code', async () => {
+    fetchMock.mockResolvedValue(new Response('Bad gateway', { status: 502 }));
+    const error = await registerUser({
+      email: 'a@b.ru',
+      password: 'x'.repeat(10),
+      name: 'Иван',
+      role: 'CUSTOMER',
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 502, code: undefined, userMessage: undefined });
+  });
+});

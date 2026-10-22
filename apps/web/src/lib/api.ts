@@ -59,6 +59,8 @@ export class ApiError extends Error {
     readonly status?: number,
     /** Сообщение API для пользователя (валидация, конфликт), если оно было в ответе. */
     readonly userMessage?: string,
+    /** Машинный код ошибки API (ADR 0002): VALIDATION_FAILED, JOB_NOT_OPEN… */
+    readonly code?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -142,20 +144,26 @@ export async function getJob(id: string): Promise<JobDto | null> {
   return (await res.json()) as JobDto;
 }
 
-async function userMessageOf(res: Response): Promise<string | undefined> {
+/** Ошибка из ответа API: текст для человека и машинный код, если они есть в теле. */
+async function apiErrorOf(label: string, res: Response): Promise<ApiError> {
+  let userMessage: string | undefined;
+  let code: string | undefined;
   try {
-    const body = (await res.json()) as { message?: unknown };
-    if (typeof body.message === 'string') return body.message;
-    if (Array.isArray(body.message) && typeof body.message[0] === 'string') return body.message[0];
+    const body = (await res.json()) as { message?: unknown; code?: unknown };
+    if (typeof body.message === 'string') userMessage = body.message;
+    else if (Array.isArray(body.message) && typeof body.message[0] === 'string') {
+      userMessage = body.message[0];
+    }
+    if (typeof body.code === 'string') code = body.code;
   } catch {
     // тело не JSON
   }
-  return undefined;
+  return new ApiError(`${label} responded ${res.status}`, res.status, userMessage, code);
 }
 
 async function expectJson<T>(res: Response, label: string): Promise<T> {
   if (!res.ok) {
-    throw new ApiError(`${label} responded ${res.status}`, res.status, await userMessageOf(res));
+    throw await apiErrorOf(label, res);
   }
   return (await res.json()) as T;
 }
@@ -281,11 +289,7 @@ export async function deleteDraft(token: string, id: string, clientIp?: string):
     clientIp,
   });
   if (res.status !== 204) {
-    throw new ApiError(
-      `DELETE /v1/me/drafts/:id responded ${res.status}`,
-      res.status,
-      await userMessageOf(res),
-    );
+    throw await apiErrorOf('DELETE /v1/me/drafts/:id', res);
   }
 }
 
@@ -502,11 +506,7 @@ export async function quitJob(
     clientIp,
   });
   if (!res.ok) {
-    throw new ApiError(
-      `POST /v1/jobs/:id/quit responded ${res.status}`,
-      res.status,
-      await userMessageOf(res),
-    );
+    throw await apiErrorOf('POST /v1/jobs/:id/quit', res);
   }
 }
 
@@ -666,11 +666,7 @@ export async function changePassword(
 ): Promise<void> {
   const res = await request('/v1/me/password', { method: 'POST', body: input, token, clientIp });
   if (res.status !== 204) {
-    throw new ApiError(
-      `POST /v1/me/password responded ${res.status}`,
-      res.status,
-      await userMessageOf(res),
-    );
+    throw await apiErrorOf('POST /v1/me/password', res);
   }
 }
 
@@ -686,11 +682,7 @@ export async function revokeSession(token: string, id: string, clientIp?: string
     clientIp,
   });
   if (res.status !== 204) {
-    throw new ApiError(
-      `DELETE /v1/me/sessions/:id responded ${res.status}`,
-      res.status,
-      await userMessageOf(res),
-    );
+    throw await apiErrorOf('DELETE /v1/me/sessions/:id', res);
   }
 }
 

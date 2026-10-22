@@ -13,8 +13,6 @@ import {
 import {
   BadRequestException,
   ConflictException,
-  HttpException,
-  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -27,6 +25,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateJobDto, UpdateJobDto } from './dto/job-input.dto';
 import { readJobDetails, readJobItems } from '../jobs/job.mapper';
 import { toOwnJobDto } from './own-job.mapper';
+import { ApiError, QuotaExceeded } from '../common/api-error';
 
 const JOB_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 /** Повторная публикация того же черновика (ответ 409; web показывает его как есть). */
@@ -129,13 +128,18 @@ export class MyJobsService {
           return existing;
         }
       }
-      const createdToday = await tx.job.count({
-        where: { ownerId, createdAt: { gt: new Date(Date.now() - DAY_MS) } },
-      });
+      const window = { ownerId, createdAt: { gt: new Date(Date.now() - DAY_MS) } };
+      const createdToday = await tx.job.count({ where: window });
       if (createdToday >= JOB_LIMITS.CREATED_PER_DAY) {
-        throw new HttpException(
+        const oldest = await tx.job.findFirst({
+          where: window,
+          orderBy: { createdAt: 'asc' },
+          select: { createdAt: true },
+        });
+        throw new QuotaExceeded(
           `Можно создать не больше ${JOB_LIMITS.CREATED_PER_DAY} заказов за сутки`,
-          HttpStatus.TOO_MANY_REQUESTS,
+          oldest?.createdAt,
+          DAY_MS,
         );
       }
 
@@ -184,7 +188,7 @@ export class MyJobsService {
     const job = await this.prisma.$transaction(async (tx) => {
       const current = await this.lockOwned(tx, ownerId, id);
       if (current.status !== 'OPEN') {
-        throw new ConflictException('Редактировать можно только открытый заказ');
+        throw new ApiError(409, 'JOB_NOT_OPEN', 'Редактировать можно только открытый заказ');
       }
       // Форма открыта на старой версии (заказ изменён в другой вкладке или окне): правка не
       // применяется, иначе она молча затёрла бы чужие изменения (MVP-2).
@@ -227,7 +231,7 @@ export class MyJobsService {
         data.extraItems = extraItems as unknown as Prisma.InputJsonArray;
       }
       if (Object.keys(data).length === 0) {
-        throw new BadRequestException('Нет полей для изменения');
+        throw new ApiError(400, 'NO_FIELDS_TO_UPDATE', 'Нет полей для изменения');
       }
       assertBudgetRange(
         dto.budgetMin !== undefined ? dto.budgetMin : current.budgetMin,
@@ -270,7 +274,8 @@ export class MyJobsService {
   async close(ownerId: string, id: string, outcome?: JobCloseOutcome): Promise<OwnJobDto> {
     const job = await this.prisma.$transaction(async (tx) => {
       const current = await this.lockOwned(tx, ownerId, id);
-      if (current.status === 'CLOSED') throw new ConflictException('Заказ уже закрыт');
+      if (current.status === 'CLOSED')
+        throw new ApiError(409, 'JOB_ALREADY_CLOSED', 'Заказ уже закрыт');
       if (current.status === 'OPEN' && outcome === 'COMPLETED') {
         throw new ConflictException(
           'Исполнитель не выбран: заказ можно только отменить. Выберите исполнителя, чтобы завершить заказ',
@@ -331,7 +336,11 @@ export class MyJobsService {
 
 function assertBudgetRange(min: number | null | undefined, max: number | null | undefined): void {
   if (min != null && max != null && min > max) {
-    throw new BadRequestException('Минимальный бюджет не может быть больше максимального');
+    throw new ApiError(
+      400,
+      'BUDGET_RANGE_INVALID',
+      'Минимальный бюджет не может быть больше максимального',
+    );
   }
 }
 

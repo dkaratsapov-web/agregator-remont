@@ -1,4 +1,4 @@
-import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { UserRole } from '@agregator/shared';
 import { RolesGuard } from './roles';
@@ -31,10 +31,14 @@ describe('RolesGuard', () => {
   });
 
   it('forbids another role', () => {
-    expect(check(['CONTRACTOR'], 'CUSTOMER')).toThrow(ForbiddenException);
+    expect(check(['CONTRACTOR'], 'CUSTOMER')).toThrow(
+      expect.objectContaining({ code: 'FORBIDDEN_ROLE', status: 403 }),
+    );
   });
 
   it('fails closed when the route has no session', () => {
-    expect(check(['ADMIN'])).toThrow(ForbiddenException);
+    expect(check(['ADMIN'])).toThrow(
+      expect.objectContaining({ code: 'FORBIDDEN_ROLE', status: 403 }),
+    );
   });
 });

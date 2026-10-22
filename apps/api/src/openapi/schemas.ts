@@ -20,6 +20,11 @@ import {
   type AuthSessionDto,
   type AdminUserDto,
   ANALYTICS_METRICS,
+  API_ERROR_CODES,
+  FIELD_ERROR_CODES,
+  type ApiErrorBody,
+  type FieldError,
+  type FieldErrorCode,
   type AnalyticsDto,
   type AnalyticsMetric,
   type AnalyticsSeriesDto,
@@ -355,21 +360,29 @@ export class HealthSchema {
   @ApiProperty({ enum: ['ok'] }) status!: 'ok';
 }
 
+@ApiSchema({ name: 'FieldError' })
+export class FieldErrorSchema implements FieldError {
+  @ApiProperty({ description: 'Путь к полю через точку: title, items.2.category' }) path!: string;
+  @ApiProperty({ enum: FIELD_ERROR_CODES, enumName: 'FieldErrorCode' }) code!: FieldErrorCode;
+  @ApiProperty() message!: string;
+}
+
 /**
- * Текущий формат ошибок NestJS (до ADR 0002 / PR C). `message` — строка или массив строк
- * (ошибки валидации); `error` есть не у всех исключений (например, у ответов throttler'а нет).
+ * Единый формат ошибок (ADR 0002): машинный `code` есть всегда; `message` — строка, массив —
+ * только у VALIDATION_FAILED (те же тексты, что в fieldErrors).
  */
 @ApiSchema({ name: 'ErrorResponse' })
-export class ErrorSchema {
+export class ErrorSchema implements ApiErrorBody {
   @int() statusCode!: number;
+  @ApiProperty({
+    description: `Машинный код: ${API_ERROR_CODES.join(', ')}; вход через банк — OAUTH_*`,
+  })
+  code!: string;
   @ApiProperty({ oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] })
   message!: string | string[];
-  @ApiProperty({ required: false }) error?: string;
-  @ApiProperty({
-    required: false,
-    description: 'Код ошибки для программы (вход через банк: OAUTH_*)',
-  })
-  code?: string;
+  @ApiProperty({ description: 'Текстовое имя статуса' }) error!: string;
+  @ApiProperty({ type: FieldErrorSchema, isArray: true, required: false })
+  fieldErrors?: FieldErrorSchema[];
 }
 
 @ApiSchema({ name: 'OAuthNeedRoleError' })

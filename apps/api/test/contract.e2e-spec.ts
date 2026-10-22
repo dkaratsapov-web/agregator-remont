@@ -4,6 +4,7 @@ import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import sharp from 'sharp';
 import request from 'supertest';
+import { ApiExceptionFilter } from '../src/common/exception-filter';
 import { HealthController } from '../src/health/health.controller';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { expectContract, uncoveredResponses } from './contract';
@@ -1517,6 +1518,7 @@ describe('API contract (e2e)', () => {
       ],
     }).compile();
     const app = moduleRef.createNestApplication();
+    app.useGlobalFilters(new ApiExceptionFilter());
     await app.init();
     try {
       const res = await request(app.getHttpServer()).get('/health/ready');

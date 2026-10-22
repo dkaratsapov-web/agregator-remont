@@ -10,6 +10,7 @@ export * from './moderation';
 export * from './reviews';
 export * from './contacts';
 export * from './analytics';
+export * from './errors';
 export type { components, operations, paths } from './generated/openapi';
 export * from './job-questions';
 export * from './job-items';

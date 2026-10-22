@@ -1,13 +1,8 @@
 import type { UserRole } from '@agregator/shared';
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
-  SetMetadata,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, SetMetadata } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { AuthenticatedRequest } from './auth.types';
+import { ApiError } from '../common/api-error';
 
 const ROLES_KEY = 'roles';
 
@@ -27,7 +22,7 @@ export class RolesGuard implements CanActivate {
     const { auth } = context.switchToHttp().getRequest<AuthenticatedRequest>();
     // Нет сессии здесь означает ошибку конфигурации маршрута: запрещаем, а не пропускаем.
     if (!auth || !roles.includes(auth.user.role)) {
-      throw new ForbiddenException('Недостаточно прав');
+      throw new ApiError(403, 'FORBIDDEN_ROLE', 'Недостаточно прав');
     }
     return true;
   }

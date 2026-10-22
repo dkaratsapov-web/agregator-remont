@@ -688,11 +688,18 @@
         "additionalProperties": false,
         "properties": {
           "code": {
-            "description": "Код ошибки для программы (вход через банк: OAUTH_*)",
+            "description": "Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_*",
             "type": "string"
           },
           "error": {
+            "description": "Текстовое имя статуса",
             "type": "string"
+          },
+          "fieldErrors": {
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            },
+            "type": "array"
           },
           "message": {
             "oneOf": [
@@ -713,7 +720,9 @@
         },
         "required": [
           "statusCode",
-          "message"
+          "code",
+          "message",
+          "error"
         ],
         "type": "object"
       },
@@ -747,6 +756,42 @@
           "favorite"
         ],
         "type": "object"
+      },
+      "FieldError": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FieldErrorCode"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "description": "Путь к полю через точку: title, items.2.category",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "code",
+          "message"
+        ],
+        "type": "object"
+      },
+      "FieldErrorCode": {
+        "enum": [
+          "INVALID",
+          "REQUIRED",
+          "TOO_SHORT",
+          "TOO_LONG",
+          "OUT_OF_RANGE",
+          "UNKNOWN_FIELD"
+        ],
+        "type": "string"
       },
       "Health": {
         "additionalProperties": false,
@@ -1935,11 +1980,18 @@
         "additionalProperties": false,
         "properties": {
           "code": {
-            "description": "Код ошибки для программы (вход через банк: OAUTH_*)",
+            "description": "Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_*",
             "type": "string"
           },
           "error": {
+            "description": "Текстовое имя статуса",
             "type": "string"
+          },
+          "fieldErrors": {
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            },
+            "type": "array"
           },
           "message": {
             "oneOf": [
@@ -1969,7 +2021,9 @@
         },
         "required": [
           "statusCode",
+          "code",
           "message",
+          "error",
           "pending",
           "name"
         ],
