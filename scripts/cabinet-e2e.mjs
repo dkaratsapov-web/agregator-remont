@@ -130,7 +130,7 @@ try {
     await bidPage.getByRole('button', { name: 'Откликнуться' }).dblclick();
     await bidPage.waitForURL(/\?bid=sent/, { timeout: 15_000 });
     await sleep(1000);
-    const bids = (await api(`/v1/me/jobs/${job.id}/bids`)).body;
+    const bids = (await api(`/v1/me/jobs/${job.id}/bids`)).body.items;
     check('double click on "respond" leaves one bid', bids.length === 1, `bids ${bids.length}`);
     await bidPage.close();
   }
@@ -144,7 +144,7 @@ try {
     await page.waitForURL(/\?accepted=1/, { timeout: 15_000 });
     await page.unrouteAll({ behavior: 'ignoreErrors' });
     const stored = (await api(`/v1/me/jobs/${job.id}`)).body;
-    const bids = (await api(`/v1/me/jobs/${job.id}/bids`)).body;
+    const bids = (await api(`/v1/me/jobs/${job.id}/bids`)).body.items;
     check(
       'accepting in the browser starts the job with one contractor',
       stored.status === 'IN_PROGRESS' && bids.filter((b) => b.status === 'ACCEPTED').length === 1,

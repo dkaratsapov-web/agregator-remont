@@ -20,7 +20,7 @@ import { JobBidList } from '@/components/bids/job-bid-list';
 import { JobChatPanel } from '@/components/chat/job-chat-panel';
 import { JobPlanPanel } from '@/components/plan/job-plan-panel';
 import { planNotice } from '@/components/plan/plan-notice';
-import { historyCursor, reportNotice } from '@/lib/search-params';
+import { historyCursor, parsePage, reportNotice } from '@/lib/search-params';
 import { getContacts, getJobReview, getMessages, getMyJob, getPlan, listJobBids } from '@/lib/api';
 import { ContactsPanel } from '@/components/contacts/contacts-panel';
 import { ReviewPanel } from '@/components/reviews/review-panel';
@@ -48,7 +48,13 @@ export default async function MyJobPage({
   if (!token) return <CustomersOnly />;
 
   let job: Awaited<ReturnType<typeof getMyJob>>;
-  let bids: Awaited<ReturnType<typeof listJobBids>> = [];
+  const bidsPage = parsePage(query.bids);
+  let bids: Awaited<ReturnType<typeof listJobBids>> = {
+    items: [],
+    page: 1,
+    limit: 50,
+    total: 0,
+  };
   let plan: Awaited<ReturnType<typeof getPlan>> = null;
   let chat: Awaited<ReturnType<typeof getMessages>> = null;
   let review: Awaited<ReturnType<typeof getJobReview>> = null;
@@ -57,7 +63,7 @@ export default async function MyJobPage({
     job = await getMyJob(token, id);
     if (job) {
       [bids, plan, chat, review, contacts] = await Promise.all([
-        listJobBids(token, job.id),
+        listJobBids(token, job.id, bidsPage),
         // План и переписка есть только у заказа с выбранным исполнителем.
         job.status === 'OPEN' ? Promise.resolve(null) : getPlan(token, job.id),
         job.status === 'OPEN' ? Promise.resolve(null) : getMessages(token, job.id, before),
@@ -178,23 +184,26 @@ export default async function MyJobPage({
               id="bids-title"
               title={
                 <>
-                  Отклики <span className="tabular-nums text-ink-soft">{bids.length}</span>
+                  Отклики <span className="tabular-nums text-ink-soft">{bids.total}</span>
                 </>
               }
               description={
-                job.status === 'OPEN' && bids.length > 0
+                job.status === 'OPEN' && bids.total > 0
                   ? 'Выберите исполнителя — заказ перейдёт в работу, остальные отклики будут отклонены.'
                   : undefined
               }
             />
-            {bids.length === 0 ? (
+            {bids.total === 0 ? (
               <EmptyState title="Откликов пока нет">
                 {job.status === 'OPEN'
                   ? 'Подрядчики видят заказ в каталоге. Отклики с ценой и сроком появятся здесь.'
                   : 'Заказ больше не принимает отклики.'}
               </EmptyState>
             ) : (
-              <JobBidList jobId={job.id} bids={bids} canAccept={job.status === 'OPEN'} />
+              <>
+                <JobBidList jobId={job.id} bids={bids.items} canAccept={job.status === 'OPEN'} />
+                <BidPages jobId={job.id} page={bids.page} limit={bids.limit} total={bids.total} />
+              </>
             )}
           </Sheet>
 
@@ -254,7 +263,7 @@ export default async function MyJobPage({
               [
                 'Откликов',
                 <span key="n" className="tabular-nums">
-                  {bids.length}
+                  {bids.total}
                 </span>,
               ],
             ]}
@@ -314,5 +323,41 @@ export default async function MyJobPage({
         </section>
       ) : null}
     </div>
+  );
+}
+
+/** Страницы откликов, если их больше 50: ссылки работают и без JS. */
+function BidPages({
+  jobId,
+  page,
+  limit,
+  total,
+}: {
+  jobId: string;
+  page: number;
+  limit: number;
+  total: number;
+}) {
+  const pages = Math.ceil(total / limit);
+  if (pages <= 1) return null;
+  const href = (n: number) => `/account/jobs/${jobId}?bids=${n}#bids`;
+  const link =
+    'inline-flex min-h-11 items-center rounded-[10px] border border-line bg-surface px-4 text-sm font-semibold text-ink hover:border-ink/30';
+  return (
+    <nav aria-label="Страницы откликов" className="mt-4 flex flex-wrap items-center gap-3">
+      {page > 1 ? (
+        <Link href={href(page - 1)} className={link} rel="prev">
+          Ранние отклики
+        </Link>
+      ) : null}
+      <span className="text-sm text-ink-soft tabular-nums">
+        Страница {page} из {pages}
+      </span>
+      {page < pages ? (
+        <Link href={href(page + 1)} className={link} rel="next">
+          Следующие отклики
+        </Link>
+      ) : null}
+    </nav>
   );
 }

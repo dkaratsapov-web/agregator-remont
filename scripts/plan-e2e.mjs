@@ -223,7 +223,7 @@ try {
       await workerPage.getByText('Вы отказались от заказа.').isVisible(),
     );
     const { body: job } = await api(owner, `/v1/me/jobs/${quit.jobId}`);
-    const { body: bids } = await api(owner, `/v1/me/jobs/${quit.jobId}/bids`);
+    const bids = (await api(owner, `/v1/me/jobs/${quit.jobId}/bids`)).body.items;
     check(
       'job is open again and the other bid is pending',
       job.status === 'OPEN' && bids.find((b) => b.id === quit.otherBidId)?.status === 'PENDING',

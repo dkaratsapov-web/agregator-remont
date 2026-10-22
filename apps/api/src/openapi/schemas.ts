@@ -619,6 +619,14 @@ export class AdminUserSchema implements AdminUserDto {
   @int({ description: 'Открытых жалоб на его заказы, сообщения и отклики' }) openReports!: number;
 }
 
+@ApiSchema({ name: 'PaginatedJobBidDto' })
+export class PaginatedJobBidSchema implements Paginated<JobBidDto> {
+  @ApiProperty({ type: [JobBidSchema] }) items!: JobBidSchema[];
+  @int() page!: number;
+  @int() limit!: number;
+  @int() total!: number;
+}
+
 @ApiSchema({ name: 'PaginatedAdminUserDto' })
 export class PaginatedAdminUserSchema implements Paginated<AdminUserDto> {
   @ApiProperty({ type: [AdminUserSchema] }) items!: AdminUserSchema[];

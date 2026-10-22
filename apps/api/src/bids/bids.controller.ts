@@ -17,10 +17,16 @@ import { Roles, RolesGuard } from '../auth/roles';
 import { SessionGuard } from '../auth/session.guard';
 import { BidsService } from './bids.service';
 import { CreateBidDto } from './dto/create-bid.dto';
+import { PaginationQuery } from '../jobs/dto/list-jobs.query';
 import { ListMyBidsQuery } from './dto/list-my-bids.query';
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { ApiErrors, ApiRole } from '../openapi/decorators';
-import { JobBidSchema, MyBidSchema, PaginatedMyBidSchema } from '../openapi/schemas';
+import {
+  JobBidSchema,
+  MyBidSchema,
+  PaginatedJobBidSchema,
+  PaginatedMyBidSchema,
+} from '../openapi/schemas';
 
 /** Отклик на заказ: только подрядчик. */
 @ApiTags('bids')
@@ -86,10 +92,14 @@ export class OwnerBidsController {
   constructor(private readonly bids: BidsService) {}
 
   @Get()
-  @ApiOkResponse({ type: [JobBidSchema] })
-  @ApiErrors(404)
-  list(@CurrentAuth() auth: AuthContext, @Param('jobId') jobId: string): Promise<JobBidDto[]> {
-    return this.bids.listForOwner(auth.user.id, jobId);
+  @ApiOkResponse({ type: PaginatedJobBidSchema })
+  @ApiErrors(400, 404)
+  list(
+    @CurrentAuth() auth: AuthContext,
+    @Param('jobId') jobId: string,
+    @Query() query: PaginationQuery,
+  ): Promise<Paginated<JobBidDto>> {
+    return this.bids.listForOwner(auth.user.id, jobId, query);
   }
 
   @Post(':bidId/accept')

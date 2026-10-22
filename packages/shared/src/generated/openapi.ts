@@ -1697,6 +1697,12 @@ export interface components {
             page: number;
             total: number;
         };
+        PaginatedJobBidDto: {
+            items: components["schemas"]["JobBidDto"][];
+            limit: number;
+            page: number;
+            total: number;
+        };
         PaginatedJobDto: {
             items: components["schemas"]["JobDto"][];
             limit: number;
@@ -6022,7 +6028,10 @@ export interface operations {
     };
     OwnerBids_list: {
         parameters: {
-            query?: never;
+            query?: {
+                page?: number;
+                limit?: number;
+            };
             header?: never;
             path: {
                 jobId: string;
@@ -6036,7 +6045,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JobBidDto"][];
+                    "application/json": components["schemas"]["PaginatedJobBidDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Нет действующей сессии или неверные учётные данные */

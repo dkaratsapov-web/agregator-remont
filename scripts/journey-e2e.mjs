@@ -135,7 +135,7 @@ try {
   check('submit button reached by Tab has a visible focus ring', focusVisible);
   await contractor.keyboard.press('Enter');
   await contractor.waitForURL(/\?bid=sent/, { timeout: 15_000 });
-  const bids = (await apiAs(customerContext, `/v1/me/jobs/${jobId}/bids`)).body ?? [];
+  const bids = (await apiAs(customerContext, `/v1/me/jobs/${jobId}/bids`)).body?.items ?? [];
   check('bid sent with the keyboard only', bids.length === 1 && bids[0].price === 12000);
 
   // --- Заказчик: выбор исполнителя и закрытие с исходом.

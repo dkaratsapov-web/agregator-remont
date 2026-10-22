@@ -236,6 +236,12 @@ describe('API contract (e2e)', () => {
         const OWNER_BIDS = '/v1/me/jobs/{jobId}/bids';
         const ownerBids = `/v1/me/jobs/${jobId}/bids`;
         await check('get', OWNER_BIDS, http().get(ownerBids).set(customer.auth), 200);
+        await check(
+          'get',
+          OWNER_BIDS,
+          http().get(`${ownerBids}?limit=500`).set(customer.auth),
+          400,
+        );
         await check('get', OWNER_BIDS, http().get(ownerBids).set(other.auth), 404);
         await check('get', OWNER_BIDS, http().get(ownerBids), 401);
         await check('get', OWNER_BIDS, http().get(ownerBids).set(contractor.auth), 403);

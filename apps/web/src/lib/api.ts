@@ -52,6 +52,7 @@ import type {
   PlanInput,
   PlanParty,
 } from '@agregator/shared';
+import { PAGINATION } from '@agregator/shared';
 
 export class ApiError extends Error {
   constructor(
@@ -382,9 +383,15 @@ export async function withdrawBid(
 
 // --- Заказчик: отклики на свой заказ
 
-export async function listJobBids(token: string, jobId: string): Promise<JobBidDto[]> {
-  const res = await request(`/v1/me/jobs/${encodeURIComponent(jobId)}/bids`, { token });
-  return expectJson<JobBidDto[]>(res, 'GET /v1/me/jobs/:id/bids');
+/** Отклики на свой заказ по страницам (от ранних к поздним), до 50 на страницу. */
+export async function listJobBids(
+  token: string,
+  jobId: string,
+  page = 1,
+): Promise<Paginated<JobBidDto>> {
+  const query = new URLSearchParams({ page: String(page), limit: String(PAGINATION.MAX_LIMIT) });
+  const res = await request(`/v1/me/jobs/${encodeURIComponent(jobId)}/bids?${query}`, { token });
+  return expectJson<Paginated<JobBidDto>>(res, 'GET /v1/me/jobs/:id/bids');
 }
 
 export async function acceptBid(

@@ -15,6 +15,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ratingsFor } from '../reviews/ratings';
 import { toJobBidDto, toMyBidDto } from './bid.mapper';
 import { CreateBidDto } from './dto/create-bid.dto';
+import { PaginationQuery } from '../jobs/dto/list-jobs.query';
 import { ListMyBidsQuery } from './dto/list-my-bids.query';
 import { ApiError, QuotaExceeded } from '../common/api-error';
 
@@ -179,19 +180,35 @@ export class BidsService {
 
   // --- заказчик (владелец заказа)
 
-  async listForOwner(ownerId: string, jobId: string): Promise<JobBidDto[]> {
+  /** Отклики на свой заказ по страницам: от ранних к поздним (ADR 0001 — список с пределом). */
+  async listForOwner(
+    ownerId: string,
+    jobId: string,
+    { page, limit }: PaginationQuery,
+  ): Promise<Paginated<JobBidDto>> {
     await this.findOwnedJob(this.prisma, ownerId, jobId);
-    const bids = await this.prisma.bid.findMany({
-      // Скрытые модератором отклики заказчик не видит.
-      where: { jobId, status: { not: 'WITHDRAWN' }, hiddenAt: null },
-      include: { contractor: { include: { profile: true } } },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    });
+    // Скрытые модератором отклики заказчик не видит.
+    const where: Prisma.BidWhereInput = { jobId, status: { not: 'WITHDRAWN' }, hiddenAt: null };
+    const [bids, total] = await this.prisma.$transaction([
+      this.prisma.bid.findMany({
+        where,
+        include: { contractor: { include: { profile: true } } },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.bid.count({ where }),
+    ]);
     const ratings = await ratingsFor(
       this.prisma,
       bids.map((b) => b.contractorId),
     );
-    return bids.map((b) => toJobBidDto(b, ratings.get(b.contractorId)!));
+    return {
+      items: bids.map((b) => toJobBidDto(b, ratings.get(b.contractorId)!)),
+      page,
+      limit,
+      total,
+    };
   }
 
   /**

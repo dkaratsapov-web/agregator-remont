@@ -111,4 +111,6 @@ export type ContractChecks = [
   // Единый формат ошибок (ADR 0002).
   Expect<Equal<FieldError, Schemas['FieldError']>>,
   Expect<Equal<ApiErrorBody, Schemas['ErrorResponse']>>,
+  // Отклики владельца по страницам (ADR 0001).
+  Expect<Equal<Paginated<JobBidDto>, Schemas['PaginatedJobBidDto']>>,
 ];

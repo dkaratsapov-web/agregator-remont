@@ -255,7 +255,7 @@ describe('Accounts and trust (e2e)', () => {
       const { body: next } = await http().post('/v1/me/jobs').set(customer.auth).send(jobBody);
       await http().post(`/v1/jobs/${next.id}/bids`).set(contractor.auth).send(bidBody).expect(201);
       const bids = await http().get(`/v1/me/jobs/${next.id}/bids`).set(customer.auth).expect(200);
-      expect(bids.body[0].contractor).toMatchObject({
+      expect(bids.body.items[0].contractor).toMatchObject({
         publicId,
         rating: { average: 4.5, count: 2 },
       });
