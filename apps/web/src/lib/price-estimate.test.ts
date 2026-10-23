@@ -9,6 +9,7 @@ const all: PriceEstimateDto = {
   median: 20_000,
   high: 30_000,
   bids: 40,
+  perSqm: null,
 };
 const moscow: PriceEstimateDto = { ...all, city: 'Москва', low: 20_000, high: 35_000, bids: 12 };
 
@@ -30,5 +31,15 @@ describe('price estimate in the job form', () => {
     expect(text).toContain('«Плиточные работы»');
     expect(text).toContain('в городе Москва');
     expect(estimateText(all)).toContain('по всем городам');
+  });
+
+  it('adds the price per m² and, with an area, the sum for it', () => {
+    const tiling = { ...moscow, perSqm: { low: 1_200, median: 1_500, high: 1_800, bids: 9 } };
+    const plain = (text: string) => text.replace(/\u00a0|\u202f/g, ' ');
+    expect(plain(estimateText(tiling))).toContain('За м² — обычно от 1 200 до 1 800 ₽.');
+    expect(plain(estimateText(tiling, 12.5))).toContain(
+      'для ваших 12,5 м² это около 15 000–22 500 ₽.',
+    );
+    expect(estimateText(moscow, 12.5)).not.toContain('За м²');
   });
 });

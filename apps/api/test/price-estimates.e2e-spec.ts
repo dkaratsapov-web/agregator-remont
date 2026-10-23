@@ -1,6 +1,6 @@
 import { PRICE_ESTIMATE, type JobCategory, type PriceEstimatesDto } from '@agregator/shared';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { createTestApp } from './create-app';
 import { signUp } from './helpers';
@@ -43,7 +43,7 @@ describe('Price estimates from bids (e2e)', () => {
   const job = async (
     category: JobCategory,
     city = 'Москва',
-    extra: { extra?: JobCategory[]; hiddenAt?: Date } = {},
+    extra: { extra?: JobCategory[]; hiddenAt?: Date; details?: Record<string, unknown> } = {},
   ) =>
     (
       await prisma.job.create({
@@ -56,6 +56,7 @@ describe('Price estimates from bids (e2e)', () => {
           city,
           ownerId,
           hiddenAt: extra.hiddenAt ?? null,
+          details: (extra.details ?? {}) as Prisma.InputJsonObject,
         },
       })
     ).id;
@@ -92,7 +93,16 @@ describe('Price estimates from bids (e2e)', () => {
     const viewer = await signUp(app, 'CUSTOMER');
     const res = await estimates(viewer.auth, '?city=москва');
     expect(res.items).toEqual([
-      { category: 'TILING', city: 'Москва', low: 15_000, median: 20_000, high: 25_000, bids: 5 },
+      {
+        category: 'TILING',
+        city: 'Москва',
+        low: 15_000,
+        median: 20_000,
+        high: 25_000,
+        bids: 5,
+        // У заказов нет площади в анкете — цены за м² нет.
+        perSqm: null,
+      },
     ]);
     // Ни id, ни имён — только числа.
     const text = JSON.stringify(res);
@@ -159,6 +169,30 @@ describe('Price estimates from bids (e2e)', () => {
     expect(inPiter).toMatchObject({ category: 'ELECTRICAL', city: null, bids: 6 });
     const [unknown] = (await estimates(viewer.auth, '?city=Атлантида')).items;
     expect(unknown).toMatchObject({ city: null, bids: 6 });
+  });
+
+  it('price per m² from jobs with a work area; no area or a non-number area is skipped', async () => {
+    await setup();
+    const viewer = await signUp(app, 'CUSTOMER');
+    const area = (n: unknown) => ({ details: { covering: 'laminate', area: n } });
+    const [a, b, c] = [
+      await job('FLOORING', 'Москва', area(10)),
+      await job('FLOORING', 'Москва', area(20)),
+      await job('FLOORING', 'Москва', area(40)),
+    ];
+    // За м²: 1000, 1500, 1000, 1500, 1500.
+    await bid(a, masters[0], 10_000);
+    await bid(a, masters[1], 15_000);
+    await bid(b, masters[0], 20_000);
+    await bid(b, masters[2], 30_000);
+    await bid(c, masters[1], 60_000);
+    // Без площади и с площадью не числом: в оценке заказа есть, в цене за м² — нет.
+    await bid(await job('FLOORING'), masters[3], 500_000);
+    await bid(await job('FLOORING', 'Москва', area('много')), masters[2], 500_000);
+
+    const [flooring] = (await estimates(viewer.auth, '?city=Москва')).items;
+    expect(flooring).toMatchObject({ category: 'FLOORING', city: 'Москва', bids: 7 });
+    expect(flooring.perSqm).toEqual({ low: 1_000, median: 1_500, high: 1_500, bids: 5 });
   });
 
   it('needs a session; a too long city is 400', async () => {

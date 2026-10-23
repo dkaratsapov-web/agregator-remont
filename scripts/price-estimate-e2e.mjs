@@ -56,7 +56,12 @@ const draft = async (body) => {
   if (status !== 201) throw new Error(`draft -> ${status}`);
   return created.id;
 };
-const single = await draft({ title: 'Ламинат на кухне', category: 'FLOORING', city: 'Москва' });
+const single = await draft({
+  title: 'Ламинат на кухне',
+  category: 'FLOORING',
+  city: 'Москва',
+  details: { covering: 'laminate', area: 20 },
+});
 const several = await draft({
   title: 'Пол и плитка',
   category: 'FLOORING',
@@ -92,6 +97,9 @@ try {
     const text = (await hint.textContent().catch(() => '')) ?? '';
     check(`${name}: the estimate is under the budget`, text.includes('Мастера на сервисе'), text);
     check(`${name}: it names the category`, text.includes(`«${label}»`), text);
+    // У заказов сценария площадь 20 м²: есть цена за м² и сумма для площади черновика.
+    const plain = text.replace(/\u00a0|\u202f/g, ' ');
+    check(`${name}: price per m² for the draft area`, /За м².*для ваших 20 м²/.test(plain), plain);
     check(`${name}: no ids or names in the hint`, !masters.some((m) => text.includes(m.user.name)));
 
     await page.goto(`${WEB}/account/jobs/new?draft=${several}`, { waitUntil: 'networkidle' });

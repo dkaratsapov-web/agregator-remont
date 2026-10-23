@@ -28,6 +28,7 @@ import {
   type AnalyticsDto,
   type PriceEstimateDto,
   type PriceEstimatesDto,
+  type PriceRangeDto,
   type AnalyticsMetric,
   type AnalyticsSeriesDto,
   type ContactExchangeDto,
@@ -722,6 +723,14 @@ export class AnalyticsSchema implements AnalyticsDto {
   @ApiProperty({ type: AnalyticsSeriesSchema, isArray: true }) series!: AnalyticsSeriesSchema[];
 }
 
+@ApiSchema({ name: 'PriceRangeDto' })
+export class PriceRangeSchema implements PriceRangeDto {
+  @int({ description: 'Нижняя четверть, ₽ (округлено)' }) low!: number;
+  @int({ description: 'Медиана, ₽ (округлено)' }) median!: number;
+  @int({ description: 'Верхняя четверть, ₽ (округлено)' }) high!: number;
+  @int({ description: 'Сколько откликов учтено' }) bids!: number;
+}
+
 @ApiSchema({ name: 'PriceEstimateDto' })
 export class PriceEstimateSchema implements PriceEstimateDto {
   @ApiProperty({ enum: JOB_CATEGORIES, enumName: 'JobCategory' }) category!: JobCategory;
@@ -735,6 +744,12 @@ export class PriceEstimateSchema implements PriceEstimateDto {
   @int({ description: 'Медиана, ₽ (округлено)' }) median!: number;
   @int({ description: 'Верхняя четверть, ₽ (округлено)' }) high!: number;
   @int({ description: 'Сколько откликов учтено' }) bids!: number;
+  @ApiProperty({
+    type: PriceRangeSchema,
+    nullable: true,
+    description: 'Цена за м² по заказам с площадью работ в анкете; null — таких откликов мало',
+  })
+  perSqm!: PriceRangeSchema | null;
 }
 
 @ApiSchema({ name: 'PriceEstimatesDto' })

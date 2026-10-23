@@ -1810,10 +1810,22 @@ export interface components {
             low: number;
             /** @description Медиана, ₽ (округлено) */
             median: number;
+            /** @description Цена за м² по заказам с площадью работ в анкете; null — таких откликов мало */
+            perSqm: components["schemas"]["PriceRangeDto"] | null;
         };
         PriceEstimatesDto: {
             /** @description Только категории с достаточными данными */
             items: components["schemas"]["PriceEstimateDto"][];
+        };
+        PriceRangeDto: {
+            /** @description Сколько откликов учтено */
+            bids: number;
+            /** @description Верхняя четверть, ₽ (округлено) */
+            high: number;
+            /** @description Нижняя четверть, ₽ (округлено) */
+            low: number;
+            /** @description Медиана, ₽ (округлено) */
+            median: number;
         };
         PublicContractorDto: {
             completedJobs: number;

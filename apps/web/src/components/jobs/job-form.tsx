@@ -13,6 +13,7 @@ import {
   type JobCategory,
   type JobDetails,
   type PriceEstimateDto,
+  workArea,
 } from '@agregator/shared';
 import { useActionState, useCallback, useEffect, useRef, useState } from 'react';
 import { saveDraftAction, type JobFormState } from '@/app/(site)/account/jobs/actions';
@@ -789,7 +790,10 @@ export function JobForm({
                   data-testid="price-estimate"
                   className="mt-3 rounded-xl border border-line bg-canvas px-4 py-3 text-sm leading-relaxed text-ink"
                 >
-                  {estimateText(estimate)}
+                  {estimateText(
+                    estimate,
+                    category ? workArea(category, answersByCategory[category] ?? {}) : null,
+                  )}
                 </p>
               ) : null}
             </fieldset>
