@@ -8,7 +8,7 @@ import {
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { MSK_OFFSET_MS, mskDay } from './usage';
+import { MSK_OFFSET_MS, UsageCounters, mskDay } from './usage';
 
 const DAY_MS = 86_400_000;
 /** День записи по Москве (created_at хранится в UTC без пояса). */
@@ -41,9 +41,14 @@ const ROLE_METRICS: Record<string, AnalyticsMetric> = {
  */
 @Injectable()
 export class AnalyticsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly usage: UsageCounters,
+  ) {}
 
   async report(period: AnalyticsPeriod, now = new Date()): Promise<AnalyticsDto> {
+    // Накопленное в памяти этого экземпляра — в базу, чтобы отчёт видел и последние секунды.
+    await this.usage.flush();
     const today = mskDay(now);
     const todayUtc = Date.parse(`${today}T00:00:00Z`);
     const days = Array.from({ length: period }, (_, i) =>

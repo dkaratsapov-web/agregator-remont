@@ -3,7 +3,8 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { AnalyticsService } from '../src/analytics/analytics.service';
-import { mskDay } from '../src/analytics/usage';
+import { mskDay, UsageCounters } from '../src/analytics/usage';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp } from './create-app';
 import { requiredAnswers, signUp, signUpAdmin } from './helpers';
 
@@ -136,6 +137,28 @@ describe('Analytics without personal data (e2e)', () => {
     }
     expect(text).not.toContain(job.id);
     expect(await prisma.usageCounter.count()).toBe(3);
+  });
+
+  it('public views are buffered in memory and saved in one write, failures are kept', async () => {
+    const usage = app.get(UsageCounters);
+    await usage.flush();
+    for (let i = 0; i < 5; i += 1) await http().get('/v1/jobs').expect(200);
+    // Открытие каталога не пишет в базу на каждый запрос.
+    expect(await prisma.usageCounter.count()).toBe(0);
+    await usage.flush();
+    const saved = await prisma.usageCounter.findMany();
+    expect(saved).toEqual([expect.objectContaining({ metric: 'CATALOG_VIEWS', count: 5 })]);
+
+    // Сбой записи: накопленное возвращается в очередь и уходит при следующем сбросе.
+    usage.add('CATALOG_VIEWS');
+    const write = jest
+      .spyOn(app.get(PrismaService), '$executeRaw')
+      .mockRejectedValueOnce(new Error('connection lost'));
+    await usage.flush();
+    write.mockRestore();
+    expect((await prisma.usageCounter.findFirstOrThrow()).count).toBe(5);
+    await usage.flush();
+    expect((await prisma.usageCounter.findFirstOrThrow()).count).toBe(6);
   });
 
   it('only an admin sees it; the period is 7, 30 or 90 days', async () => {

@@ -1,7 +1,7 @@
 import type { JobDto, Paginated } from '@agregator/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { countUsage } from '../analytics/usage';
+import { UsageCounters } from '../analytics/usage';
 import { PrismaService } from '../prisma/prisma.service';
 import { ListJobsQuery } from './dto/list-jobs.query';
 import { toJobDto } from './job.mapper';
@@ -19,7 +19,10 @@ const JOB_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 @Injectable()
 export class JobsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly usage: UsageCounters,
+  ) {}
 
   async list(query: ListJobsQuery): Promise<Paginated<JobDto>> {
     const { page, limit, category, status } = query;
@@ -53,7 +56,7 @@ export class JobsService {
     ]);
 
     // Открытие каталога — первая страница; листание дальше не считается.
-    if (page === 1) await countUsage(this.prisma, 'CATALOG_VIEWS');
+    if (page === 1) this.usage.add('CATALOG_VIEWS');
     return { items: items.map(toJobDto), page, limit, total };
   }
 
@@ -65,7 +68,7 @@ export class JobsService {
     if (!job || job.hiddenAt) {
       throw new NotFoundException('Заказ не найден');
     }
-    await countUsage(this.prisma, 'JOB_VIEWS');
+    this.usage.add('JOB_VIEWS');
     return toJobDto(job);
   }
 }
