@@ -3,8 +3,10 @@
 // консоль; сценарий собирает их со всех вкладок и падает, если они есть. Так весь набор
 // браузерных сценариев CI проверяет, что включение блокировки ничего не сломает.
 
-const VIOLATION =
-  /Content[- ]Security[- ]Policy|Refused to (load|execute|apply|connect|frame|evaluate)/i;
+// Нарушение — только отказ в загрузке или выполнении: «Refused to … Content Security Policy»
+// (так пишут и Chromium, и WebKit). Служебные предупреждения о самой политике — не нарушения:
+// например, WebKit сообщает, что frame-ancestors в report-only не действует.
+export const VIOLATION = /Refused to .*Content[- ]Security[- ]Policy/is;
 
 /** Следить за всеми вкладками браузера: возвращает массив, куда попадают нарушения. */
 export function watchCsp(browser) {
