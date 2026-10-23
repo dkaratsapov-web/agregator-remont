@@ -103,6 +103,8 @@ describe('Price estimates from bids (e2e)', () => {
         median: 20_000,
         high: 25_000,
         bids: 5,
+        // 5 откликов на 3 заказа — грубый ориентир.
+        rough: true,
         // У заказов нет площади в анкете — цены за м² нет.
         perSqm: null,
       },
@@ -189,17 +191,20 @@ describe('Price estimates from bids (e2e)', () => {
     await bid(b, masters[0], 20_000);
     await bid(b, masters[2], 30_000);
     await bid(c, masters[1], 60_000);
-    // Без площади и с площадью не числом: в оценке заказа есть, в цене за м² — нет.
+    // Без площади, с площадью не числом и мелкая работа (меньше SQM_MIN_AREA): в оценке заказа
+    // есть, в цене за м² — нет.
     await bid(await job('FLOORING'), masters[3], 500_000);
     await bid(await job('FLOORING', 'Москва', area('много')), masters[2], 500_000);
+    await bid(await job('FLOORING', 'Москва', area(1)), masters[2], 500_000);
 
     const [flooring] = (await estimates(viewer.auth, '?city=Москва')).items;
-    expect(flooring).toMatchObject({ category: 'FLOORING', city: 'Москва', bids: 7 });
+    expect(flooring).toMatchObject({ category: 'FLOORING', city: 'Москва', bids: 8 });
     expect(flooring.perSqm).toEqual({
       low: 1_000,
       median: 1_500,
       high: 1_500,
       bids: 5,
+      rough: true,
       city: 'Москва',
     });
   });
@@ -253,6 +258,18 @@ describe('Price estimates from bids (e2e)', () => {
       await cached.close();
       process.env.PRICE_ESTIMATES_CACHE_SEC = '0';
     }
+  });
+
+  it('enough bids and jobs: not rough', async () => {
+    await setup();
+    const viewer = await signUp(app, 'CUSTOMER');
+    // 8 заказов × 3 мастера = 24 отклика: больше порогов ROUGH_BELOW_*.
+    for (let j = 0; j < PRICE_ESTIMATE.ROUGH_BELOW_JOBS; j += 1) {
+      const id = await job('ROOFING');
+      for (let m = 0; m < 3; m += 1) await bid(id, masters[m], 100_000 + j * 1_000 + m * 500);
+    }
+    const [roofing] = (await estimates(viewer.auth)).items;
+    expect(roofing).toMatchObject({ category: 'ROOFING', bids: 24, rough: false });
   });
 
   it('needs a session; a too long city is 400', async () => {

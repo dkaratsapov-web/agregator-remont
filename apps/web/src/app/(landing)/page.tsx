@@ -51,7 +51,13 @@ const SERVICE_ROWS = [
   ],
 ];
 
-export default async function LandingPage() {
+export default async function LandingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ lead?: string | string[] }>;
+}) {
+  // Результат заявки, отправленной без JS (/lead отвечает переходом на `/?lead=<код>`).
+  const { lead } = await searchParams;
   // Запрос к API только при cookie сессии: гость получает страницу без обращения к API.
   const user = await getCurrentUser();
   const avatarSrc = user?.avatarVersion ? await getAvatarThumb() : null;
@@ -150,7 +156,10 @@ export default async function LandingPage() {
                 </p>
               </div>
               <div className="relative self-center">
-                <LeadForm open={PRIVACY_OPERATOR !== null} />
+                <LeadForm
+                  open={PRIVACY_OPERATOR !== null}
+                  result={typeof lead === 'string' ? lead : undefined}
+                />
               </div>
             </div>
           </Reveal>

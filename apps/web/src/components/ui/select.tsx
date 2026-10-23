@@ -207,7 +207,7 @@ export function Select({
           invalid ? 'border-accent' : 'border-line hover:border-ink-soft/40'
         } ${open ? 'border-accent' : ''}`}
       >
-        <span className={`truncate ${selected ? 'text-ink' : 'text-ink-soft/80'}`}>
+        <span className={`truncate ${selected ? 'text-ink' : 'text-ink-soft'}`}>
           {selected ? selected.label : placeholder}
         </span>
         <svg

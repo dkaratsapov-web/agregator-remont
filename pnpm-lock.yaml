@@ -18,6 +18,9 @@ importers:
       '@next/eslint-plugin-next':
         specifier: ^16.4.1
         version: 16.4.1(eslint@10.12.0(jiti@2.7.0))
+      axe-core:
+        specifier: 4.10.2
+        version: 4.10.2
       dotenv-cli:
         specifier: ^11.0.0
         version: 11.0.0
@@ -2167,6 +2170,10 @@ packages:
 
   asynckit@0.4.0:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
+
+  axe-core@4.10.2:
+    resolution: {integrity: sha512-RE3mdQ7P3FRSe7eqCWoeQ/Z9QXrtniSjp1wUjt5nRC3WIpz5rSCve6o3fsZ2aCpJtrZjSZgjwXAoTO5k4tEI0w==}
+    engines: {node: '>=4'}
 
   babel-jest@30.5.2:
     resolution: {integrity: sha512-ES8WeJ2fNWPEDunyAtUfJ12nHyaWUloCHdkfK2oW5uSoQSUmjNKdWiGaXJITJwvFEWoD/evHEg/QoCXAvLaQqQ==}
@@ -6483,6 +6490,8 @@ snapshots:
       js-tokens: 10.0.0
 
   asynckit@0.4.0: {}
+
+  axe-core@4.10.2: {}
 
   babel-jest@30.5.2(@babel/core@7.29.7):
     dependencies:

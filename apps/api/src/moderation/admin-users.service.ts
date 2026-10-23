@@ -8,7 +8,9 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import type { Prisma } from '@prisma/client';
 import { issuePasswordReset } from '../auth/password-reset';
 import { ENTITY_ID_PATTERN } from '../common/text';
+import { ApiError } from '../common/api-error';
 import { PrismaService } from '../prisma/prisma.service';
+import { ACCOUNT_DELETED } from '../users/account-data.service';
 import { ListUsersQuery } from './dto/moderation.dto';
 
 const USER_NOT_FOUND = 'Пользователь не найден';
@@ -91,9 +93,10 @@ export class AdminUsersService {
   async issuePasswordReset(adminId: string, id: string): Promise<PasswordResetLinkDto> {
     if (!ENTITY_ID_PATTERN.test(id)) throw new NotFoundException(USER_NOT_FOUND);
     return this.prisma.$transaction(async (tx) => {
-      const [user] = await tx.$queryRaw<{ blocked_at: Date | null }[]>`
-        SELECT blocked_at FROM users WHERE id = ${id} FOR UPDATE`;
+      const [user] = await tx.$queryRaw<{ blocked_at: Date | null; deleted_at: Date | null }[]>`
+        SELECT blocked_at, deleted_at FROM users WHERE id = ${id} FOR UPDATE`;
       if (!user) throw new NotFoundException(USER_NOT_FOUND);
+      if (user.deleted_at) throw new ApiError(409, 'ACCOUNT_DELETED', ACCOUNT_DELETED);
       if (user.blocked_at) {
         throw new ConflictException('Аккаунт заблокирован: сначала разблокируйте его');
       }

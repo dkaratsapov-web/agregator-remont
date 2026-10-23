@@ -57,6 +57,9 @@ export function Manifesto({ text }: { text: string }) {
   return (
     <p
       ref={ref}
+      // Слова нарочно бледные, пока до них не дошла прокрутка: проверка контраста их пропускает
+      // (scripts/a11y-e2e.mjs); при «меньше движения» текст сразу полный.
+      data-scroll-reveal=""
       className="font-display text-[1.6rem] font-medium leading-[1.25] tracking-[-0.03em] text-ink sm:text-4xl lg:text-[3.1rem] xl:text-[3.5rem]"
     >
       {reduce

@@ -121,7 +121,8 @@ export class ListJobsQuery extends PaginationQuery {
   @IsBoolean()
   @ApiPropertyOptional({
     type: Boolean,
-    description: 'Только заказы без откликов (отозванные и скрытые не считаются)',
+    description:
+      'Только заказы без откликов (отозванные, скрытые и отклики заблокированных мастеров не считаются)',
   })
   noBids?: boolean;
 

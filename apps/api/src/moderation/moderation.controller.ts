@@ -87,6 +87,8 @@ export class ReportsController {
     return this.reports.mine(auth.user, query.page);
   }
 
+  // Без лимита записи, как отметка уведомлений: вызывается сам при открытии «Моих жалоб»,
+  // повтор ничего не меняет (только свои строки, одно обновление); общий лимит запросов действует.
   @Post('mine/seen')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiNoContentResponse({ description: 'Решения по своим жалобам отмечены просмотренными' })

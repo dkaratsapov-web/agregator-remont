@@ -64,8 +64,19 @@ export class JobsService {
       ...(status ? { status } : {}),
       ...(city ? { city: { equals: city, mode: 'insensitive' } } : {}),
       ...(days ? { createdAt: { gte: new Date(Date.now() - days * 86_400_000) } } : {}),
-      // «Без откликов»: отозванные и скрытые модератором отклики не в счёт.
-      ...(noBids ? { bids: { none: { status: { not: 'WITHDRAWN' }, hiddenAt: null } } } : {}),
+      // «Без откликов»: отозванные, скрытые модератором и отклики заблокированных мастеров не
+      // в счёт — такой мастер недоступен (аудит 23.10.2026, F-06).
+      ...(noBids
+        ? {
+            bids: {
+              none: {
+                status: { not: 'WITHDRAWN' },
+                hiddenAt: null,
+                contractor: { blockedAt: null },
+              },
+            },
+          }
+        : {}),
       AND: [
         ...budget,
         ...(q

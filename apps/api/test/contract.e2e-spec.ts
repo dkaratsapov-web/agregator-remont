@@ -1441,6 +1441,66 @@ describe('API contract (e2e)', () => {
     }
   });
 
+  it('account data endpoints (export, delete) match openapi.json', async () => {
+    const high = {
+      RATE_LIMIT_PER_MIN: '1000',
+      AUTH_RATE_LIMIT_PER_MIN: '1000',
+      WRITE_RATE_LIMIT_PER_MIN: '1000',
+    };
+    await withApp(high, async (app) => {
+      const http = () => request(app.getHttpServer());
+      const check = async (
+        method: 'get' | 'post',
+        template: string,
+        req: request.Test,
+        status: number,
+      ) => {
+        const res = await req;
+        expect(res.status).toBe(status);
+        expectContract(res, method, template);
+        return res;
+      };
+      const password = 'correct-horse-battery';
+      const reg = await http()
+        .post('/v1/auth/register')
+        .send({
+          email: `contract-del-${Date.now()}@example.ru`,
+          password,
+          name: 'Контракт',
+          role: 'CUSTOMER',
+        })
+        .expect(201);
+      const customer = { Authorization: `Bearer ${reg.body.token}` };
+      const contractor = await signUp(app, 'CONTRACTOR');
+
+      const EXP = '/v1/me/export';
+      await check('get', EXP, http().get(EXP).set(customer), 200);
+      await check('get', EXP, http().get(EXP), 401);
+
+      // Заказ в работе: удалить нельзя (409).
+      const jobId = (await http().post('/v1/me/jobs').set(customer).send(job).expect(201)).body.id;
+      const bidId = (
+        await http().post(`/v1/jobs/${jobId}/bids`).set(contractor.auth).send(bid).expect(201)
+      ).body.id;
+      await http().post(`/v1/me/jobs/${jobId}/bids/${bidId}/accept`).set(customer).expect(200);
+      const DEL = '/v1/me/delete';
+      await check('post', DEL, http().post(DEL).set(customer).send({ password }), 409);
+      await http()
+        .post(`/v1/me/jobs/${jobId}/close`)
+        .set(customer)
+        .send({ outcome: 'COMPLETED' })
+        .expect(200);
+      await check(
+        'post',
+        DEL,
+        http().post(DEL).set(customer).send({ password: 'wrong-pass-1' }),
+        400,
+      );
+      await check('post', DEL, http().post(DEL).send({ password }), 401);
+      await check('post', DEL, http().post(DEL).set(customer).send({ password }), 204);
+    });
+  });
+
   it('429 responses match openapi.json for every limit mechanism', async () => {
     // Общий лимит (default) на публичном маршруте.
     await withApp({ RATE_LIMIT_PER_MIN: '2' }, async (app) => {

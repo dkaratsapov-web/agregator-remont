@@ -74,6 +74,8 @@ enum AuditAction {
   FLAG_RESOLVED
   CONTACTS_SHARED
   CONTACTS_HIDDEN
+  ACCOUNT_DELETED
+  ACCOUNT_EXPORTED
 }
 
 // Синхронизировано с BID_STATUSES в packages/shared/src/bids.ts.
@@ -201,6 +203,9 @@ model User {
   uiMotion         String             @default("system") @map("ui_motion") @db.VarChar(10)
   /// Заблокирован администратором: вход запрещён, сессии отозваны. null — активен.
   blockedAt        DateTime?          @map("blocked_at")
+  /// Удалён по просьбе пользователя: личные данные стёрты, аккаунт заблокирован навсегда
+  /// (docs/ACCOUNTS.md, «Удаление аккаунта»). null — не удалён.
+  deletedAt        DateTime?          @map("deleted_at")
   createdAt        DateTime           @default(now()) @map("created_at")
   updatedAt        DateTime           @updatedAt @map("updated_at")
   avatar           UserAvatar?
@@ -330,6 +335,9 @@ model Bid {
   @@unique([jobId, contractorId])
   @@index([contractorId, createdAt(sort: Desc)])
   @@index([jobId, status])
+  // Частичный уникальный индекс bids_one_accepted_per_job (не больше одного выбранного
+  // исполнителя на заказ, WHERE status = 'ACCEPTED') Prisma не описывает: он только в миграции
+  // 20261015213341_contractor_profiles_bids.
   @@map("bids")
 }
 
