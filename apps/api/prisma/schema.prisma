@@ -330,6 +330,9 @@ model Bid {
   @@unique([jobId, contractorId])
   @@index([contractorId, createdAt(sort: Desc)])
   @@index([jobId, status])
+  // Частичный уникальный индекс bids_one_accepted_per_job (не больше одного выбранного
+  // исполнителя на заказ, WHERE status = 'ACCEPTED') Prisma не описывает: он только в миграции
+  // 20261015213341_contractor_profiles_bids.
   @@map("bids")
 }
 

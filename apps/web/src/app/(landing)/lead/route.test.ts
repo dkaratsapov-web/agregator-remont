@@ -83,7 +83,7 @@ describe('POST /lead', () => {
     ['no consent', { ...valid, consent: false }, {}, 400],
     ['consent as a string', { ...valid, consent: 'on' }, {}, 400],
     ['not JSON', null, { raw: 'name=1' }, 400],
-    ['form content type', valid, { type: 'application/x-www-form-urlencoded' }, 415],
+    ['plain text', valid, { type: 'text/plain' }, 415],
     ['oversized body', null, { raw: JSON.stringify({ ...valid, pad: 'x'.repeat(3000) }) }, 413],
   ] as const)('rejects %s', async (_name, body, init, status) => {
     const res = await post(body, init);
@@ -127,5 +127,65 @@ describe('POST /lead', () => {
     const res = await post(valid);
     expect(res.status).toBe(502);
     expect((await res.json()).error).toMatch(/временно недоступен/);
+  });
+
+  // Форма без JS (аудит 23.10.2026): обычная отправка POST, ответ — переход на главную с кодом
+  // результата. Имя и телефон не попадают в адрес.
+  describe('HTML form without JS', () => {
+    const form = (fields: Record<string, string>, origin?: string) =>
+      post(null, {
+        origin,
+        type: 'application/x-www-form-urlencoded',
+        raw: new URLSearchParams(fields).toString(),
+      });
+    const filled = { name: 'Ирина', phone: '8 912 345-67-89', consent: 'on' };
+
+    it('forwards the lead and redirects to the result without personal data', async () => {
+      fetchMock.mockResolvedValue(Response.json({ received: true }, { status: 201 }));
+      const res = await form(filled);
+      expect(res.status).toBe(303);
+      const location = res.headers.get('location') ?? '';
+      expect(location).toBe('/?lead=sent#apply');
+      expect(location).not.toMatch(/912|Ирина|%D0/);
+      expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+        name: 'Ирина',
+        phone: '8 912 345-67-89',
+        consent: true,
+      });
+    });
+
+    it.each([
+      ['no consent', { name: 'Ирина', phone: '8 912 345-67-89' }, 'consent'],
+      ['empty body', {}, 'consent'],
+    ] as const)('%s: back with a code, API not called', async (_name, fields, code) => {
+      const res = await form(fields);
+      expect(res.status).toBe(303);
+      expect(res.headers.get('location')).toBe(`/?lead=${code}#apply`);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('closed while the privacy operator is not set', async () => {
+      state.operator = null;
+      const res = await form(filled);
+      expect(res.headers.get('location')).toBe('/?lead=closed#apply');
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [400, 'invalid'],
+      [429, 'limit'],
+      [500, 'failed'],
+    ] as const)('API %i: back with %s', async (status, code) => {
+      fetchMock.mockResolvedValue(Response.json({ message: 'x' }, { status }));
+      const res = await form(filled);
+      expect(res.status).toBe(303);
+      expect(res.headers.get('location')).toBe(`/?lead=${code}#apply`);
+    });
+
+    it('a foreign origin is still 403 without calling the API', async () => {
+      const res = await form(filled, 'https://evil.example');
+      expect(res.status).toBe(403);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
   });
 });

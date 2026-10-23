@@ -2,6 +2,7 @@
 
 import { LEAD_LIMITS } from '@agregator/shared';
 import { useState } from 'react';
+import { LEAD_RESULT_ERRORS, parseLeadResult } from '@/lib/lead-result';
 
 const inputClass =
   'mt-1.5 block min-h-13 w-full rounded-2xl border border-line bg-canvas px-4 text-base text-ink placeholder:text-ink-soft transition-colors duration-150 focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60';
@@ -35,9 +36,16 @@ function Submit({ disabled, pending }: { disabled: boolean; pending: boolean }) 
 /**
  * Заявка на закрытое тестирование: имя, телефон, согласие. Пока не заполнены реквизиты
  * оператора персональных данных (`open` = false), форма видна, но выключена.
+ *
+ * С JS заявка уходит запросом JSON без перезагрузки. Без JS — обычной отправкой POST на /lead,
+ * ответ — переход на главную с кодом результата (`result`); имя и телефон в адрес не попадают.
  */
-export function LeadForm({ open }: { open: boolean }) {
-  const [state, setState] = useState<{ sent?: boolean; error?: string }>({});
+export function LeadForm({ open, result }: { open: boolean; result?: string }) {
+  const [state, setState] = useState<{ sent?: boolean; error?: string }>(() => {
+    const initial = parseLeadResult(result);
+    if (initial === 'sent') return { sent: true };
+    return initial ? { error: LEAD_RESULT_ERRORS[initial] } : {};
+  });
   const [pending, setPending] = useState(false);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -87,7 +95,7 @@ export function LeadForm({ open }: { open: boolean }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form method="post" action="/lead" onSubmit={onSubmit} className="space-y-4">
       {!open ? (
         <p className="rounded-2xl bg-accent-tint px-4 py-3 text-sm font-medium text-ink">
           Приём заявок откроется в ближайшие дни.
