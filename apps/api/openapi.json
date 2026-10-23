@@ -1,6 +1,122 @@
 {
   "components": {
     "schemas": {
+      "AccountExportDto": {
+        "additionalProperties": false,
+        "properties": {
+          "account": {
+            "additionalProperties": true,
+            "description": "Аккаунт: email, имя, роль, телефон, город",
+            "type": "object"
+          },
+          "bankLogins": {
+            "description": "Привязанные входы через банк",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "bids": {
+            "description": "Свои отклики",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "contractorProfile": {
+            "additionalProperties": true,
+            "description": "Профиль мастера",
+            "nullable": true,
+            "type": "object"
+          },
+          "drafts": {
+            "description": "Черновики",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "exportedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "favorites": {
+            "description": "Избранные заказы",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "jobs": {
+            "description": "Свои заказы; у откликов на них — только число",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "messages": {
+            "description": "Свои сообщения в переписке",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "reports": {
+            "description": "Свои жалобы",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "reviewsReceived": {
+            "description": "Отзывы о себе, без автора",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "reviewsWritten": {
+            "description": "Написанные отзывы",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "sessions": {
+            "description": "Действующие сеансы",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "exportedAt",
+          "account",
+          "contractorProfile",
+          "jobs",
+          "drafts",
+          "bids",
+          "messages",
+          "reviewsWritten",
+          "reviewsReceived",
+          "favorites",
+          "reports",
+          "sessions",
+          "bankLogins"
+        ],
+        "type": "object"
+      },
       "AdminUserDto": {
         "additionalProperties": false,
         "properties": {
@@ -715,11 +831,25 @@
         "type": "string",
         "x-enum-kind": "closed"
       },
+      "DeleteAccountDto": {
+        "additionalProperties": false,
+        "properties": {
+          "password": {
+            "description": "Текущий пароль",
+            "maxLength": 128,
+            "type": "string"
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "type": "object"
+      },
       "ErrorResponse": {
         "additionalProperties": false,
         "properties": {
           "code": {
-            "description": "Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, LOGIN_THROTTLED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_*",
+            "description": "Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, PASSWORD_INVALID, ACCOUNT_HAS_ACTIVE_DEALS, ACCOUNT_DELETED, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, LOGIN_THROTTLED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_*",
             "type": "string"
           },
           "error": {
@@ -2069,7 +2199,7 @@
         "additionalProperties": false,
         "properties": {
           "code": {
-            "description": "Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, LOGIN_THROTTLED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_*",
+            "description": "Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, PASSWORD_INVALID, ACCOUNT_HAS_ACTIVE_DEALS, ACCOUNT_DELETED, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, LOGIN_THROTTLED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_*",
             "type": "string"
           },
           "error": {
@@ -8247,6 +8377,75 @@
         ]
       }
     },
+    "/v1/me/delete": {
+      "post": {
+        "operationId": "Me_delete",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAccountDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Аккаунт удалён, все сеансы завершены"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Конфликт с текущим состоянием ресурса"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
+        ]
+      }
+    },
     "/v1/me/drafts": {
       "get": {
         "operationId": "Drafts_list",
@@ -8628,6 +8827,52 @@
         ],
         "tags": [
           "my-drafts"
+        ]
+      }
+    },
+    "/v1/me/export": {
+      "get": {
+        "operationId": "Me_export",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountExportDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "me"
         ]
       }
     },

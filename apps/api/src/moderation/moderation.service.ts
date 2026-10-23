@@ -13,7 +13,9 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import type { Prisma } from '@prisma/client';
 import { writeAudit } from '../audit/audit';
 import { ENTITY_ID_PATTERN } from '../common/text';
+import { ApiError } from '../common/api-error';
 import { PrismaService } from '../prisma/prisma.service';
+import { ACCOUNT_DELETED } from '../users/account-data.service';
 import {
   BlockDto,
   HideDto,
@@ -174,9 +176,13 @@ export class ModerationService {
   async setUserBlocked(adminId: string, id: string, dto: BlockDto): Promise<BlockedStateDto> {
     if (!ENTITY_ID_PATTERN.test(id)) throw new NotFoundException('Пользователь не найден');
     return this.prisma.$transaction(async (tx) => {
-      const locked = await tx.$queryRaw<{ role: string; blocked_at: Date | null }[]>`
-        SELECT role::text AS role, blocked_at FROM users WHERE id = ${id} FOR UPDATE`;
+      const locked = await tx.$queryRaw<
+        { role: string; blocked_at: Date | null; deleted_at: Date | null }[]
+      >`
+        SELECT role::text AS role, blocked_at, deleted_at FROM users WHERE id = ${id} FOR UPDATE`;
       if (locked.length === 0) throw new NotFoundException('Пользователь не найден');
+      // Удалённый аккаунт заблокирован навсегда: личных данных нет, войти в него нельзя.
+      if (locked[0].deleted_at) throw new ApiError(409, 'ACCOUNT_DELETED', ACCOUNT_DELETED);
       if (locked[0].role === 'ADMIN') {
         throw new ConflictException('Администратора заблокировать нельзя');
       }

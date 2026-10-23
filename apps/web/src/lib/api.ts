@@ -679,6 +679,26 @@ export async function updatePreferences(
   return expectJson<UserDto>(res, 'PATCH /v1/me/preferences');
 }
 
+/** Удаление аккаунта по текущему паролю (204). Ошибки — ApiError с кодом API. */
+export async function deleteAccount(
+  token: string,
+  password: string,
+  clientIp?: string,
+): Promise<void> {
+  const res = await request('/v1/me/delete', {
+    method: 'POST',
+    body: { password },
+    token,
+    clientIp,
+  });
+  if (res.status !== 204) throw await apiErrorOf('POST /v1/me/delete', res);
+}
+
+/** Выгрузка своих данных: ответ API как есть (файл JSON), чтобы передать его браузеру потоком. */
+export async function exportAccount(token: string, clientIp?: string): Promise<Response> {
+  return request('/v1/me/export', { token, clientIp });
+}
+
 export async function changePassword(
   token: string,
   input: PasswordChangeInput,

@@ -1,4 +1,9 @@
-import { ACCOUNT_LIMITS, type SessionDto, type UserDto } from '@agregator/shared';
+import {
+  ACCOUNT_LIMITS,
+  type AccountExportDto,
+  type SessionDto,
+  type UserDto,
+} from '@agregator/shared';
 import {
   BadRequestException,
   Body,
@@ -12,12 +17,14 @@ import {
   Patch,
   Post,
   Put,
+  Res,
   StreamableFile,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import {
   ApiBody,
   ApiConsumes,
@@ -30,9 +37,16 @@ import { CurrentAuth } from '../auth/current-auth.decorator';
 import { AuthRateLimited, WriteRateLimited } from '../auth/rate-limit';
 import { SessionGuard } from '../auth/session.guard';
 import { ApiErrors, ApiSession } from '../openapi/decorators';
-import { SessionSchema, SessionsRevokedSchema, UserSchema } from '../openapi/schemas';
+import {
+  AccountExportSchema,
+  SessionSchema,
+  SessionsRevokedSchema,
+  UserSchema,
+} from '../openapi/schemas';
+import { AccountDataService } from './account-data.service';
 import { AccountService } from './account.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { DeleteAccountDto } from './dto/delete-account.dto';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { toUserDto } from './user.mapper';
@@ -44,7 +58,10 @@ import { toUserDto } from './user.mapper';
 @Controller('v1/me')
 @UseGuards(SessionGuard)
 export class MeController {
-  constructor(private readonly account: AccountService) {}
+  constructor(
+    private readonly account: AccountService,
+    private readonly data: AccountDataService,
+  ) {}
 
   @Get()
   @ApiOkResponse({ type: UserSchema })
@@ -79,6 +96,39 @@ export class MeController {
   @ApiErrors(400)
   changePassword(@CurrentAuth() auth: AuthContext, @Body() dto: ChangePasswordDto): Promise<void> {
     return this.account.changePassword(auth.user, auth.sessionId, dto);
+  }
+
+  /**
+   * Выгрузка своих данных одним JSON-файлом (152-ФЗ). Лимит записи: ответ собирается из
+   * нескольких таблиц, и частые выгрузки не должны нагружать базу.
+   */
+  @Get('export')
+  @WriteRateLimited()
+  @Header('Cache-Control', 'no-store')
+  @ApiOkResponse({ type: AccountExportSchema })
+  async export(
+    @CurrentAuth() auth: AuthContext,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AccountExportDto> {
+    const date = new Date().toISOString().slice(0, 10);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="garantych-${auth.user.publicId}-${date}.json"`,
+    );
+    return this.data.export(auth.user);
+  }
+
+  /**
+   * Удаление аккаунта по текущему паролю. Строгий лимит как у входа: подбор пароля через
+   * удаление не дешевле, чем через вход. Во время заказа в работе — 409.
+   */
+  @Post('delete')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @AuthRateLimited()
+  @ApiNoContentResponse({ description: 'Аккаунт удалён, все сеансы завершены' })
+  @ApiErrors(400, 409)
+  delete(@CurrentAuth() auth: AuthContext, @Body() dto: DeleteAccountDto): Promise<void> {
+    return this.data.delete(auth.user, auth.sessionId, dto.password);
   }
 
   @Get('sessions')

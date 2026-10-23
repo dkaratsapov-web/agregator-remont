@@ -20,12 +20,14 @@ import {
 import {
   ApiError,
   changePassword,
+  deleteAccount,
   revokeOtherSessions,
   revokeSession,
   updatePreferences,
   updateProfile,
 } from '@/lib/api';
-import { getClientIp } from '@/lib/session';
+import { redirect } from 'next/navigation';
+import { clearSessionCookie, getClientIp } from '@/lib/session';
 import { argString, readFormArgs } from '@/lib/form-args';
 
 const SETTINGS = '/account/settings';
@@ -116,6 +118,38 @@ export async function passwordAction(_prev: SettingsState, form: FormData): Prom
   }
   revalidatePath(SETTINGS);
   return { done: 'Пароль изменён. На других устройствах нужно войти заново.' };
+}
+
+/**
+ * Удаление аккаунта: галочка «понимаю» и текущий пароль. После удаления сеансов нет, поэтому
+ * cookie стирается без запроса выхода, а человек попадает на страницу входа с пометкой.
+ */
+export async function deleteAccountAction(
+  _prev: SettingsState,
+  form: FormData,
+): Promise<SettingsState> {
+  if (!(await isTrustedOrigin())) return { error: FOREIGN_ORIGIN };
+  if (form.get('confirm') !== 'on') {
+    return { error: 'Подтвердите, что понимаете: удаление нельзя отменить' };
+  }
+  const password = field(form, 'password', AUTH_LIMITS.PASSWORD_MAX + 1);
+  if (!password) return { error: 'Введите пароль' };
+  const token = await requireSessionToken(SETTINGS);
+  try {
+    await deleteAccount(token, password, await getClientIp());
+  } catch (error) {
+    redirectIfUnauthorized(error, SETTINGS);
+    if (error instanceof ApiError && error.code === 'LOGIN_THROTTLED' && error.userMessage) {
+      return { error: error.userMessage };
+    }
+    return {
+      error: apiErrorMessage(error, {
+        429: 'Слишком много попыток. Подождите минуту и попробуйте снова.',
+      }),
+    };
+  }
+  await clearSessionCookie();
+  redirect('/login?deleted=1');
 }
 
 export async function revokeSessionAction(
