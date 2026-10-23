@@ -7,6 +7,7 @@ import {
   type PriceEstimateDto,
   type PriceEstimatesDto,
   type PriceRangeDto,
+  type PriceSqmDto,
 } from '@agregator/shared';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -44,10 +45,34 @@ const WORK_AREA = Prisma.sql`CASE j.category::text ${Prisma.join(
  */
 @Injectable()
 export class PriceEstimatesService {
-  constructor(private readonly prisma: PrismaService) {}
+  /**
+   * Кэш на PRICE_ESTIMATES_CACHE_SEC секунд (по умолчанию 600; 0 — выключен): форма заказа
+   * спрашивает оценку при каждом открытии, а на 100 000 откликов каждый из четырёх запросов
+   * идёт около 0,2 с (docs/PRICE_ESTIMATES.md). Ключ — город из списка сервиса или «все
+   * города», поэтому размер кэша ограничен списком городов. Одновременные запросы ждут один
+   * расчёт; ошибка из кэша убирается.
+   */
+  private readonly cache = new Map<string, { at: number; value: Promise<PriceEstimatesDto> }>();
+  private readonly ttlMs: number;
 
-  async estimates(cityQuery?: string, now = new Date()): Promise<PriceEstimatesDto> {
+  constructor(private readonly prisma: PrismaService) {
+    const seconds = Number(process.env.PRICE_ESTIMATES_CACHE_SEC ?? 600);
+    this.ttlMs = Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 0;
+  }
+
+  estimates(cityQuery?: string): Promise<PriceEstimatesDto> {
     const city = cityQuery ? (findServiceCity(cityQuery)?.name ?? null) : null;
+    if (this.ttlMs === 0) return this.compute(city);
+    const key = city ?? '';
+    const hit = this.cache.get(key);
+    if (hit && Date.now() - hit.at < this.ttlMs) return hit.value;
+    const value = this.compute(city);
+    this.cache.set(key, { at: Date.now(), value });
+    value.catch(() => this.cache.delete(key));
+    return value;
+  }
+
+  async compute(city: string | null, now = new Date()): Promise<PriceEstimatesDto> {
     const since = new Date(now.getTime() - PRICE_ESTIMATE.WINDOW_DAYS * 86_400_000);
     const inCity = city ? Prisma.sql`AND j.city = ${city}` : null;
     const [local, all, localSqm, allSqm] = await Promise.all([
@@ -56,17 +81,18 @@ export class PriceEstimatesService {
       inCity ? this.query(since, inCity, true) : Promise.resolve([]),
       this.query(since, Prisma.empty, true),
     ]);
-    const sqm = (rows: Row[], category: JobCategory): PriceRangeDto | null => {
+    const sqm = (rows: Row[], category: JobCategory, where: string | null): PriceSqmDto | null => {
       const row = rows.find((r) => r.category === category);
-      return row ? this.range(row, PRICE_ESTIMATE.SQM_ROUND_TO) : null;
+      return row ? { ...this.range(row, PRICE_ESTIMATE.SQM_ROUND_TO), city: where } : null;
     };
+    // Цена за м² по городу, иначе по всем городам — независимо от того, где посчитана оценка
+    // заказа: в городе может хватать откликов вообще, но не хватать откликов с площадью.
+    const perSqm = (category: JobCategory) =>
+      sqm(localSqm, category, city) ?? sqm(allSqm, category, null);
     const byCategory = new Map<JobCategory, PriceEstimateDto>();
-    for (const row of all) {
-      byCategory.set(row.category, this.dto(row, null, sqm(allSqm, row.category)));
-    }
-    for (const row of local) {
-      byCategory.set(row.category, this.dto(row, city, sqm(localSqm, row.category)));
-    }
+    for (const row of all) byCategory.set(row.category, this.dto(row, null, perSqm(row.category)));
+    for (const row of local)
+      byCategory.set(row.category, this.dto(row, city, perSqm(row.category)));
     return { items: [...byCategory.values()].sort((a, b) => a.category.localeCompare(b.category)) };
   }
 
@@ -79,7 +105,7 @@ export class PriceEstimatesService {
     };
   }
 
-  private dto(row: Row, city: string | null, perSqm: PriceRangeDto | null): PriceEstimateDto {
+  private dto(row: Row, city: string | null, perSqm: PriceSqmDto | null): PriceEstimateDto {
     return { category: row.category, city, ...this.range(row, PRICE_ESTIMATE.ROUND_TO), perSqm };
   }
 

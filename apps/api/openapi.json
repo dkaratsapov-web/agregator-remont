@@ -2725,10 +2725,10 @@
           "perSqm": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/PriceRangeDto"
+                "$ref": "#/components/schemas/PriceSqmDto"
               }
             ],
-            "description": "Цена за м² по заказам с площадью работ в анкете; null — таких откликов мало",
+            "description": "Цена за м² по заказам с площадью работ в анкете: по городу или, если там мало, по всем городам; null — мало и там",
             "nullable": true,
             "type": "object"
           }
@@ -2760,12 +2760,17 @@
         ],
         "type": "object"
       },
-      "PriceRangeDto": {
+      "PriceSqmDto": {
         "additionalProperties": false,
         "properties": {
           "bids": {
             "description": "Сколько откликов учтено",
             "type": "integer"
+          },
+          "city": {
+            "description": "Город, по которому посчитана цена за м²; null — по всем городам",
+            "nullable": true,
+            "type": "string"
           },
           "high": {
             "description": "Верхняя четверть, ₽ (округлено)",
@@ -2784,7 +2789,8 @@
           "low",
           "median",
           "high",
-          "bids"
+          "bids",
+          "city"
         ],
         "type": "object"
       },

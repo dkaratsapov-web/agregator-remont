@@ -29,6 +29,7 @@ import {
   type PriceEstimateDto,
   type PriceEstimatesDto,
   type PriceRangeDto,
+  type PriceSqmDto,
   type AnalyticsMetric,
   type AnalyticsSeriesDto,
   type ContactExchangeDto,
@@ -731,6 +732,16 @@ export class PriceRangeSchema implements PriceRangeDto {
   @int({ description: 'Сколько откликов учтено' }) bids!: number;
 }
 
+@ApiSchema({ name: 'PriceSqmDto' })
+export class PriceSqmSchema extends PriceRangeSchema implements PriceSqmDto {
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Город, по которому посчитана цена за м²; null — по всем городам',
+  })
+  city!: string | null;
+}
+
 @ApiSchema({ name: 'PriceEstimateDto' })
 export class PriceEstimateSchema implements PriceEstimateDto {
   @ApiProperty({ enum: JOB_CATEGORIES, enumName: 'JobCategory' }) category!: JobCategory;
@@ -745,11 +756,12 @@ export class PriceEstimateSchema implements PriceEstimateDto {
   @int({ description: 'Верхняя четверть, ₽ (округлено)' }) high!: number;
   @int({ description: 'Сколько откликов учтено' }) bids!: number;
   @ApiProperty({
-    type: PriceRangeSchema,
+    type: PriceSqmSchema,
     nullable: true,
-    description: 'Цена за м² по заказам с площадью работ в анкете; null — таких откликов мало',
+    description:
+      'Цена за м² по заказам с площадью работ в анкете: по городу или, если там мало, по всем городам; null — мало и там',
   })
-  perSqm!: PriceRangeSchema | null;
+  perSqm!: PriceSqmSchema | null;
 }
 
 @ApiSchema({ name: 'PriceEstimatesDto' })

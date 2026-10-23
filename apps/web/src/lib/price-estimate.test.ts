@@ -34,12 +34,22 @@ describe('price estimate in the job form', () => {
   });
 
   it('adds the price per m² and, with an area, the sum for it', () => {
-    const tiling = { ...moscow, perSqm: { low: 1_200, median: 1_500, high: 1_800, bids: 9 } };
+    const tiling = {
+      ...moscow,
+      perSqm: { low: 1_200, median: 1_500, high: 1_800, bids: 9, city: 'Москва' },
+    };
     const plain = (text: string) => text.replace(/\u00a0|\u202f/g, ' ');
     expect(plain(estimateText(tiling))).toContain('За м² — обычно от 1 200 до 1 800 ₽.');
     expect(plain(estimateText(tiling, 12.5))).toContain(
       'для ваших 12,5 м² это около 15 000–22 500 ₽.',
     );
     expect(estimateText(moscow, 12.5)).not.toContain('За м²');
+    // Оценка по Москве, цена за м² — по всем городам: так и сказано.
+    const fallback = { ...tiling, perSqm: { ...tiling.perSqm, city: null } };
+    expect(plain(estimateText(fallback))).toContain('За м² по всем городам — обычно');
+  });
+
+  it('says it is statistics of bids, not a quote', () => {
+    expect(estimateText(all)).toMatch(/статистика откликов на сервисе, а не смета/);
   });
 });

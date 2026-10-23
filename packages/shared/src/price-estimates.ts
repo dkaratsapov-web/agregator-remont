@@ -70,10 +70,16 @@ export interface PriceEstimateDto {
   /** Сколько откликов учтено. */
   bids: number;
   /**
-   * Цена за м² по заказам, где в анкете указана площадь работ (PRICE_AREA_QUESTIONS), в том же
-   * городе или по всем городам, что и оценка. null — таких откликов мало.
+   * Цена за м² по заказам, где в анкете указана площадь работ (PRICE_AREA_QUESTIONS). Сначала
+   * по городу, при нехватке данных — по всем городам, даже если оценка заказа посчитана по
+   * городу: где именно, говорит perSqm.city. null — таких откликов мало и по всем городам.
    */
-  perSqm: PriceRangeDto | null;
+  perSqm: PriceSqmDto | null;
+}
+
+export interface PriceSqmDto extends PriceRangeDto {
+  /** Город, по которому посчитана цена за м²; null — по всем городам. */
+  city: string | null;
 }
 
 export interface PriceEstimatesDto {

@@ -47,11 +47,14 @@ export function estimateText(estimate: PriceEstimateDto, area: number | null = n
     'за последний год.';
   const sqm = estimate.perSqm;
   if (sqm) {
-    text += ` За м² — обычно от ${formatAmount(sqm.low)} до ${rub(sqm.high)}`;
+    // Цена за м² может быть посчитана по всем городам, когда оценка заказа — по городу.
+    const sqmWhere =
+      sqm.city === estimate.city ? '' : sqm.city ? ` в городе ${sqm.city}` : ' по всем городам';
+    text += ` За м²${sqmWhere} — обычно от ${formatAmount(sqm.low)} до ${rub(sqm.high)}`;
     text += area
       ? `: для ваших ${areaFormat.format(area)}\u00a0м² это около ` +
         `${formatAmount(roundEstimate(sqm.low * area))}–${rub(roundEstimate(sqm.high * area))}.`
       : '.';
   }
-  return text;
+  return `${text} Это статистика откликов на сервисе, а не смета: точную цену назовут мастера.`;
 }

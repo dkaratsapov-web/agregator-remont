@@ -1812,16 +1812,18 @@ export interface components {
             low: number;
             /** @description Медиана, ₽ (округлено) */
             median: number;
-            /** @description Цена за м² по заказам с площадью работ в анкете; null — таких откликов мало */
-            perSqm: components["schemas"]["PriceRangeDto"] | null;
+            /** @description Цена за м² по заказам с площадью работ в анкете: по городу или, если там мало, по всем городам; null — мало и там */
+            perSqm: components["schemas"]["PriceSqmDto"] | null;
         };
         PriceEstimatesDto: {
             /** @description Только категории с достаточными данными */
             items: components["schemas"]["PriceEstimateDto"][];
         };
-        PriceRangeDto: {
+        PriceSqmDto: {
             /** @description Сколько откликов учтено */
             bids: number;
+            /** @description Город, по которому посчитана цена за м²; null — по всем городам */
+            city: string | null;
             /** @description Верхняя четверть, ₽ (округлено) */
             high: number;
             /** @description Нижняя четверть, ₽ (округлено) */

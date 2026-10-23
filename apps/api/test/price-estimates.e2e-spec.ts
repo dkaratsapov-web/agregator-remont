@@ -14,6 +14,8 @@ describe('Price estimates from bids (e2e)', () => {
 
   beforeAll(async () => {
     process.env.AUTH_RATE_LIMIT_PER_MIN = '1000';
+    // Каждый тест меняет данные: кэш оценок выключен (отдельный тест ниже — с кэшем).
+    process.env.PRICE_ESTIMATES_CACHE_SEC = '0';
     app = await createTestApp();
   });
 
@@ -31,6 +33,7 @@ describe('Price estimates from bids (e2e)', () => {
     await app.close();
     await prisma.$disconnect();
     delete process.env.AUTH_RATE_LIMIT_PER_MIN;
+    delete process.env.PRICE_ESTIMATES_CACHE_SEC;
   });
 
   let ownerId: string;
@@ -192,7 +195,64 @@ describe('Price estimates from bids (e2e)', () => {
 
     const [flooring] = (await estimates(viewer.auth, '?city=Москва')).items;
     expect(flooring).toMatchObject({ category: 'FLOORING', city: 'Москва', bids: 7 });
-    expect(flooring.perSqm).toEqual({ low: 1_000, median: 1_500, high: 1_500, bids: 5 });
+    expect(flooring.perSqm).toEqual({
+      low: 1_000,
+      median: 1_500,
+      high: 1_500,
+      bids: 5,
+      city: 'Москва',
+    });
+  });
+
+  it('price per m² falls back to all cities when the city has bids but too few with an area', async () => {
+    await setup();
+    const viewer = await signUp(app, 'CUSTOMER');
+    // В Москве откликов хватает на оценку заказа, но у заказов нет площади.
+    await enough('FLOORING', 'Москва');
+    // В Твери — заказы с площадью: 5 откликов, 3 заказа, 3 мастера.
+    const area = (n: number) => ({ details: { covering: 'laminate', area: n } });
+    const [a, b, c] = [
+      await job('FLOORING', 'Тверь', area(10)),
+      await job('FLOORING', 'Тверь', area(10)),
+      await job('FLOORING', 'Тверь', area(10)),
+    ];
+    for (const [jobId, master, price] of [
+      [a, 0, 10_000],
+      [a, 1, 12_000],
+      [b, 2, 14_000],
+      [c, 0, 16_000],
+      [c, 1, 18_000],
+    ] as const) {
+      await bid(jobId, masters[master], price);
+    }
+    const [inMoscow] = (await estimates(viewer.auth, '?city=Москва')).items;
+    expect(inMoscow).toMatchObject({ category: 'FLOORING', city: 'Москва', bids: 5 });
+    // Оценка заказа — по Москве, цена за м² — по всем городам, и ответ это говорит.
+    expect(inMoscow.perSqm).toMatchObject({ city: null, bids: 5, median: 1_400 });
+  });
+
+  it('cached for PRICE_ESTIMATES_CACHE_SEC per city', async () => {
+    await setup();
+    const viewer = await signUp(app, 'CUSTOMER');
+    process.env.PRICE_ESTIMATES_CACHE_SEC = '600';
+    const cached = await createTestApp();
+    try {
+      const get = async (query = '') =>
+        (
+          await request(cached.getHttpServer())
+            .get(`/v1/price-estimates${query}`)
+            .set(viewer.auth)
+            .expect(200)
+        ).body as PriceEstimatesDto;
+      expect((await get()).items).toEqual([]);
+      await enough('TILING');
+      // Те же «все города» — из кэша; другой город — свой расчёт.
+      expect((await get()).items).toEqual([]);
+      expect((await get('?city=Москва')).items).toHaveLength(1);
+    } finally {
+      await cached.close();
+      process.env.PRICE_ESTIMATES_CACHE_SEC = '0';
+    }
   });
 
   it('needs a session; a too long city is 400', async () => {

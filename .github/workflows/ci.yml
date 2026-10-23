@@ -147,6 +147,9 @@ jobs:
           WEB_TRUST_PROXY_HOPS: '1'
           WEB_PUBLIC_ORIGIN: http://localhost:3000
           AUTH_RATE_LIMIT_PER_MIN: '3'
+          # Сценарии создают отклики и сразу проверяют оценку цены: кэш оценок выключен
+          # (на сервере — 10 минут, docs/PRICE_ESTIMATES.md).
+          PRICE_ESTIMATES_CACHE_SEC: '0'
         run: |
           # Логин и пароль тестировщика (страница /gate) проверяет web: хеш тот же, что в deploy/.env.
           export BASIC_AUTH_USER=tester
