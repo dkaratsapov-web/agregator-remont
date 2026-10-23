@@ -93,7 +93,22 @@
           "REVIEWS_LEFT",
           "CONTACTS_SHARED"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "open",
+        "x-extensible-enum": [
+          "CUSTOMERS_REGISTERED",
+          "CONTRACTORS_REGISTERED",
+          "CATALOG_VIEWS",
+          "JOB_VIEWS",
+          "DRAFTS_STARTED",
+          "JOBS_PUBLISHED",
+          "BIDS_PLACED",
+          "CONTRACTORS_CHOSEN",
+          "MESSAGES_SENT",
+          "JOBS_COMPLETED",
+          "REVIEWS_LEFT",
+          "CONTACTS_SHARED"
+        ]
       },
       "AnalyticsSeriesDto": {
         "additionalProperties": false,
@@ -183,7 +198,12 @@
           "OTHER_ACCEPTED",
           "JOB_CLOSED"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "open",
+        "x-extensible-enum": [
+          "OTHER_ACCEPTED",
+          "JOB_CLOSED"
+        ]
       },
       "BidStatus": {
         "enum": [
@@ -192,7 +212,8 @@
           "REJECTED",
           "WITHDRAWN"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "BlockDto": {
         "additionalProperties": false,
@@ -377,14 +398,22 @@
           "LINK",
           "MESSENGER"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "open",
+        "x-extensible-enum": [
+          "PHONE",
+          "EMAIL",
+          "LINK",
+          "MESSENGER"
+        ]
       },
       "ContentFlagTarget": {
         "enum": [
           "MESSAGE",
           "BID"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "ContractorProfileDto": {
         "additionalProperties": false,
@@ -601,7 +630,8 @@
             "enum": [
               true
             ],
-            "type": "boolean"
+            "type": "boolean",
+            "x-enum-kind": "closed"
           },
           "name": {
             "maxLength": 80,
@@ -682,7 +712,8 @@
         "enum": [
           "RUB"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "ErrorResponse": {
         "additionalProperties": false,
@@ -791,7 +822,16 @@
           "OUT_OF_RANGE",
           "UNKNOWN_FIELD"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "open",
+        "x-extensible-enum": [
+          "INVALID",
+          "REQUIRED",
+          "TOO_SHORT",
+          "TOO_LONG",
+          "OUT_OF_RANGE",
+          "UNKNOWN_FIELD"
+        ]
       },
       "Health": {
         "additionalProperties": false,
@@ -800,7 +840,8 @@
             "enum": [
               "ok"
             ],
-            "type": "string"
+            "type": "string",
+            "x-enum-kind": "closed"
           }
         },
         "required": [
@@ -921,7 +962,20 @@
           "DESIGN",
           "OTHER"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "open",
+        "x-extensible-enum": [
+          "REPAIR_TURNKEY",
+          "PLUMBING",
+          "ELECTRICAL",
+          "TILING",
+          "FINISHING",
+          "FLOORING",
+          "ROOFING",
+          "WINDOWS_DOORS",
+          "DESIGN",
+          "OTHER"
+        ]
       },
       "JobCloseOutcome": {
         "description": "Исход закрытого заказа; null — не закрыт или закрыт до появления поля",
@@ -929,7 +983,8 @@
           "COMPLETED",
           "CANCELLED"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "JobDraftDto": {
         "additionalProperties": false,
@@ -1437,7 +1492,8 @@
           "IN_PROGRESS",
           "CLOSED"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "LeadDto": {
         "additionalProperties": false,
@@ -1480,7 +1536,8 @@
             "enum": [
               true
             ],
-            "type": "boolean"
+            "type": "boolean",
+            "x-enum-kind": "closed"
           }
         },
         "required": [
@@ -1500,7 +1557,12 @@
               "sber",
               "tbank"
             ],
-            "type": "string"
+            "type": "string",
+            "x-enum-kind": "open",
+            "x-extensible-enum": [
+              "sber",
+              "tbank"
+            ]
           }
         },
         "required": [
@@ -1537,7 +1599,8 @@
             "enum": [
               true
             ],
-            "type": "boolean"
+            "type": "boolean",
+            "x-enum-kind": "closed"
           },
           "ids": {
             "description": "Перечисленные уведомления",
@@ -1826,7 +1889,24 @@
           "JOB_CLOSED",
           "MESSAGE"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "open",
+        "x-extensible-enum": [
+          "BID_RECEIVED",
+          "BID_WITHDRAWN",
+          "BID_ACCEPTED",
+          "BID_REJECTED",
+          "PLAN_PROPOSED",
+          "PLAN_APPROVED",
+          "PLAN_RETURNED",
+          "PLAN_AUTHOR_CHANGED",
+          "STAGE_SUBMITTED",
+          "STAGE_ACCEPTED",
+          "STAGE_REWORK",
+          "CONTRACTOR_QUIT",
+          "JOB_CLOSED",
+          "MESSAGE"
+        ]
       },
       "NotificationsPageDto": {
         "additionalProperties": false,
@@ -2037,7 +2117,12 @@
               "sber",
               "tbank"
             ],
-            "type": "string"
+            "type": "string",
+            "x-enum-kind": "open",
+            "x-extensible-enum": [
+              "sber",
+              "tbank"
+            ]
           },
           "title": {
             "type": "string"
@@ -2572,7 +2657,8 @@
           "OWNER",
           "CONTRACTOR"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "PlanStatus": {
         "enum": [
@@ -2580,7 +2666,8 @@
           "PROPOSED",
           "APPROVED"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "PlanVersionDto": {
         "additionalProperties": false,
@@ -2814,7 +2901,15 @@
           "FAKE",
           "OTHER"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "open",
+        "x-extensible-enum": [
+          "SPAM",
+          "FRAUD",
+          "ABUSE",
+          "FAKE",
+          "OTHER"
+        ]
       },
       "ReportReceivedDto": {
         "additionalProperties": false,
@@ -2839,7 +2934,8 @@
           "RESOLVED",
           "DISMISSED"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "ReportSubjectDto": {
         "additionalProperties": false,
@@ -2884,7 +2980,8 @@
           "MESSAGE",
           "BID"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "ResolveFlagDto": {
         "additionalProperties": false,
@@ -2894,7 +2991,8 @@
               "RESOLVED",
               "DISMISSED"
             ],
-            "type": "string"
+            "type": "string",
+            "x-enum-kind": "closed"
           }
         },
         "required": [
@@ -2915,7 +3013,8 @@
               "RESOLVED",
               "DISMISSED"
             ],
-            "type": "string"
+            "type": "string",
+            "x-enum-kind": "closed"
           }
         },
         "required": [
@@ -3100,7 +3199,8 @@
           "CUSTOMER",
           "CONTRACTOR"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "SessionDto": {
         "additionalProperties": false,
@@ -3181,14 +3281,16 @@
           "ACCEPTED",
           "REWORK"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "UiMotion": {
         "enum": [
           "system",
           "reduced"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "UiPreferences": {
         "additionalProperties": false,
@@ -3228,7 +3330,8 @@
           "normal",
           "large"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "UiTheme": {
         "enum": [
@@ -3236,7 +3339,8 @@
           "dark",
           "system"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "UpdateJobDto": {
         "additionalProperties": false,
@@ -3514,7 +3618,8 @@
           "CONTRACTOR",
           "ADMIN"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       }
     },
     "securitySchemes": {
@@ -3528,7 +3633,7 @@
   },
   "info": {
     "contact": {},
-    "description": "Публичный контракт API маркетплейса. Ошибки — в текущем формате NestJS.",
+    "description": "Публичный контракт API маркетплейса. Ошибки — с машинным code (ADR 0002). Перечни помечены x-enum-kind: open — может пополняться, closed — нет (ADR 0001).",
     "title": "Agregator Remont API",
     "version": "1.0.0"
   },

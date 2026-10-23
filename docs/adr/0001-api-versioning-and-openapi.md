@@ -60,7 +60,25 @@ API уже версионирован префиксом `/v1`. Единстве
 
 Состояние (PR #47): формат ошибок — сделан (ADR 0002, «Реализация»); список откликов
 владельца `GET /v1/me/jobs/:jobId/bids` — `Paginated<JobBidDto>` (`page`, `limit` до 50, от
-ранних к поздним), web показывает страницы по 50. Осталась разметка открытых/закрытых enum'ов.
+ранних к поздним), web показывает страницы по 50. Разметка enum'ов — сделана (ниже). Все три
+пункта закрыты.
+
+**Разметка enum'ов (PR #47).** Решение по каждому перечню — `packages/shared/src/api-enums.ts`.
+В `openapi.json` у каждого именованного enum есть `x-enum-kind: open | closed`, у открытых ещё
+`x-extensible-enum`. Новый именованный enum без решения останавливает сборку `openapi.json`
+(`markEnums`, тест `apps/api/src/openapi/document.spec.ts`).
+
+- **Открытые:** `JobCategory`, `NotificationKind`, `ContentFlagKind`, `ReportReason`,
+  `BidRejectReason`, `AnalyticsMetric`, `FieldErrorCode`, а также банки входа
+  (`OAuthProviderDto.id`, `LinkedBankDto.provider`). Клиент показывает незнакомое значение
+  нейтрально («Другое», общий текст уведомления) и не строит на нём логику.
+- **Закрытые:** статусы и исходы (`JobStatus`, `JobCloseOutcome`, `BidStatus`, `PlanStatus`,
+  `StageStatus`), роли и стороны (`UserRole`, `SelfServiceRole`, `PlanParty`), жалобы
+  (`ReportStatus`, `ReportTarget`, `ContentFlagTarget`), `Currency`, оформление (`UiTheme`,
+  `UiScale`, `UiMotion`). Безымянные перечни внутри схем — закрытые, кроме перечисленных выше.
+- **Web** выходит из того же коммита, что и API, и знает все значения. Запасной вариант для
+  незнакомых значений обязателен для мобильного приложения: его старые сборки живут
+  месяцами.
 
 ### 5. Депрекация, поддержка старых версий и вывод из обращения
 
