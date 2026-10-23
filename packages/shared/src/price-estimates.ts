@@ -21,6 +21,15 @@ export const PRICE_ESTIMATE = {
   ROUND_TO: 500,
   /** Цена за м² округляется до стольких рублей. */
   SQM_ROUND_TO: 50,
+  /**
+   * Грубый ориентир (rough): откликов меньше или заказов меньше. Отклики на один заказ похожи
+   * друг на друга, а квартили по малой выборке неустойчивы (аудит 23.10.2026, F-04).
+   */
+  ROUGH_BELOW_BIDS: 20,
+  ROUGH_BELOW_JOBS: 8,
+  /** Цена за м² — только по заказам не меньше этой площади: на мелких работах цена за метр
+   *  не показательна и искажает выборку. */
+  SQM_MIN_AREA: 3,
 } as const;
 
 /**
@@ -55,6 +64,8 @@ export interface PriceRangeDto {
   median: number;
   high: number;
   bids: number;
+  /** Мало данных (PRICE_ESTIMATE.ROUGH_BELOW_*): показывать как грубый ориентир. */
+  rough: boolean;
 }
 
 export interface PriceEstimateDto {
@@ -69,6 +80,8 @@ export interface PriceEstimateDto {
   high: number;
   /** Сколько откликов учтено. */
   bids: number;
+  /** Мало данных (PRICE_ESTIMATE.ROUGH_BELOW_*): показывать как грубый ориентир. */
+  rough: boolean;
   /**
    * Цена за м² по заказам, где в анкете указана площадь работ (PRICE_AREA_QUESTIONS). Сначала
    * по городу, при нехватке данных — по всем городам, даже если оценка заказа посчитана по

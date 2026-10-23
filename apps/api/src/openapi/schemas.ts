@@ -730,6 +730,7 @@ export class PriceRangeSchema implements PriceRangeDto {
   @int({ description: 'Медиана, ₽ (округлено)' }) median!: number;
   @int({ description: 'Верхняя четверть, ₽ (округлено)' }) high!: number;
   @int({ description: 'Сколько откликов учтено' }) bids!: number;
+  @ApiProperty({ description: 'Мало данных: показывать как грубый ориентир' }) rough!: boolean;
 }
 
 @ApiSchema({ name: 'PriceSqmDto' })
@@ -755,6 +756,7 @@ export class PriceEstimateSchema implements PriceEstimateDto {
   @int({ description: 'Медиана, ₽ (округлено)' }) median!: number;
   @int({ description: 'Верхняя четверть, ₽ (округлено)' }) high!: number;
   @int({ description: 'Сколько откликов учтено' }) bids!: number;
+  @ApiProperty({ description: 'Мало данных: показывать как грубый ориентир' }) rough!: boolean;
   @ApiProperty({
     type: PriceSqmSchema,
     nullable: true,

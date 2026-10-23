@@ -1814,6 +1814,8 @@ export interface components {
             median: number;
             /** @description Цена за м² по заказам с площадью работ в анкете: по городу или, если там мало, по всем городам; null — мало и там */
             perSqm: components["schemas"]["PriceSqmDto"] | null;
+            /** @description Мало данных: показывать как грубый ориентир */
+            rough: boolean;
         };
         PriceEstimatesDto: {
             /** @description Только категории с достаточными данными */
@@ -1830,6 +1832,8 @@ export interface components {
             low: number;
             /** @description Медиана, ₽ (округлено) */
             median: number;
+            /** @description Мало данных: показывать как грубый ориентир */
+            rough: boolean;
         };
         PublicContractorDto: {
             completedJobs: number;
@@ -3582,7 +3586,7 @@ export interface operations {
                 budgetTo?: number;
                 /** @description Опубликован за последние N дней */
                 days?: 1 | 7 | 30;
-                /** @description Только заказы без откликов (отозванные и скрытые не считаются) */
+                /** @description Только заказы без откликов (отозванные, скрытые и отклики заблокированных мастеров не считаются) */
                 noBids?: boolean;
                 /** @description new — сначала новые; budget_desc — по нижней границе бюджета, budget_asc — по верхней; без бюджета в конце */
                 sort?: components["schemas"]["JobSort"];

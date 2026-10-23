@@ -424,6 +424,24 @@ describe('Notifications (e2e)', () => {
       void contractor;
     });
 
+    it('a job hidden by a moderator keeps its title from everyone but the owner (audit F-07)', async () => {
+      const owner = await signUp(app, 'CUSTOMER');
+      const contractor = await signUp(app, 'CONTRACTOR');
+      const jobId = await openJob(owner);
+      await prisma.notification.createMany({
+        data: [
+          { userId: owner.id, jobId, kind: 'BID_RECEIVED' as const },
+          { userId: contractor.id, jobId, kind: 'BID_REJECTED' as const },
+        ],
+      });
+      await prisma.job.update({ where: { id: jobId }, data: { hiddenAt: new Date() } });
+      const [mine] = (await list(owner)).body.items;
+      expect(mine.jobTitle).toBe(jobBody.title);
+      const [theirs] = (await list(contractor)).body.items;
+      expect(theirs.jobTitle).toBe('Заказ скрыт модератором');
+      expect(JSON.stringify((await list(contractor)).body)).not.toContain(jobBody.title);
+    });
+
     it('notifications disappear with the job and with the user', async () => {
       const owner = await signUp(app, 'CUSTOMER');
       const contractor = await signUp(app, 'CONTRACTOR');

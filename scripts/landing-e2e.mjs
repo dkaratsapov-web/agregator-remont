@@ -90,6 +90,19 @@ try {
     check('landing is public (200)', res?.status() === 200, `got ${res?.status()}`);
     check('flight video loads', video);
     check('landing title', (await page.title()).includes('Гарантыч'));
+    // Сайт не обещает безопасной сделки, удержания денег и арбитража (аудит F-01, Issue #58).
+    const copy = (await page.locator('body').textContent()) ?? '';
+    const promises = [
+      /гарантом качества/i,
+      /без потери ваших денег/i,
+      /деньги (?:за этап )?хранятся/i,
+      /деньги будут ждать/i,
+    ].filter((re) => re.test(copy));
+    check('landing makes no payment promises', promises.length === 0, promises.join(', '));
+    check(
+      'landing names payments as work in progress',
+      copy.includes('Оплата через сервис — в разработке'),
+    );
     for (let y = 0; y <= 12000; y += 800) {
       await page.evaluate((v) => window.scrollTo(0, v), y);
       await page.waitForTimeout(80);

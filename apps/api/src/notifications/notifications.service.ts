@@ -18,8 +18,11 @@ const NOTIFICATION_SELECT = {
   data: true,
   readAt: true,
   createdAt: true,
-  job: { select: { title: true, ownerId: true } },
+  job: { select: { title: true, ownerId: true, hiddenAt: true } },
 } as const;
+
+/** Название скрытого модератором заказа видит только владелец (аудит 23.10.2026, F-07). */
+export const HIDDEN_JOB_TITLE = 'Заказ скрыт модератором';
 type NotificationRow = Prisma.NotificationGetPayload<{ select: typeof NOTIFICATION_SELECT }>;
 
 function toNotificationDto(userId: string, row: NotificationRow): NotificationDto {
@@ -27,7 +30,7 @@ function toNotificationDto(userId: string, row: NotificationRow): NotificationDt
     id: row.id,
     kind: row.kind,
     jobId: row.jobId,
-    jobTitle: row.job.title,
+    jobTitle: row.job.hiddenAt && row.job.ownerId !== userId ? HIDDEN_JOB_TITLE : row.job.title,
     party: row.job.ownerId === userId ? 'OWNER' : 'CONTRACTOR',
     count: row.count,
     data: row.data as NotificationData,

@@ -2731,6 +2731,10 @@
             "description": "Цена за м² по заказам с площадью работ в анкете: по городу или, если там мало, по всем городам; null — мало и там",
             "nullable": true,
             "type": "object"
+          },
+          "rough": {
+            "description": "Мало данных: показывать как грубый ориентир",
+            "type": "boolean"
           }
         },
         "required": [
@@ -2740,6 +2744,7 @@
           "median",
           "high",
           "bids",
+          "rough",
           "perSqm"
         ],
         "type": "object"
@@ -2783,6 +2788,10 @@
           "median": {
             "description": "Медиана, ₽ (округлено)",
             "type": "integer"
+          },
+          "rough": {
+            "description": "Мало данных: показывать как грубый ориентир",
+            "type": "boolean"
           }
         },
         "required": [
@@ -2790,6 +2799,7 @@
           "median",
           "high",
           "bids",
+          "rough",
           "city"
         ],
         "type": "object"
@@ -5922,7 +5932,7 @@
             }
           },
           {
-            "description": "Только заказы без откликов (отозванные и скрытые не считаются)",
+            "description": "Только заказы без откликов (отозванные, скрытые и отклики заблокированных мастеров не считаются)",
             "in": "query",
             "name": "noBids",
             "required": false,
