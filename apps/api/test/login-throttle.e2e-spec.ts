@@ -116,6 +116,32 @@ describe('Login throttling per address and scheduled cleanup (e2e, release gate 
     ).toBe(1);
   });
 
+  it('the current password in account settings shares the series with login', async () => {
+    const user = await signUp(app, 'CUSTOMER');
+    const email = await emailOf(user.id);
+    const change = (currentPassword: string) =>
+      http()
+        .post('/v1/me/password')
+        .set(user.auth)
+        .send({ currentPassword, newPassword: 'brand-new-password-1' });
+    // Тот, кто завладел открытой сессией, подбирает пароль через смену: серия та же, что у входа.
+    for (let i = 0; i < LOGIN_THROTTLE.FREE_FAILURES - 1; i += 1) {
+      expect((await change(WRONG)).status).toBe(400);
+    }
+    expect((await login(email, WRONG)).status).toBe(401);
+    const throttled = await change(PASSWORD);
+    expect(throttled.status).toBe(429);
+    expect(throttled.body.code).toBe('LOGIN_THROTTLED');
+    expect(throttled.body.message).toMatch(/текущий пароль/);
+    expect(Number(throttled.headers['retry-after'])).toBe(LOGIN_THROTTLE.BASE_DELAY_S);
+    expect((await login(email, PASSWORD)).status).toBe(429);
+    // Во время паузы пароль не сменился.
+    await rewind(email, LOGIN_THROTTLE.BASE_DELAY_S + 1);
+    await change(PASSWORD).expect(204);
+    expect(await prisma.loginFailure.count()).toBe(0);
+    await login(email, 'brand-new-password-1').expect(200);
+  });
+
   it('scheduled cleanup removes expired sessions, old reset links and finished series only', async () => {
     const user = await signUp(app, 'CUSTOMER');
     const now = new Date();

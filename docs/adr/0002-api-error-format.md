@@ -64,6 +64,7 @@ interface FieldError {
 | 409 | `BID_NOT_PENDING` | отзыв или выбор отклика не в статусе «на рассмотрении» | нет |
 | 413 | `PAYLOAD_TOO_LARGE` | тело запроса больше лимита | нет |
 | 429 | `RATE_LIMITED` | лимит частоты (`default`, `auth`, `write`) | да, не раньше `Retry-After` |
+| 429 | `LOGIN_THROTTLED` | пауза после серии неверных паролей к адресу: вход и текущий пароль при смене (`docs/SECURITY.md`, release gate 2) | да, не раньше `Retry-After` |
 | 429 | `DAILY_QUOTA_EXCEEDED` | суточная квота заказов/откликов | автоматически нет; `Retry-After` — когда квота освободится |
 | 500 | `INTERNAL` | всё непредвиденное; текст общий, без деталей | GET — с паузой; POST — только с `Idempotency-Key` |
 | 503 | `UNAVAILABLE` | БД или зависимость недоступна | как 500 |

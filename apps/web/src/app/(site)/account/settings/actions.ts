@@ -18,6 +18,7 @@ import {
   requireSessionToken,
 } from '@/lib/action-helpers';
 import {
+  ApiError,
   changePassword,
   revokeOtherSessions,
   revokeSession,
@@ -103,6 +104,10 @@ export async function passwordAction(_prev: SettingsState, form: FormData): Prom
     await changePassword(token, { currentPassword, newPassword }, await getClientIp());
   } catch (error) {
     redirectIfUnauthorized(error, SETTINGS);
+    // Пауза после серии неверных паролей (общая со входом): API называет, сколько ждать.
+    if (error instanceof ApiError && error.code === 'LOGIN_THROTTLED' && error.userMessage) {
+      return { error: error.userMessage };
+    }
     return {
       error: apiErrorMessage(error, {
         429: 'Слишком много попыток. Подождите минуту и попробуйте снова.',

@@ -40,12 +40,11 @@ export class QuotaExceeded extends ApiError {
 
 /** Слишком много неверных паролей к одному адресу подряд: пауза перед следующей попыткой. */
 export class LoginThrottled extends ApiError {
-  constructor(seconds: number) {
-    super(
-      429,
-      'LOGIN_THROTTLED',
-      `Слишком много неверных попыток входа для этого адреса. Повторите через ${seconds} с или восстановите пароль.`,
-    );
+  constructor(
+    seconds: number,
+    message = `Слишком много неверных попыток входа для этого адреса. Повторите через ${seconds} с или восстановите пароль.`,
+  ) {
+    super(429, 'LOGIN_THROTTLED', message);
     this.retryAfterSeconds = seconds;
   }
 }

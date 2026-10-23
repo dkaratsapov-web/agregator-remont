@@ -129,6 +129,16 @@ describe('passwordAction', () => {
 
     fetchMock.mockResolvedValueOnce(json(429, {}));
     expect((await passwordAction({}, form(fields))).error).toMatch(/Слишком много попыток/);
+    // Пауза после неверных паролей: текст API с числом секунд.
+    fetchMock.mockResolvedValueOnce(
+      json(429, {
+        statusCode: 429,
+        code: 'LOGIN_THROTTLED',
+        error: 'Too Many Requests',
+        message: 'Слишком много неверных попыток ввести текущий пароль. Повторите через 8 с.',
+      }),
+    );
+    expect((await passwordAction({}, form(fields))).error).toMatch(/Повторите через 8 с/);
     fetchMock.mockResolvedValueOnce(json(400, { message: 'Неверный текущий пароль' }));
     expect((await passwordAction({}, form(fields))).error).toBe('Неверный текущий пароль');
   });
