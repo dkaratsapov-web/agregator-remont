@@ -132,6 +132,60 @@ describe('Account export and deletion (e2e)', () => {
     });
   });
 
+  describe('export of every section', () => {
+    it('contractor: bids, messages, reviews, favorites, reports and bank logins; no customer data', async () => {
+      const customer = await register('CUSTOMER');
+      const contractor = await register('CONTRACTOR');
+      const jobId = await openJob(customer);
+      const bidId = await bid(contractor, jobId);
+      await accept(customer, jobId, bidId);
+      await http()
+        .post(`/v1/jobs/${jobId}/messages`)
+        .set(contractor.auth)
+        .send({ body: 'Начинаю завтра в девять.' })
+        .expect(200);
+      await http()
+        .post(`/v1/me/jobs/${jobId}/close`)
+        .set(customer.auth)
+        .send({ outcome: 'COMPLETED' })
+        .expect(200);
+      await http()
+        .post(`/v1/me/jobs/${jobId}/review`)
+        .set(customer.auth)
+        .send({ rating: 5, text: 'Всё аккуратно.' })
+        .expect(201);
+      const other = await openJob(customer);
+      await http().put(`/v1/me/favorites/${other}`).set(contractor.auth).expect(200);
+      await http()
+        .post('/v1/reports')
+        .set(contractor.auth)
+        .send({ targetType: 'JOB', targetId: other, reason: 'SPAM', comment: 'Похоже на рекламу' })
+        .expect(201);
+      await prisma.externalAccount.create({
+        data: { provider: 'SBER', subject: `export-${contractor.id}`, userId: contractor.id },
+      });
+
+      const data = (await http().get('/v1/me/export').set(contractor.auth).expect(200))
+        .body as AccountExportDto;
+      expect(data.bids).toMatchObject([{ id: bidId, jobId, status: 'ACCEPTED' }]);
+      expect(data.messages).toMatchObject([{ jobId, body: 'Начинаю завтра в девять.', photos: 0 }]);
+      expect(data.reviewsReceived).toMatchObject([{ jobId, rating: 5, text: 'Всё аккуратно.' }]);
+      expect(data.reviewsWritten).toEqual([]);
+      expect(data.favorites).toMatchObject([{ jobId: other }]);
+      expect(data.reports).toMatchObject([{ targetType: 'JOB', reason: 'SPAM' }]);
+      expect(data.bankLogins).toMatchObject([{ provider: 'SBER' }]);
+      // Отзыв о себе без автора, заказы заказчика — не выгрузка мастера.
+      const text = JSON.stringify(data);
+      expect(text).not.toContain(customer.id);
+      expect(text).not.toContain(customer.email);
+      expect(text).not.toContain(`export-${contractor.id}`);
+
+      const written = (await http().get('/v1/me/export').set(customer.auth).expect(200))
+        .body as AccountExportDto;
+      expect(written.reviewsWritten).toMatchObject([{ jobId, rating: 5 }]);
+    });
+  });
+
   describe('delete', () => {
     it('needs a session and the current password', async () => {
       const customer = await register('CUSTOMER');
