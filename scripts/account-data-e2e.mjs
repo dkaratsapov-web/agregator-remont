@@ -27,14 +27,19 @@ const contextFor = async (who, options = {}) => {
   return context;
 };
 const me = (who) => fetch(`${API}/v1/me`, { headers: who.auth }).then((r) => r.status);
+// Удаление идёт под строгим лимитом входа (в CI — 3 в минуту на адрес): у каждого режима свой
+// адрес, как у разных людей; сайт передаёт его в API (WEB_TRUST_PROXY_HOPS=1).
+const ipFor = (mode, part) => `10.254.${process.pid % 250}.${mode * 10 + part}`;
 
 try {
-  for (const [name, options] of [
+  for (const [mode, [name, options]] of [
     ['with JS', {}],
     ['without JS', { javaScriptEnabled: false }],
-  ]) {
+  ].entries()) {
     const who = await registerViaApi('CUSTOMER');
-    const page = await (await contextFor(who, options)).newPage();
+    const page = await (
+      await contextFor(who, { ...options, extraHTTPHeaders: { 'X-Forwarded-For': ipFor(mode, 1) } })
+    ).newPage();
     await page.goto(`${WEB}/account/settings#data`, { waitUntil: 'networkidle' });
 
     // Скачивание: файл с именем от API, внутри свой email и нет хеша пароля.
@@ -88,7 +93,7 @@ try {
     check(`${name}: the session no longer works`, (await me(who)) === 401);
     const login = await fetch(`${API}/v1/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ipFor(mode, 2) },
       body: JSON.stringify({ email: who.user.email, password: PASSWORD }),
     });
     check(`${name}: the old email and password do not log in`, login.status === 401);
