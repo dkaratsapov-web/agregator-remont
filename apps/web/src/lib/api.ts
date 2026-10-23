@@ -3,6 +3,8 @@ import type {
   AdminUserDto,
   AnalyticsDto,
   PriceEstimatesDto,
+  JobPostedDays,
+  JobSort,
   AnalyticsPeriod,
   AuthSessionDto,
   ContactExchangeDto,
@@ -122,12 +124,22 @@ export async function getJobs(params: {
   status?: JobStatus;
   city?: string;
   q?: string;
+  budgetFrom?: number;
+  budgetTo?: number;
+  days?: JobPostedDays;
+  noBids?: boolean;
+  sort?: JobSort;
 }): Promise<Paginated<JobDto>> {
   const query = new URLSearchParams({ page: String(params.page), limit: String(params.limit) });
   if (params.category) query.set('category', params.category);
   if (params.status) query.set('status', params.status);
   if (params.city) query.set('city', params.city);
   if (params.q) query.set('q', params.q);
+  if (params.budgetFrom !== undefined) query.set('budgetFrom', String(params.budgetFrom));
+  if (params.budgetTo !== undefined) query.set('budgetTo', String(params.budgetTo));
+  if (params.days) query.set('days', String(params.days));
+  if (params.noBids) query.set('noBids', 'true');
+  if (params.sort) query.set('sort', params.sort);
 
   const res = await request(`/v1/jobs?${query.toString()}`);
   if (!res.ok) {

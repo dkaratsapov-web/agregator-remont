@@ -9,11 +9,16 @@ import { Pagination } from '@/components/pagination';
 import { getJobs } from '@/lib/api';
 import {
   jobsHref,
+  activeFilterCount,
+  parseBudget,
   parseCategory,
   parseCity,
-  parseOpenOnly,
+  parseNoBids,
   parsePage,
+  parsePostedDays,
   parseQuery,
+  parseSort,
+  parseStatus,
   type JobsFilters,
 } from '@/lib/search-params';
 
@@ -45,9 +50,22 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
     category: parseCategory(params.category),
     q: parseQuery(params.q),
     city: parseCity(params.city),
-    openOnly: parseOpenOnly(params.open),
+    status: parseStatus(params.status, params.open),
+    budgetFrom: parseBudget(params.budgetFrom),
+    budgetTo: parseBudget(params.budgetTo),
+    days: parsePostedDays(params.days),
+    noBids: parseNoBids(params.noBids),
+    sort: parseSort(params.sort),
   };
-  const searching = Boolean(filters.q || filters.city || filters.openOnly || filters.category);
+  // «От» больше «до» — меняем местами, а не показываем ошибку.
+  if (
+    filters.budgetFrom !== undefined &&
+    filters.budgetTo !== undefined &&
+    filters.budgetFrom > filters.budgetTo
+  ) {
+    [filters.budgetFrom, filters.budgetTo] = [filters.budgetTo, filters.budgetFrom];
+  }
+  const searching = activeFilterCount(filters) > 0 || Boolean(filters.category);
 
   let data: Awaited<ReturnType<typeof getJobs>> | null = null;
   try {
@@ -57,7 +75,12 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
       category: filters.category,
       q: filters.q,
       city: filters.city,
-      status: filters.openOnly ? 'OPEN' : undefined,
+      status: filters.status,
+      budgetFrom: filters.budgetFrom,
+      budgetTo: filters.budgetTo,
+      days: filters.days,
+      noBids: filters.noBids,
+      sort: filters.sort,
     });
   } catch (error) {
     console.error('Jobs: failed to load', error);
@@ -113,7 +136,7 @@ export default async function JobsPage({ searchParams }: { searchParams: SearchP
               <p className="mx-auto mt-2 max-w-md text-sm text-ink-soft">
                 {data.total === 0
                   ? searching
-                    ? 'Попробуйте другой запрос, город или категорию.'
+                    ? 'Попробуйте другой запрос, город, бюджет или срок публикации.'
                     : 'Новые заказы появятся здесь после публикации.'
                   : 'Похоже, страниц меньше, чем указано в адресе.'}
               </p>

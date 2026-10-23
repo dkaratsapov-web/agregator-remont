@@ -1481,6 +1481,8 @@ export interface components {
             contractor: components["schemas"]["ReviewContractorSchema"] | null;
             review: components["schemas"]["ReviewDto"] | null;
         };
+        /** @enum {string} */
+        JobSort: "new" | "budget_desc" | "budget_asc";
         JobStageDto: {
             /** Format: date-time */
             acceptedAt: string | null;
@@ -3572,6 +3574,16 @@ export interface operations {
                 city?: string;
                 /** @description Поиск подстроки в названии и описании без учёта регистра */
                 q?: string;
+                /** @description Бюджет от, ₽: верхняя граница бюджета заказа не меньше. Заказы без бюджета не входят */
+                budgetFrom?: number;
+                /** @description Бюджет до, ₽: нижняя граница бюджета заказа не больше. Заказы без бюджета не входят */
+                budgetTo?: number;
+                /** @description Опубликован за последние N дней */
+                days?: 1 | 7 | 30;
+                /** @description Только заказы без откликов (отозванные и скрытые не считаются) */
+                noBids?: boolean;
+                /** @description new — сначала новые; budget_desc — по нижней границе бюджета, budget_asc — по верхней; без бюджета в конце */
+                sort?: components["schemas"]["JobSort"];
             };
             header?: never;
             path?: never;

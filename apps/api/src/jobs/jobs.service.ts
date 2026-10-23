@@ -2,6 +2,7 @@ import type { JobDto, Paginated } from '@agregator/shared';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { UsageCounters } from '../analytics/usage';
+import { ApiError } from '../common/api-error';
 import { PrismaService } from '../prisma/prisma.service';
 import { ListJobsQuery } from './dto/list-jobs.query';
 import { toJobDto } from './job.mapper';
@@ -25,9 +26,36 @@ export class JobsService {
   ) {}
 
   async list(query: ListJobsQuery): Promise<Paginated<JobDto>> {
-    const { page, limit, category, status } = query;
+    const { page, limit, category, status, budgetFrom, budgetTo, days, noBids, sort } = query;
+    if (budgetFrom !== undefined && budgetTo !== undefined && budgetFrom > budgetTo) {
+      throw new ApiError(400, 'BUDGET_RANGE_INVALID', 'Бюджет «от» больше, чем «до»');
+    }
     const city = query.city ? escapeLike(query.city) : undefined;
     const q = query.q ? escapeLike(query.q) : undefined;
+    // Бюджет: диапазон заказа пересекается с запрошенным. Заказ «до 100 000» подходит под
+    // «от 50 000»; заказы без бюджета при фильтре по бюджету не показываются.
+    const budget: Prisma.JobWhereInput[] = [
+      ...(budgetFrom !== undefined
+        ? [
+            {
+              OR: [
+                { budgetMax: { gte: budgetFrom } },
+                { budgetMax: null, budgetMin: { gte: budgetFrom } },
+              ],
+            },
+          ]
+        : []),
+      ...(budgetTo !== undefined
+        ? [
+            {
+              OR: [
+                { budgetMin: { lte: budgetTo } },
+                { budgetMin: null, budgetMax: { lte: budgetTo } },
+              ],
+            },
+          ]
+        : []),
+    ];
     const where: Prisma.JobWhereInput = {
       // Скрытые модератором заказы в каталоге не показываются.
       hiddenAt: null,
@@ -35,20 +63,45 @@ export class JobsService {
       ...(category ? { categories: { has: category } } : {}),
       ...(status ? { status } : {}),
       ...(city ? { city: { equals: city, mode: 'insensitive' } } : {}),
-      ...(q
-        ? {
-            OR: [
-              { title: { contains: q, mode: 'insensitive' } },
-              { description: { contains: q, mode: 'insensitive' } },
-            ],
-          }
-        : {}),
+      ...(days ? { createdAt: { gte: new Date(Date.now() - days * 86_400_000) } } : {}),
+      // «Без откликов»: отозванные и скрытые модератором отклики не в счёт.
+      ...(noBids ? { bids: { none: { status: { not: 'WITHDRAWN' }, hiddenAt: null } } } : {}),
+      AND: [
+        ...budget,
+        ...(q
+          ? [
+              {
+                OR: [
+                  { title: { contains: q, mode: 'insensitive' as const } },
+                  { description: { contains: q, mode: 'insensitive' as const } },
+                ],
+              },
+            ]
+          : []),
+      ],
     };
+    const newest: Prisma.JobOrderByWithRelationInput[] = [{ createdAt: 'desc' }, { id: 'desc' }];
+    // «Сначала больше» — по нижней границе (сколько заказчик готов платить точно), «сначала
+    // меньше» — по верхней; заказы без бюджета в конце.
+    const orderBy: Prisma.JobOrderByWithRelationInput[] =
+      sort === 'budget_desc'
+        ? [
+            { budgetMin: { sort: 'desc', nulls: 'last' } },
+            { budgetMax: { sort: 'desc', nulls: 'last' } },
+            ...newest,
+          ]
+        : sort === 'budget_asc'
+          ? [
+              { budgetMax: { sort: 'asc', nulls: 'last' } },
+              { budgetMin: { sort: 'asc', nulls: 'last' } },
+              ...newest,
+            ]
+          : newest;
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.job.findMany({
         where,
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        orderBy,
         skip: (page - 1) * limit,
         take: limit,
       }),

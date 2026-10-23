@@ -1416,6 +1416,15 @@
         ],
         "type": "object"
       },
+      "JobSort": {
+        "enum": [
+          "new",
+          "budget_desc",
+          "budget_asc"
+        ],
+        "type": "string",
+        "x-enum-kind": "closed"
+      },
       "JobStageDto": {
         "additionalProperties": false,
         "properties": {
@@ -5868,6 +5877,60 @@
               "maxLength": 100,
               "minLength": 2,
               "type": "string"
+            }
+          },
+          {
+            "description": "Бюджет от, ₽: верхняя граница бюджета заказа не меньше. Заказы без бюджета не входят",
+            "in": "query",
+            "name": "budgetFrom",
+            "required": false,
+            "schema": {
+              "maximum": 1000000000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Бюджет до, ₽: нижняя граница бюджета заказа не больше. Заказы без бюджета не входят",
+            "in": "query",
+            "name": "budgetTo",
+            "required": false,
+            "schema": {
+              "maximum": 1000000000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Опубликован за последние N дней",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "enum": [
+                1,
+                7,
+                30
+              ],
+              "type": "number"
+            }
+          },
+          {
+            "description": "Только заказы без откликов (отозванные и скрытые не считаются)",
+            "in": "query",
+            "name": "noBids",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "new — сначала новые; budget_desc — по нижней границе бюджета, budget_asc — по верхней; без бюджета в конце",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/JobSort"
             }
           }
         ],

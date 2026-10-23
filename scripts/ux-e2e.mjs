@@ -100,6 +100,39 @@ try {
     await page.context().close();
   }
 
+  // --- Фильтры каталога без JS: обычная GET-форма, выбор сохраняется после отправки.
+  {
+    const page = await newPage({ width: 1280, height: 900, javaScriptEnabled: false });
+    await page.goto(`${WEB}/jobs`, { waitUntil: 'load' });
+    const form = page.getByRole('search', { name: 'Фильтры каталога' });
+    await form.getByText('В работе', { exact: true }).click();
+    await form.getByLabel('Бюджет от, ₽').fill('50 000');
+    await form.getByText('Неделя', { exact: true }).click();
+    await form.getByLabel('Ещё без откликов').check();
+    await form.getByLabel('Сортировка').selectOption('budget_asc');
+    await form.getByRole('button', { name: 'Найти' }).click();
+    await page.waitForLoadState('load');
+    const params = new URL(page.url()).searchParams;
+    check(
+      'catalog filters: sent in the address',
+      params.get('status') === 'IN_PROGRESS' &&
+        params.get('budgetFrom')?.replace(/\D/g, '') === '50000' &&
+        params.get('days') === '7' &&
+        params.get('noBids') === '1' &&
+        params.get('sort') === 'budget_asc',
+      page.url(),
+    );
+    const again = page.getByRole('search', { name: 'Фильтры каталога' });
+    check(
+      'catalog filters: the choice stays after reload',
+      (await again.locator('input[name="status"][value="IN_PROGRESS"]').isChecked()) &&
+        (await again.locator('input[name="days"][value="7"]').isChecked()) &&
+        (await again.getByLabel('Ещё без откликов').isChecked()),
+    );
+    check('catalog filters: count and reset', await again.getByText('Фильтров: 5').isVisible());
+    await page.context().close();
+  }
+
   // --- UX-2: скрытые кнопки первого экрана не получают фокус.
   {
     const page = await newPage();

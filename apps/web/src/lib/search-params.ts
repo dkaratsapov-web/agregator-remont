@@ -1,8 +1,14 @@
 import {
   isJobCategory,
   JOB_LIMITS,
+  JOB_POSTED_DAYS,
   JOB_SEARCH,
+  JOB_SORTS,
+  JOB_STATUSES,
   type JobCategory,
+  type JobPostedDays,
+  type JobSort,
+  type JobStatus,
   PAGINATION,
 } from '@agregator/shared';
 
@@ -41,16 +47,68 @@ export function parseCity(raw: RawParam): string | undefined {
   return value;
 }
 
-/** «Только открытые»: ?open=1. */
-export function parseOpenOnly(raw: RawParam): boolean {
+/**
+ * Статус: ?status=OPEN|IN_PROGRESS|CLOSED. Старые ссылки «Только открытые» (?open=1) значат
+ * OPEN.
+ */
+export function parseStatus(raw: RawParam, legacyOpen?: RawParam): JobStatus | undefined {
+  const value = first(raw);
+  if ((JOB_STATUSES as readonly string[]).includes(value ?? '')) return value as JobStatus;
+  return first(legacyOpen) === '1' ? 'OPEN' : undefined;
+}
+
+/** Сумма бюджета: цифры, пробелы между разрядами допустимы («100 000»); иное игнорируется. */
+export function parseBudget(raw: RawParam): number | undefined {
+  const value = first(raw)?.replace(/[\s\u00a0\u202f]/g, '');
+  if (!value || !/^\d{1,10}$/.test(value)) return undefined;
+  const amount = Number(value);
+  return amount <= JOB_LIMITS.BUDGET_MAX ? amount : undefined;
+}
+
+export function parsePostedDays(raw: RawParam): JobPostedDays | undefined {
+  const value = Number(first(raw));
+  return (JOB_POSTED_DAYS as readonly number[]).includes(value)
+    ? (value as JobPostedDays)
+    : undefined;
+}
+
+/** «Ещё без откликов»: ?noBids=1. */
+export function parseNoBids(raw: RawParam): boolean {
   return first(raw) === '1';
+}
+
+/** Сортировка; «сначала новые» — по умолчанию, в адресе не пишется. */
+export function parseSort(raw: RawParam): JobSort | undefined {
+  const value = first(raw);
+  return value !== 'new' && (JOB_SORTS as readonly string[]).includes(value ?? '')
+    ? (value as JobSort)
+    : undefined;
 }
 
 export interface JobsFilters {
   category?: JobCategory;
   q?: string;
   city?: string;
-  openOnly?: boolean;
+  status?: JobStatus;
+  budgetFrom?: number;
+  budgetTo?: number;
+  days?: JobPostedDays;
+  noBids?: boolean;
+  sort?: JobSort;
+}
+
+/** Сколько фильтров задано (кроме категории — у неё свой список). */
+export function activeFilterCount(filters: JobsFilters): number {
+  return [
+    filters.q,
+    filters.city,
+    filters.status,
+    filters.budgetFrom,
+    filters.budgetTo,
+    filters.days,
+    filters.noBids || undefined,
+    filters.sort,
+  ].filter((value) => value !== undefined && value !== '').length;
 }
 
 export function jobsHref(params: JobsFilters & { page?: number }): string {
@@ -58,7 +116,12 @@ export function jobsHref(params: JobsFilters & { page?: number }): string {
   if (params.q) query.set('q', params.q);
   if (params.city) query.set('city', params.city);
   if (params.category) query.set('category', params.category);
-  if (params.openOnly) query.set('open', '1');
+  if (params.status) query.set('status', params.status);
+  if (params.budgetFrom !== undefined) query.set('budgetFrom', String(params.budgetFrom));
+  if (params.budgetTo !== undefined) query.set('budgetTo', String(params.budgetTo));
+  if (params.days) query.set('days', String(params.days));
+  if (params.noBids) query.set('noBids', '1');
+  if (params.sort) query.set('sort', params.sort);
   if (params.page && params.page > 1) query.set('page', String(params.page));
   const qs = query.toString();
   return qs ? `/jobs?${qs}` : '/jobs';

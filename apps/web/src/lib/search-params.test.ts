@@ -4,10 +4,15 @@ import {
   reportNotice,
   jobsHref,
   parseCategory,
+  activeFilterCount,
+  parseBudget,
   parseCity,
-  parseOpenOnly,
+  parseNoBids,
   parsePage,
+  parsePostedDays,
   parseQuery,
+  parseSort,
+  parseStatus,
 } from './search-params';
 
 describe('parsePage', () => {
@@ -42,9 +47,20 @@ describe('jobsHref', () => {
 
   it('keeps all filters', () => {
     expect(
-      jobsHref({ q: 'плитка ванная', city: 'Тверь', category: 'TILING', openOnly: true, page: 3 }),
+      jobsHref({
+        q: 'плитка ванная',
+        city: 'Тверь',
+        category: 'TILING',
+        status: 'OPEN',
+        budgetFrom: 50_000,
+        budgetTo: 0,
+        days: 7,
+        noBids: true,
+        sort: 'budget_desc',
+        page: 3,
+      }),
     ).toBe(
-      '/jobs?q=%D0%BF%D0%BB%D0%B8%D1%82%D0%BA%D0%B0+%D0%B2%D0%B0%D0%BD%D0%BD%D0%B0%D1%8F&city=%D0%A2%D0%B2%D0%B5%D1%80%D1%8C&category=TILING&open=1&page=3',
+      '/jobs?q=%D0%BF%D0%BB%D0%B8%D1%82%D0%BA%D0%B0+%D0%B2%D0%B0%D0%BD%D0%BD%D0%B0%D1%8F&city=%D0%A2%D0%B2%D0%B5%D1%80%D1%8C&category=TILING&status=OPEN&budgetFrom=50000&budgetTo=0&days=7&noBids=1&sort=budget_desc&page=3',
     );
   });
 });
@@ -69,11 +85,42 @@ describe('parseQuery and parseCity', () => {
   });
 });
 
-describe('parseOpenOnly', () => {
-  it('is true only for 1', () => {
-    expect(parseOpenOnly('1')).toBe(true);
-    expect(parseOpenOnly('true')).toBe(false);
-    expect(parseOpenOnly(undefined)).toBe(false);
+describe('catalog filters', () => {
+  it('status: known values, old ?open=1 means OPEN', () => {
+    expect(parseStatus('IN_PROGRESS')).toBe('IN_PROGRESS');
+    expect(parseStatus('open')).toBeUndefined();
+    expect(parseStatus(undefined, '1')).toBe('OPEN');
+    expect(parseStatus('CLOSED', '1')).toBe('CLOSED');
+    expect(parseStatus(undefined, 'true')).toBeUndefined();
+  });
+
+  it('budget: digits with spaces between groups, within the limit', () => {
+    expect(parseBudget('100 000')).toBe(100_000);
+    expect(parseBudget('100\u00a0000')).toBe(100_000);
+    expect(parseBudget('0')).toBe(0);
+    expect(parseBudget('-5')).toBeUndefined();
+    expect(parseBudget('1e5')).toBeUndefined();
+    expect(parseBudget('2000000000')).toBeUndefined();
+    expect(parseBudget('')).toBeUndefined();
+  });
+
+  it('posted days, no bids and sort', () => {
+    expect(parsePostedDays('7')).toBe(7);
+    expect(parsePostedDays('3')).toBeUndefined();
+    expect(parseNoBids('1')).toBe(true);
+    expect(parseNoBids('true')).toBe(false);
+    expect(parseSort('budget_asc')).toBe('budget_asc');
+    // «Сначала новые» — по умолчанию, в адрес не пишется.
+    expect(parseSort('new')).toBeUndefined();
+    expect(parseSort('cheap')).toBeUndefined();
+  });
+
+  it('counts active filters except the category', () => {
+    expect(activeFilterCount({ category: 'TILING' })).toBe(0);
+    expect(
+      activeFilterCount({ status: 'OPEN', budgetTo: 0, noBids: true, sort: 'budget_asc' }),
+    ).toBe(4);
+    expect(activeFilterCount({ noBids: false, q: '' })).toBe(0);
   });
 });
 
