@@ -52,6 +52,14 @@ for id in $(gh api repos/dkaratsapov-web/agregator-remont/rules/branches/main --
 done
 ```
 
+На сервере то же проверяет `readiness.sh` (`deploy/autodeploy/ruleset_check.py`): четыре
+проверки — точно по имени, ruleset `active`, список обхода пуст. Список обхода GitHub
+показывает только с токеном (`READINESS_GITHUB_TOKEN`, порядок ввода —
+`docs/OWNER_RELEASE_ACTIONS.md`); без него итог — NO-GO с причиной «список обхода не виден».
+Закрыто по умолчанию: правила без `ruleset_id` (например, старые Branch protection rules), из
+ruleset в режиме `evaluate` или с непустым обходом не засчитываются; пустой список задач,
+неожиданный ответ или ответ на пределе страницы (100 правил) — тоже NO-GO.
+
 Практическая проверка: попытка `git push origin HEAD:main` с любым коммитом должна получить
 отказ `GH013: Repository rule violations found`, а PR без зелёных четырёх проверок — неактивную
 кнопку «Merge».

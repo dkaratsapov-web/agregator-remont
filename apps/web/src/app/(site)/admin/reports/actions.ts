@@ -9,9 +9,10 @@ import {
   redirectIfUnauthorized,
   requireSessionToken,
 } from '@/lib/action-helpers';
-import { resolveReport, setContentHidden, setUserBlocked } from '@/lib/api';
+import { resolveFlag, resolveReport, setContentHidden, setUserBlocked } from '@/lib/api';
 import { safeRedirectPath } from '@/lib/redirect';
 import { getClientIp } from '@/lib/session';
+import { argBool, argString, readFormArgs } from '@/lib/form-args';
 
 export interface ModerationFormState {
   error?: string;
@@ -58,7 +59,7 @@ export async function resolveReportAction(
 
 /** Скрыть или вернуть заказ, сообщение или отклик с причиной для журнала. */
 export async function setHiddenAction(
-  kind: 'jobs' | 'messages' | 'bids',
+  kind: 'jobs' | 'messages' | 'bids' | 'reviews',
   id: string,
   hidden: boolean,
   returnTo: string,
@@ -66,7 +67,7 @@ export async function setHiddenAction(
   form: FormData,
 ): Promise<ModerationFormState> {
   if (!(await isTrustedOrigin())) return { error: FOREIGN_ORIGIN };
-  if (!['jobs', 'messages', 'bids'].includes(kind) || !isEntityId(id)) {
+  if (!['jobs', 'messages', 'bids', 'reviews'].includes(kind) || !isEntityId(id)) {
     return { error: ERRORS[404] };
   }
   const reason = text(form, 'text', MODERATION_LIMITS.REASON_MAX);
@@ -111,4 +112,61 @@ export async function setBlockedAction(
     return { error: apiErrorMessage(error, ERRORS) };
   }
   redirect(back);
+}
+
+/** Пометка автопроверки разобрана: меры приняты или нарушения нет (кнопка формы). */
+export async function resolveFlagAction(
+  id: string,
+  returnTo: string,
+  _prev: ModerationFormState,
+  form: FormData,
+): Promise<ModerationFormState> {
+  if (!(await isTrustedOrigin())) return { error: FOREIGN_ORIGIN };
+  if (!isEntityId(id)) return { error: ERRORS[404] };
+  const status = form.get('decision');
+  if (status !== 'RESOLVED' && status !== 'DISMISSED') return { error: 'Выберите решение.' };
+  const back = safeRedirectPath(returnTo);
+  const token = await requireSessionToken(back);
+  try {
+    await resolveFlag(token, id, status, await getClientIp());
+  } catch (error) {
+    redirectIfUnauthorized(error, back);
+    return { error: apiErrorMessage(error, { ...ERRORS, 409: 'Пометку уже разобрали.' }) };
+  }
+  redirect(back);
+}
+
+// --- Формы: параметры скрытым полем args вместо bind (lib/form-args.ts, docs/NO_JS_FORMS.md).
+
+/** args: [reportId, returnTo] */
+export async function resolveReportFormAction(prev: ModerationFormState, form: FormData) {
+  const [id, returnTo] = readFormArgs(form);
+  return resolveReportAction(argString(id), argString(returnTo), prev, form);
+}
+
+/** args: [kind, id, hidden, returnTo]; kind — jobs, messages, bids или reviews. */
+export async function setHiddenFormAction(prev: ModerationFormState, form: FormData) {
+  const [kind, id, hidden, returnTo] = readFormArgs(form);
+  const target = argString(kind);
+  if (!['jobs', 'messages', 'bids', 'reviews'].includes(target)) return { error: ERRORS[404] };
+  return setHiddenAction(
+    target as 'jobs' | 'messages' | 'bids' | 'reviews',
+    argString(id),
+    argBool(hidden),
+    argString(returnTo),
+    prev,
+    form,
+  );
+}
+
+/** args: [userId, blocked, returnTo] */
+export async function setBlockedFormAction(prev: ModerationFormState, form: FormData) {
+  const [userId, blocked, returnTo] = readFormArgs(form);
+  return setBlockedAction(argString(userId), argBool(blocked), argString(returnTo), prev, form);
+}
+
+/** args: [flagId, returnTo] */
+export async function resolveFlagFormAction(prev: ModerationFormState, form: FormData) {
+  const [id, returnTo] = readFormArgs(form);
+  return resolveFlagAction(argString(id), argString(returnTo), prev, form);
 }

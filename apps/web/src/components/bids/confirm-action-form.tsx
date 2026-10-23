@@ -2,6 +2,8 @@
 
 import { useActionState } from 'react';
 import { FormError } from '@/components/auth/form-error';
+import { FormArgs } from '@/components/ui/form-args';
+import type { FormArg } from '@/lib/form-args';
 
 interface State {
   error?: string;
@@ -9,6 +11,7 @@ interface State {
 
 /** Действие с подтверждением: кнопка подтверждения спрятана за раскрытием. */
 export function ConfirmActionForm({
+  args,
   action,
   summary,
   explanation,
@@ -16,6 +19,8 @@ export function ConfirmActionForm({
   pendingLabel,
 }: {
   action: (state: State, form: FormData) => Promise<State>;
+  /** Параметры действия скрытым полем вместо bind (lib/form-args.ts). */
+  args?: readonly FormArg[];
   summary: string;
   explanation: string;
   confirmLabel: string;
@@ -28,6 +33,7 @@ export function ConfirmActionForm({
         {summary}
       </summary>
       <form action={formAction} className="mt-3 space-y-3">
+        {args ? <FormArgs values={args} /> : null}
         <FormError message={state.error} />
         <p className="text-sm leading-relaxed text-ink-soft">{explanation}</p>
         <button

@@ -4,6 +4,7 @@
 // Требует запущенные API и web (production-сборка), как drafts-e2e.
 import { chromium } from 'playwright';
 import { API, WEB, createChecker, registerViaApi } from './lib/forms.mjs';
+import { checkCsp, watchCsp } from './lib/csp-watch.mjs';
 
 const { check, finish } = createChecker();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -12,6 +13,7 @@ const contractor = await registerViaApi('CONTRACTOR');
 const browser = await chromium.launch(
   process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
 );
+const cspViolations = watchCsp(browser);
 const host = new URL(WEB).hostname;
 // Регистрация в браузере идёт через web → API: свой адрес, чтобы не делить лимит на вход
 // с другими скриптами CI.
@@ -130,7 +132,7 @@ try {
     await bidPage.getByRole('button', { name: 'Откликнуться' }).dblclick();
     await bidPage.waitForURL(/\?bid=sent/, { timeout: 15_000 });
     await sleep(1000);
-    const bids = (await api(`/v1/me/jobs/${job.id}/bids`)).body;
+    const bids = (await api(`/v1/me/jobs/${job.id}/bids`)).body.items;
     check('double click on "respond" leaves one bid', bids.length === 1, `bids ${bids.length}`);
     await bidPage.close();
   }
@@ -144,7 +146,7 @@ try {
     await page.waitForURL(/\?accepted=1/, { timeout: 15_000 });
     await page.unrouteAll({ behavior: 'ignoreErrors' });
     const stored = (await api(`/v1/me/jobs/${job.id}`)).body;
-    const bids = (await api(`/v1/me/jobs/${job.id}/bids`)).body;
+    const bids = (await api(`/v1/me/jobs/${job.id}/bids`)).body.items;
     check(
       'accepting in the browser starts the job with one contractor',
       stored.status === 'IN_PROGRESS' && bids.filter((b) => b.status === 'ACCEPTED').length === 1,
@@ -189,4 +191,5 @@ try {
   await browser.close();
 }
 
+checkCsp(check, cspViolations);
 finish('cabinet e2e');

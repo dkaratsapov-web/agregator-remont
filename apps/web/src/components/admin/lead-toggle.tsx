@@ -1,7 +1,8 @@
 'use client';
 
 import { useActionState } from 'react';
-import { setLeadProcessedAction, type LeadToggleState } from '@/app/(site)/admin/leads/actions';
+import { setLeadProcessedFormAction, type LeadToggleState } from '@/app/(site)/admin/leads/actions';
+import { FormArgs } from '@/components/ui/form-args';
 
 export function LeadToggle({
   id,
@@ -13,11 +14,12 @@ export function LeadToggle({
   returnTo: string;
 }) {
   const [state, action, pending] = useActionState<LeadToggleState, FormData>(
-    setLeadProcessedAction.bind(null, id, !processed, returnTo),
+    setLeadProcessedFormAction,
     {},
   );
   return (
     <form action={action} className="flex flex-col items-end gap-1.5">
+      <FormArgs values={[id, !processed, returnTo]} />
       <button
         type="submit"
         disabled={pending}

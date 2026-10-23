@@ -20,13 +20,15 @@ import { JobBidList } from '@/components/bids/job-bid-list';
 import { JobChatPanel } from '@/components/chat/job-chat-panel';
 import { JobPlanPanel } from '@/components/plan/job-plan-panel';
 import { planNotice } from '@/components/plan/plan-notice';
-import { historyCursor, reportNotice } from '@/lib/search-params';
-import { getMessages, getMyJob, getPlan, listJobBids } from '@/lib/api';
+import { historyCursor, parsePage, reportNotice } from '@/lib/search-params';
+import { getContacts, getJobReview, getMessages, getMyJob, getPlan, listJobBids } from '@/lib/api';
+import { ContactsPanel } from '@/components/contacts/contacts-panel';
+import { ReviewPanel } from '@/components/reviews/review-panel';
 import { requireCustomerPage } from '@/lib/customer';
 import { MarkSeen } from '@/components/notifications/mark-seen';
 import { getUnreadSummary, unreadForJob } from '@/lib/notifications-server';
 import { formatAmount, formatBudget, formatDate } from '@/lib/format';
-import { closeJobAction, updateJobAction } from '../actions';
+import { closeJobFormAction, updateJobFormAction } from '../actions';
 
 export const metadata: Metadata = { title: 'Мой заказ', robots: { index: false } };
 
@@ -46,17 +48,29 @@ export default async function MyJobPage({
   if (!token) return <CustomersOnly />;
 
   let job: Awaited<ReturnType<typeof getMyJob>>;
-  let bids: Awaited<ReturnType<typeof listJobBids>> = [];
+  const bidsPage = parsePage(query.bids);
+  let bids: Awaited<ReturnType<typeof listJobBids>> = {
+    items: [],
+    page: 1,
+    limit: 50,
+    total: 0,
+  };
   let plan: Awaited<ReturnType<typeof getPlan>> = null;
   let chat: Awaited<ReturnType<typeof getMessages>> = null;
+  let review: Awaited<ReturnType<typeof getJobReview>> = null;
+  let contacts: Awaited<ReturnType<typeof getContacts>> = null;
   try {
     job = await getMyJob(token, id);
     if (job) {
-      [bids, plan, chat] = await Promise.all([
-        listJobBids(token, job.id),
+      [bids, plan, chat, review, contacts] = await Promise.all([
+        listJobBids(token, job.id, bidsPage),
         // План и переписка есть только у заказа с выбранным исполнителем.
         job.status === 'OPEN' ? Promise.resolve(null) : getPlan(token, job.id),
         job.status === 'OPEN' ? Promise.resolve(null) : getMessages(token, job.id, before),
+        // Отзыв — только у выполненного заказа.
+        job.closeOutcome === 'COMPLETED' ? getJobReview(token, job.id) : Promise.resolve(null),
+        // Контакты — у сделки с выбранным исполнителем, по согласию сторон.
+        job.status === 'OPEN' ? Promise.resolve(null) : getContacts(token, job.id),
       ]);
     }
   } catch (error) {
@@ -81,9 +95,11 @@ export default async function MyJobPage({
           : query.closed === 'cancelled'
             ? 'Заказ отменён.'
             : 'Заказ закрыт.'
-        : query.accepted
-          ? 'Исполнитель выбран, заказ в работе. Составьте план работ вместе с ним.'
-          : planNotice(query.plan);
+        : query.reviewed
+          ? 'Спасибо, отзыв опубликован на карточке мастера.'
+          : query.accepted
+            ? 'Исполнитель выбран, заказ в работе. Составьте план работ вместе с ним.'
+            : planNotice(query.plan);
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 pb-16 pt-10 sm:px-6 md:pt-14 lg:px-10">
@@ -140,10 +156,18 @@ export default async function MyJobPage({
 
       <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="flex min-w-0 flex-col gap-8">
+          {review ? <ReviewPanel jobId={job.id} state={review} /> : null}
           {plan ? (
             <JobPlanPanel
               plan={plan}
               jobOpen={job.status === 'IN_PROGRESS'}
+              returnTo={`/account/jobs/${job.id}`}
+            />
+          ) : null}
+          {contacts ? (
+            <ContactsPanel
+              jobId={job.id}
+              contacts={contacts}
               returnTo={`/account/jobs/${job.id}`}
             />
           ) : null}
@@ -160,23 +184,26 @@ export default async function MyJobPage({
               id="bids-title"
               title={
                 <>
-                  Отклики <span className="tabular-nums text-ink-soft">{bids.length}</span>
+                  Отклики <span className="tabular-nums text-ink-soft">{bids.total}</span>
                 </>
               }
               description={
-                job.status === 'OPEN' && bids.length > 0
+                job.status === 'OPEN' && bids.total > 0
                   ? 'Выберите исполнителя — заказ перейдёт в работу, остальные отклики будут отклонены.'
                   : undefined
               }
             />
-            {bids.length === 0 ? (
+            {bids.total === 0 ? (
               <EmptyState title="Откликов пока нет">
                 {job.status === 'OPEN'
                   ? 'Подрядчики видят заказ в каталоге. Отклики с ценой и сроком появятся здесь.'
                   : 'Заказ больше не принимает отклики.'}
               </EmptyState>
             ) : (
-              <JobBidList jobId={job.id} bids={bids} canAccept={job.status === 'OPEN'} />
+              <>
+                <JobBidList jobId={job.id} bids={bids.items} canAccept={job.status === 'OPEN'} />
+                <BidPages jobId={job.id} page={bids.page} limit={bids.limit} total={bids.total} />
+              </>
             )}
           </Sheet>
 
@@ -236,7 +263,7 @@ export default async function MyJobPage({
               [
                 'Откликов',
                 <span key="n" className="tabular-nums">
-                  {bids.length}
+                  {bids.total}
                 </span>,
               ],
             ]}
@@ -255,7 +282,8 @@ export default async function MyJobPage({
           />
           {job.status !== 'CLOSED' ? (
             <CloseJobForm
-              action={closeJobAction.bind(null, job.id)}
+              action={closeJobFormAction}
+              args={[job.id]}
               inProgress={job.status === 'IN_PROGRESS'}
             />
           ) : null}
@@ -275,7 +303,8 @@ export default async function MyJobPage({
           </p>
           <div className="mt-6">
             <JobForm
-              action={updateJobAction.bind(null, job.id)}
+              action={updateJobFormAction}
+              args={[job.id]}
               initial={{
                 title: job.title,
                 description: job.description,
@@ -294,5 +323,41 @@ export default async function MyJobPage({
         </section>
       ) : null}
     </div>
+  );
+}
+
+/** Страницы откликов, если их больше 50: ссылки работают и без JS. */
+function BidPages({
+  jobId,
+  page,
+  limit,
+  total,
+}: {
+  jobId: string;
+  page: number;
+  limit: number;
+  total: number;
+}) {
+  const pages = Math.ceil(total / limit);
+  if (pages <= 1) return null;
+  const href = (n: number) => `/account/jobs/${jobId}?bids=${n}#bids`;
+  const link =
+    'inline-flex min-h-11 items-center rounded-[10px] border border-line bg-surface px-4 text-sm font-semibold text-ink hover:border-ink/30';
+  return (
+    <nav aria-label="Страницы откликов" className="mt-4 flex flex-wrap items-center gap-3">
+      {page > 1 ? (
+        <Link href={href(page - 1)} className={link} rel="prev">
+          Ранние отклики
+        </Link>
+      ) : null}
+      <span className="text-sm text-ink-soft tabular-nums">
+        Страница {page} из {pages}
+      </span>
+      {page < pages ? (
+        <Link href={href(page + 1)} className={link} rel="next">
+          Следующие отклики
+        </Link>
+      ) : null}
+    </nav>
   );
 }

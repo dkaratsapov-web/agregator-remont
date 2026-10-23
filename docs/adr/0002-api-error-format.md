@@ -1,7 +1,7 @@
 # ADR 0002. Единый формат ошибок API с машинным `code`
 
 **Статус:** Принято владельцем (Issue #10), редакция 2 — после аудита PR #11.
-Реализация — PR C.
+**Реализовано** в PR #47 (раздел «Реализация» в конце).
 
 ## Контекст
 
@@ -64,6 +64,7 @@ interface FieldError {
 | 409 | `BID_NOT_PENDING` | отзыв или выбор отклика не в статусе «на рассмотрении» | нет |
 | 413 | `PAYLOAD_TOO_LARGE` | тело запроса больше лимита | нет |
 | 429 | `RATE_LIMITED` | лимит частоты (`default`, `auth`, `write`) | да, не раньше `Retry-After` |
+| 429 | `LOGIN_THROTTLED` | пауза после серии неверных паролей к адресу: вход и текущий пароль при смене (`docs/SECURITY.md`, release gate 2) | да, не раньше `Retry-After` |
 | 429 | `DAILY_QUOTA_EXCEEDED` | суточная квота заказов/откликов | автоматически нет; `Retry-After` — когда квота освободится |
 | 500 | `INTERNAL` | всё непредвиденное; текст общий, без деталей | GET — с паузой; POST — только с `Idempotency-Key` |
 | 503 | `UNAVAILABLE` | БД или зависимость недоступна | как 500 |
@@ -129,3 +130,37 @@ interface FieldError {
 - **RFC 9457 `application/problem+json`** (`type`, `title`, `detail`) — стандартнее, но
   меняет форму ответа и ломает текущий web; можно принять в `/v2`.
 - **Только `message` без кода** — текущее состояние, не подходит для native.
+
+## Реализация (PR #47)
+
+- **Где.**
+  - Фильтр и проверка ввода — `apps/api/src/common/exception-filter.ts` (`ApiExceptionFilter`,
+    `ApiValidationPipe`), подключены в `setup-app.ts`.
+  - Доменные ошибки — `apps/api/src/common/api-error.ts` (`ApiError`, `QuotaExceeded`).
+  - Типы — `packages/shared/src/errors.ts` (`API_ERROR_CODES`, `ApiErrorBody`, `FieldError`).
+  - Схема OpenAPI `ErrorResponse`: `code` и `error` обязательны, сверка типов — в
+    `contract-checks.ts`.
+- **Доменные коды.** Каталог из раздела 2 введён в местах, где возникают эти ошибки:
+  - `EMAIL_TAKEN`, `INVALID_CREDENTIALS`, `FORBIDDEN_ROLE`;
+  - `JOB_NOT_OPEN`, `JOB_ALREADY_CLOSED`, `BID_ALREADY_EXISTS`, `BID_NOT_PENDING`;
+  - `NO_FIELDS_TO_UPDATE`, `BUDGET_RANGE_INVALID`;
+  - `DAILY_QUOTA_EXCEEDED` (заказы, отклики, жалобы, заявки) с `Retry-After` до освобождения
+    квоты.
+
+  Остальные конфликты пока получают общий код по статусу (`CONFLICT` и т. п.). Новые доменные
+  коды добавляются по мере надобности клиентам — это совместимое изменение.
+- **Отличия от текста выше.**
+  - `isLength` (одно ограничение на обе границы) даёт `OUT_OF_RANGE`, а не
+    `TOO_SHORT`/`TOO_LONG`.
+  - Тексты вложенных ошибок стали чистыми. Раньше NestJS приклеивал путь к тексту
+    («stages.0.Название этапа…»), теперь путь — в `fieldErrors[].path` (`stages.0.title`), а
+    текст — для человека.
+  - Ошибки разбора тела (body-parser) сохраняют свой статус: битый JSON — 400 `BAD_REQUEST`,
+    слишком большое тело — 413 `PAYLOAD_TOO_LARGE`. Без этого второй случай получал 500.
+- **Web.** `ApiError.code` в `apps/web/src/lib/api.ts`; показ по-прежнему по `message`, код
+  доступен для точных текстов.
+- **Тесты.**
+  - `apps/api/test/errors.e2e-spec.ts` — каждый код со статусом и телом, `fieldErrors` (вложенное
+    поле, индекс, лишнее поле), `Retry-After` у лимита и квоты, 500/503 без деталей, ни email, ни
+    хешей в теле.
+  - Контракт всех ответов-ошибок — `contract.e2e-spec.ts`.

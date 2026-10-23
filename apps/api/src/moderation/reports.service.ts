@@ -1,16 +1,16 @@
-import { REPORT_LIMITS, type ReportReceivedDto } from '@agregator/shared';
 import {
-  BadRequestException,
-  HttpException,
-  HttpStatus,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+  REPORT_LIMITS,
+  type MyReportDto,
+  type Paginated,
+  type ReportReceivedDto,
+} from '@agregator/shared';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { User } from '@prisma/client';
 import { writeAudit } from '../audit/audit';
 import { findDeal } from '../plans/deal';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReportDto } from './dto/moderation.dto';
+import { QuotaExceeded } from '../common/api-error';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -44,13 +44,18 @@ export class ReportsService {
         select: { id: true },
       });
       if (open) return { id: open.id, duplicate: true };
-      const today = await tx.report.count({
-        where: { reporterId: user.id, createdAt: { gt: new Date(Date.now() - DAY_MS) } },
-      });
+      const window = { reporterId: user.id, createdAt: { gt: new Date(Date.now() - DAY_MS) } };
+      const today = await tx.report.count({ where: window });
       if (today >= REPORT_LIMITS.PER_DAY) {
-        throw new HttpException(
+        const oldest = await tx.report.findFirst({
+          where: window,
+          orderBy: { createdAt: 'asc' },
+          select: { createdAt: true },
+        });
+        throw new QuotaExceeded(
           `Можно отправить не больше ${REPORT_LIMITS.PER_DAY} жалоб за сутки`,
-          HttpStatus.TOO_MANY_REQUESTS,
+          oldest?.createdAt,
+          DAY_MS,
         );
       }
       const created = await tx.report.create({
@@ -76,6 +81,47 @@ export class ReportsService {
         },
       });
       return { id: created.id, duplicate: false };
+    });
+  }
+
+  /** Свои жалобы: новые первыми, с решением администратора. */
+  async mine(user: User, page: number): Promise<Paginated<MyReportDto>> {
+    const limit = REPORT_LIMITS.PAGE;
+    const where = { reporterId: user.id };
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.report.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { job: { select: { title: true } } },
+      }),
+      this.prisma.report.count({ where }),
+    ]);
+    return {
+      items: rows.map((r) => ({
+        id: r.id,
+        targetType: r.targetType,
+        reason: r.reason,
+        status: r.status,
+        jobId: r.jobId,
+        jobTitle: r.job.title,
+        note: r.note,
+        createdAt: r.createdAt.toISOString(),
+        resolvedAt: r.resolvedAt?.toISOString() ?? null,
+        unseen: r.status !== 'OPEN' && !r.reporterSeenAt,
+      })),
+      page,
+      limit,
+      total,
+    };
+  }
+
+  /** Решения по своим жалобам просмотрены: пропадают из значка уведомлений. */
+  async markSeen(user: User): Promise<void> {
+    await this.prisma.report.updateMany({
+      where: { reporterId: user.id, status: { not: 'OPEN' }, reporterSeenAt: null },
+      data: { reporterSeenAt: new Date() },
     });
   }
 

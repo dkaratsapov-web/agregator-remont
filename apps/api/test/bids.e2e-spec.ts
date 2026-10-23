@@ -218,6 +218,24 @@ describe('Contractor profiles and bids (e2e)', () => {
       await http().get('/v1/me/bids?jobId=../x').set(a.auth).expect(400);
     });
 
+    it('the owner reads bids page by page, oldest first, with the total', async () => {
+      const { customer, jobId } = await customerWithJob();
+      const placed: string[] = [];
+      for (let i = 0; i < 3; i += 1) {
+        const contractor = await signUp(app, 'CONTRACTOR');
+        placed.push((await placeBid(contractor.auth, jobId).expect(201)).body.id);
+      }
+      const url = `/v1/me/jobs/${jobId}/bids`;
+      const first = await http().get(`${url}?limit=2`).set(customer.auth).expect(200);
+      expect(first.body).toMatchObject({ page: 1, limit: 2, total: 3 });
+      const second = await http().get(`${url}?limit=2&page=2`).set(customer.auth).expect(200);
+      expect([...first.body.items, ...second.body.items].map((b: { id: string }) => b.id)).toEqual(
+        placed,
+      );
+      await http().get(`${url}?limit=51`).set(customer.auth).expect(400);
+      await http().get(`${url}?page=0`).set(customer.auth).expect(400);
+    });
+
     it('only the job owner sees its bids, without contractor email or id', async () => {
       const { customer, jobId } = await customerWithJob();
       const stranger = await signUp(app, 'CUSTOMER');
@@ -229,10 +247,14 @@ describe('Contractor profiles and bids (e2e)', () => {
       await http().get(`/v1/me/jobs/${jobId}/bids`).set(contractor.auth).expect(403);
 
       const res = await http().get(`/v1/me/jobs/${jobId}/bids`).set(customer.auth).expect(200);
-      expect(res.body).toHaveLength(1);
-      expect(res.body[0].contractor).toEqual({
+      expect(res.body).toMatchObject({ page: 1, limit: 12, total: 1 });
+      expect(res.body.items).toHaveLength(1);
+      // Номер публичной карточки и рейтинг — да; email и id пользователя — нет.
+      expect(res.body.items[0].contractor).toEqual({
+        publicId: expect.any(Number),
         name: expect.any(String),
         profile: expect.objectContaining({ categories: ['FLOORING', 'FINISHING'] }),
+        rating: { average: null, count: 0 },
       });
       const raw = JSON.stringify(res.body);
       expect(raw).not.toContain('@example.ru');
@@ -265,7 +287,7 @@ describe('Contractor profiles and bids (e2e)', () => {
         .get(`/v1/me/jobs/${jobId}/bids`)
         .set(customer.auth)
         .expect(200);
-      expect(ownerView.body).toHaveLength(0);
+      expect(ownerView.body).toMatchObject({ items: [], total: 0 });
     });
   });
 

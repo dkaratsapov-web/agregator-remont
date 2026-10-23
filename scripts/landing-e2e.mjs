@@ -6,6 +6,7 @@
 import { execSync } from 'node:child_process';
 import { chromium } from 'playwright';
 import { API, registerViaApi } from './lib/forms.mjs';
+import { checkCsp, watchCsp } from './lib/csp-watch.mjs';
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:8080';
 const USER = process.env.BASIC_USER ?? 'tester';
@@ -33,6 +34,7 @@ const check = (name, ok, detail = '') => {
 const browser = await chromium.launch(
   process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
 );
+const cspViolations = watchCsp(browser);
 
 /** Ждём, пока service worker активирован и управляет страницей. */
 async function controlledBySw(page) {
@@ -262,6 +264,7 @@ try {
   await browser.close();
 }
 
+checkCsp(check, cspViolations);
 if (failures.length > 0) {
   console.error(`\n${failures.length} landing check(s) failed`);
   process.exit(1);

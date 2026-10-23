@@ -84,6 +84,31 @@ if ! bash "$(dirname "$0")/migration-check.sh" "$target" "$current"; then
   fi
   log "опасных миграций в базе нет (база восстановлена до них): откат допустим"
 fi
+
+# Модерация (миграция 20261023100000_moderation): версия без неё схему читает, но правил не
+# знает — скрытые модератором заказы, сообщения и отклики снова увидят все. Блокировку держит
+# сама база (триггер sessions_refuse_blocked_user), а скрытое — нет. Поэтому откат на такую
+# версию — только когда скрытого в базе нет (или база восстановлена из копии до модерации).
+MODERATION=apps/api/prisma/migrations/20261023100000_moderation/migration.sql
+if ! git cat-file -e "$target:$MODERATION" 2> /dev/null; then
+  # shellcheck disable=SC2016 # переменные раскрываются внутри контейнера db
+  db_query() { "${compose[@]}" exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -XtAc "$0"' "$1"; }
+  columns=$(db_query "select count(*) from information_schema.columns where column_name = 'hidden_at' and table_name in ('jobs', 'bids', 'job_messages')") ||
+    die 'база не отвечает: не проверить скрытое модератором (docker compose ... ps db)'
+  if [ "${columns//[[:space:]]/}" = 3 ]; then
+    hidden=$(db_query "select (select count(*) from jobs where hidden_at is not null) + (select count(*) from bids where hidden_at is not null) + (select count(*) from job_messages where hidden_at is not null)") ||
+      die 'база не отвечает: не проверить скрытое модератором (docker compose ... ps db)'
+    hidden=${hidden//[[:space:]]/}
+    if [ "${hidden:-0}" != 0 ]; then
+      log "Версия ${target:0:12} не знает модерации, а в базе скрыто модератором: $hidden (заказы, сообщения, отклики)."
+      log 'После отката их снова увидят все. Варианты (решение — только владельца):'
+      log '  1) откатиться на версию с модерацией (слияние PR #45 или новее);'
+      log '  2) вернуть скрытое в /admin/reports, если это допустимо, и повторить откат;'
+      log '  3) восстановить копию перед миграцией модерации (данные после неё потеряются).'
+      die 'откат на версию без модерации раскрыл бы скрытое содержимое, откат остановлен'
+    fi
+  fi
+fi
 log "откат ${current:0:12} -> ${target:0:12}"
 git reset --quiet --hard "$target"
 # Сбой после переключения кода: рабочая копия возвращается на текущую версию, состояние

@@ -1,6 +1,9 @@
 import {
+  CONTENT_FLAG_KINDS,
   REPORT_LIMITS,
   type BlockedStateDto,
+  type ContentFlagDto,
+  type ContentFlagKind,
   type HiddenStateDto,
   type Paginated,
   type ReportDto,
@@ -11,9 +14,17 @@ import type { Prisma } from '@prisma/client';
 import { writeAudit } from '../audit/audit';
 import { ENTITY_ID_PATTERN } from '../common/text';
 import { PrismaService } from '../prisma/prisma.service';
-import { BlockDto, HideDto, ListReportsQuery, ResolveReportDto } from './dto/moderation.dto';
+import {
+  BlockDto,
+  HideDto,
+  ListFlagsQuery,
+  ListReportsQuery,
+  ResolveFlagDto,
+  ResolveReportDto,
+} from './dto/moderation.dto';
 
 const REPORT_NOT_FOUND = 'Жалоба не найдена';
+const FLAG_NOT_FOUND = 'Пометка не найдена';
 const EXCERPT_MAX = 300;
 const rubles = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
 
@@ -99,6 +110,51 @@ export class ModerationService {
     return (await this.toDtos([row]))[0];
   }
 
+  /** Пометки автопроверки: открытые — старые первыми, разобранные — новые первыми. */
+  async listFlags(query: ListFlagsQuery): Promise<Paginated<ContentFlagDto>> {
+    const limit = REPORT_LIMITS.PAGE;
+    const where: Prisma.ContentFlagWhereInput =
+      query.status === 'ALL' ? {} : { status: query.status };
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.contentFlag.findMany({
+        where,
+        orderBy:
+          query.status === 'OPEN'
+            ? [{ createdAt: 'asc' }, { id: 'asc' }]
+            : [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (query.page - 1) * limit,
+        take: limit,
+        include: { job: { select: { title: true } }, author: { select: PERSON } },
+      }),
+      this.prisma.contentFlag.count({ where }),
+    ]);
+    return { items: await this.toFlagDtos(rows), page: query.page, limit, total };
+  }
+
+  async resolveFlag(adminId: string, id: string, dto: ResolveFlagDto): Promise<ContentFlagDto> {
+    if (!ENTITY_ID_PATTERN.test(id)) throw new NotFoundException(FLAG_NOT_FOUND);
+    const row = await this.prisma.$transaction(async (tx) => {
+      const [locked] = await tx.$queryRaw<{ status: string }[]>`
+        SELECT status::text AS status FROM content_flags WHERE id = ${id} FOR UPDATE`;
+      if (!locked) throw new NotFoundException(FLAG_NOT_FOUND);
+      if (locked.status !== 'OPEN') throw new ConflictException('Пометка уже разобрана');
+      const updated = await tx.contentFlag.update({
+        where: { id },
+        data: { status: dto.status, resolvedById: adminId, resolvedAt: new Date() },
+        include: { job: { select: { title: true } }, author: { select: PERSON } },
+      });
+      await writeAudit(tx, {
+        actorId: adminId,
+        action: 'FLAG_RESOLVED',
+        entityType: updated.targetType === 'BID' ? 'bid' : 'job_message',
+        entityId: updated.targetId,
+        changes: { status: { from: 'OPEN', to: dto.status } },
+      });
+      return updated;
+    });
+    return (await this.toFlagDtos([row]))[0];
+  }
+
   setJobHidden(adminId: string, id: string, dto: HideDto): Promise<HiddenStateDto> {
     return this.setHidden(adminId, 'job', id, dto, 'Заказ не найден');
   }
@@ -109,6 +165,10 @@ export class ModerationService {
 
   setBidHidden(adminId: string, id: string, dto: HideDto): Promise<HiddenStateDto> {
     return this.setHidden(adminId, 'bid', id, dto, 'Отклик не найден');
+  }
+
+  setReviewHidden(adminId: string, id: string, dto: HideDto): Promise<HiddenStateDto> {
+    return this.setHidden(adminId, 'review', id, dto, 'Отзыв не найден');
   }
 
   async setUserBlocked(adminId: string, id: string, dto: BlockDto): Promise<BlockedStateDto> {
@@ -144,7 +204,7 @@ export class ModerationService {
 
   private async setHidden(
     adminId: string,
-    entityType: 'job' | 'job_message' | 'bid',
+    entityType: 'job' | 'job_message' | 'bid' | 'review',
     id: string,
     dto: HideDto,
     notFound: string,
@@ -158,8 +218,11 @@ export class ModerationService {
           : entityType === 'bid'
             ? await tx.$queryRaw<{ hidden_at: Date | null; status: string }[]>`
                 SELECT hidden_at, status::text AS status FROM bids WHERE id = ${id} FOR UPDATE`
-            : await tx.$queryRaw<{ hidden_at: Date | null; status: string }[]>`
-                SELECT hidden_at, '' AS status FROM job_messages WHERE id = ${id} FOR UPDATE`;
+            : entityType === 'review'
+              ? await tx.$queryRaw<{ hidden_at: Date | null; status: string }[]>`
+                  SELECT hidden_at, '' AS status FROM reviews WHERE id = ${id} FOR UPDATE`
+              : await tx.$queryRaw<{ hidden_at: Date | null; status: string }[]>`
+                  SELECT hidden_at, '' AS status FROM job_messages WHERE id = ${id} FOR UPDATE`;
       if (locked.length === 0) throw new NotFoundException(notFound);
       const was = locked[0].hidden_at !== null;
       if (was === dto.hidden) return { id, hidden: was };
@@ -172,6 +235,7 @@ export class ModerationService {
       const data = { hiddenAt: dto.hidden ? new Date() : null };
       if (entityType === 'job') await tx.job.update({ where: { id }, data });
       else if (entityType === 'bid') await tx.bid.update({ where: { id }, data });
+      else if (entityType === 'review') await tx.review.update({ where: { id }, data });
       else await tx.jobMessage.update({ where: { id }, data });
       await writeAudit(tx, {
         actorId: adminId,
@@ -181,6 +245,49 @@ export class ModerationService {
         changes: { hidden: { from: was, to: dto.hidden }, reason: { from: null, to: dto.reason } },
       });
       return { id, hidden: dto.hidden };
+    });
+  }
+
+  private async toFlagDtos(
+    rows: Prisma.ContentFlagGetPayload<{
+      include: { job: { select: { title: true } }; author: { select: typeof PERSON } };
+    }>[],
+  ): Promise<ContentFlagDto[]> {
+    const ids = (type: 'MESSAGE' | 'BID') =>
+      rows.filter((r) => r.targetType === type).map((r) => r.targetId);
+    const [messages, bids] = await Promise.all([
+      this.prisma.jobMessage.findMany({
+        where: { id: { in: ids('MESSAGE') } },
+        select: { id: true, body: true, hiddenAt: true },
+      }),
+      this.prisma.bid.findMany({
+        where: { id: { in: ids('BID') } },
+        select: { id: true, comment: true, hiddenAt: true },
+      }),
+    ]);
+    const text = new Map<string, { text: string; hidden: boolean }>([
+      ...messages.map((m) => [m.id, { text: m.body, hidden: !!m.hiddenAt }] as const),
+      ...bids.map((b) => [b.id, { text: b.comment, hidden: !!b.hiddenAt }] as const),
+    ]);
+    return rows.map((row) => {
+      const subject = text.get(row.targetId);
+      return {
+        id: row.id,
+        targetType: row.targetType as 'MESSAGE' | 'BID',
+        targetId: row.targetId,
+        kinds: row.kinds
+          .split(',')
+          .filter((k): k is ContentFlagKind =>
+            (CONTENT_FLAG_KINDS as readonly string[]).includes(k),
+          ),
+        status: row.status,
+        jobId: row.jobId,
+        jobTitle: row.job.title,
+        excerpt: excerpt(subject?.text ?? ''),
+        hidden: subject?.hidden ?? false,
+        author: author(row.author)!,
+        createdAt: row.createdAt.toISOString(),
+      };
     });
   }
 

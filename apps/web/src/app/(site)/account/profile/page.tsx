@@ -4,7 +4,8 @@ import { ApiUnavailable } from '@/components/api-unavailable';
 import { ContractorsOnly } from '@/components/jobs/contractors-only';
 import { Notice } from '@/components/notice';
 import { ProfileForm } from '@/components/profile/profile-form';
-import { PageHeader } from '@/components/ui/page-header';
+import { PageHeader, secondaryLinkClass } from '@/components/ui/page-header';
+import Link from 'next/link';
 import { ProgressRuler } from '@/components/ui/progress-ruler';
 import { Sheet, SheetBody, SheetHeader } from '@/components/ui/sheet';
 import { Stamp, StampEmpty } from '@/components/ui/stamp';
@@ -20,7 +21,7 @@ export default async function ProfilePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [{ token }, query] = await Promise.all([
+  const [{ token, user }, query] = await Promise.all([
     requireContractorPage('/account/profile'),
     searchParams,
   ]);
@@ -65,7 +66,12 @@ export default async function ProfilePage({
       <PageHeader
         back={{ href: '/account', label: 'Кабинет' }}
         title="Профиль мастера"
-        description="Заказчики видят профиль вместе с вашими откликами."
+        description="Заказчики видят профиль вместе с вашими откликами, рейтингом и отзывами."
+        action={
+          <Link href={`/contractors/${user.publicId}`} className={secondaryLinkClass}>
+            Как видят заказчики
+          </Link>
+        }
       />
       {query.saved ? (
         <div className="mt-6">

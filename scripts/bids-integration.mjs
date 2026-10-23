@@ -124,7 +124,7 @@ check(
 );
 
 // --- выбор исполнителя через форму (CSRF и владение)
-const ownerBids = await getJson(`/v1/me/jobs/${job.id}/bids`, customer.auth);
+const ownerBids = (await getJson(`/v1/me/jobs/${job.id}/bids`, customer.auth)).items;
 const bidAId = ownerBids.find((b) => b.price === 38000).id;
 const isAcceptA = (html) => html.includes('Да, выбрать') && html.includes('$ACTION');
 const forged = await submit(
@@ -157,7 +157,7 @@ check(
   accepted.status === 303 && accepted.location?.endsWith('?accepted=1'),
   `got ${accepted.status}`,
 );
-const afterAccept = await getJson(`/v1/me/jobs/${job.id}/bids`, customer.auth);
+const afterAccept = (await getJson(`/v1/me/jobs/${job.id}/bids`, customer.auth)).items;
 const statuses = Object.fromEntries(afterAccept.map((b) => [b.price, b.status]));
 check(
   'chosen bid ACCEPTED, the other REJECTED',

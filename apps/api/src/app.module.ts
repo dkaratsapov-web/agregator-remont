@@ -22,6 +22,12 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { PhotosModule } from './photos/photos.module';
 import { PlansModule } from './plans/plans.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { FavoritesModule } from './favorites/favorites.module';
+import { ContactsModule } from './contacts/contacts.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { UsageModule } from './analytics/usage';
+import { MaintenanceModule } from './maintenance/maintenance.module';
 
 @Module({
   imports: [
@@ -60,6 +66,12 @@ import { PrismaModule } from './prisma/prisma.module';
     NotificationsModule,
     ModerationModule,
     PhotosModule,
+    ReviewsModule,
+    FavoritesModule,
+    ContactsModule,
+    AnalyticsModule,
+    UsageModule,
+    MaintenanceModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

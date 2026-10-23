@@ -1,6 +1,12 @@
 'use server';
 
-import { MESSAGE_LIMITS, PLAN_LIMITS, QUIT_REASON_LIMITS, type PlanParty } from '@agregator/shared';
+import {
+  MESSAGE_LIMITS,
+  PLAN_LIMITS,
+  PLAN_PARTIES,
+  QUIT_REASON_LIMITS,
+  type PlanParty,
+} from '@agregator/shared';
 import { redirect } from 'next/navigation';
 import { FOREIGN_ORIGIN, isTrustedOrigin } from '@/lib/action-guard';
 import {
@@ -23,6 +29,7 @@ import {
   setPlanAuthor,
   submitStage,
 } from '@/lib/api';
+import { argInt, argString, readFormArgs } from '@/lib/form-args';
 import { photosOf } from '@/lib/photo-files';
 import { parsePlanForm, type PlanFieldErrors, type PlanFormValues } from '@/lib/plan-form';
 import { safeRedirectPath } from '@/lib/redirect';
@@ -277,4 +284,67 @@ export async function sendMessageAction(
     };
   }
   redirect(`${ready.back.split('#')[0]}#chat`);
+}
+
+// --- Формы: параметры скрытым полем args вместо bind (lib/form-args.ts, docs/NO_JS_FORMS.md).
+
+/** args: [jobId, version, returnTo] */
+export async function savePlanFormAction(prev: PlanActionState, form: FormData) {
+  const [jobId, version, returnTo] = readFormArgs(form);
+  return savePlanAction(argString(jobId), argInt(version), argString(returnTo), prev, form);
+}
+
+/** args: [jobId, version, author, returnTo] */
+export async function setPlanAuthorFormAction(_prev: PlanActionState, form: FormData) {
+  const [jobId, version, author, returnTo] = readFormArgs(form);
+  const party = argString(author);
+  if (!(PLAN_PARTIES as readonly string[]).includes(party)) return { error: NOT_FOUND };
+  return setPlanAuthorAction(
+    argString(jobId),
+    argInt(version),
+    party as PlanParty,
+    argString(returnTo),
+  );
+}
+
+/** args: [jobId, version, returnTo] */
+export async function approvePlanFormAction(_prev: PlanActionState, form: FormData) {
+  const [jobId, version, returnTo] = readFormArgs(form);
+  return approvePlanAction(argString(jobId), argInt(version), argString(returnTo));
+}
+
+/** args: [jobId, version, returnTo] */
+export async function returnPlanFormAction(prev: PlanActionState, form: FormData) {
+  const [jobId, version, returnTo] = readFormArgs(form);
+  return returnPlanAction(argString(jobId), argInt(version), argString(returnTo), prev, form);
+}
+
+/** args: [jobId, stageId, returnTo] */
+export async function submitStageFormAction(prev: PlanActionState, form: FormData) {
+  const [jobId, stageId, returnTo] = readFormArgs(form);
+  return submitStageAction(argString(jobId), argString(stageId), argString(returnTo), prev, form);
+}
+
+/** args: [jobId, stageId, returnTo] */
+export async function acceptStageFormAction(_prev: PlanActionState, form: FormData) {
+  const [jobId, stageId, returnTo] = readFormArgs(form);
+  return acceptStageAction(argString(jobId), argString(stageId), argString(returnTo));
+}
+
+/** args: [jobId, stageId, returnTo] */
+export async function reworkStageFormAction(prev: PlanActionState, form: FormData) {
+  const [jobId, stageId, returnTo] = readFormArgs(form);
+  return reworkStageAction(argString(jobId), argString(stageId), argString(returnTo), prev, form);
+}
+
+/** args: [jobId, returnTo] */
+export async function quitJobFormAction(prev: PlanActionState, form: FormData) {
+  const [jobId, returnTo] = readFormArgs(form);
+  return quitJobAction(argString(jobId), argString(returnTo), prev, form);
+}
+
+/** args: [jobId, requestId, returnTo] */
+export async function sendMessageFormAction(prev: PlanActionState, form: FormData) {
+  const [jobId, requestId, returnTo] = readFormArgs(form);
+  return sendMessageAction(argString(jobId), argString(requestId), argString(returnTo), prev, form);
 }

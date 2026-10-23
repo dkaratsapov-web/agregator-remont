@@ -8,10 +8,14 @@ import { createTestApp } from './create-app';
  */
 const LIMIT = 3;
 
+// Каждая попытка — на свой адрес: здесь проверяется лимит по IP, а серия неверных паролей к
+// одному адресу (своя защита, login-throttle.e2e-spec.ts) не должна вмешиваться.
+let attempts = 0;
 const attempt = (app: NestExpressApplication, forwardedFor?: string) => {
+  attempts += 1;
   const req = request(app.getHttpServer())
     .post('/v1/auth/login')
-    .send({ email: 'victim@example.ru', password: 'guess-password-1' });
+    .send({ email: `victim-${attempts}@example.ru`, password: 'guess-password-1' });
   return forwardedFor ? req.set('X-Forwarded-For', forwardedFor) : req;
 };
 

@@ -8,12 +8,14 @@
 // Требует запущенные API и web (production-сборка), как cabinet-e2e.
 import { chromium } from 'playwright';
 import { API, WEB, createChecker } from './lib/forms.mjs';
+import { checkCsp, watchCsp } from './lib/csp-watch.mjs';
 
 const { check, finish } = createChecker();
 const stamp = Date.now();
 const browser = await chromium.launch(
   process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
 );
+const cspViolations = watchCsp(browser);
 const phone = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true };
 const customerContext = await browser.newContext(phone);
 const contractorContext = await browser.newContext(phone);
@@ -135,7 +137,7 @@ try {
   check('submit button reached by Tab has a visible focus ring', focusVisible);
   await contractor.keyboard.press('Enter');
   await contractor.waitForURL(/\?bid=sent/, { timeout: 15_000 });
-  const bids = (await apiAs(customerContext, `/v1/me/jobs/${jobId}/bids`)).body ?? [];
+  const bids = (await apiAs(customerContext, `/v1/me/jobs/${jobId}/bids`)).body?.items ?? [];
   check('bid sent with the keyboard only', bids.length === 1 && bids[0].price === 12000);
 
   // --- Заказчик: выбор исполнителя и закрытие с исходом.
@@ -197,4 +199,5 @@ try {
   await browser.close();
 }
 
+checkCsp(check, cspViolations);
 finish('journey e2e');

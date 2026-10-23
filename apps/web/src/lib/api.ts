@@ -1,6 +1,19 @@
 import 'server-only';
 import type {
+  AdminUserDto,
+  AnalyticsDto,
+  AnalyticsPeriod,
   AuthSessionDto,
+  ContactExchangeDto,
+  ContentFlagDto,
+  FavoriteIdsDto,
+  FavoriteStateDto,
+  JobReviewStateDto,
+  MyReportDto,
+  PasswordResetLinkDto,
+  PublicContractorDto,
+  ReviewDto,
+  ReviewInput,
   BidInput,
   ContractorProfileDto,
   ContractorProfileInput,
@@ -39,6 +52,7 @@ import type {
   PlanInput,
   PlanParty,
 } from '@agregator/shared';
+import { PAGINATION } from '@agregator/shared';
 
 export class ApiError extends Error {
   constructor(
@@ -46,6 +60,8 @@ export class ApiError extends Error {
     readonly status?: number,
     /** Сообщение API для пользователя (валидация, конфликт), если оно было в ответе. */
     readonly userMessage?: string,
+    /** Машинный код ошибки API (ADR 0002): VALIDATION_FAILED, JOB_NOT_OPEN… */
+    readonly code?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -129,20 +145,26 @@ export async function getJob(id: string): Promise<JobDto | null> {
   return (await res.json()) as JobDto;
 }
 
-async function userMessageOf(res: Response): Promise<string | undefined> {
+/** Ошибка из ответа API: текст для человека и машинный код, если они есть в теле. */
+async function apiErrorOf(label: string, res: Response): Promise<ApiError> {
+  let userMessage: string | undefined;
+  let code: string | undefined;
   try {
-    const body = (await res.json()) as { message?: unknown };
-    if (typeof body.message === 'string') return body.message;
-    if (Array.isArray(body.message) && typeof body.message[0] === 'string') return body.message[0];
+    const body = (await res.json()) as { message?: unknown; code?: unknown };
+    if (typeof body.message === 'string') userMessage = body.message;
+    else if (Array.isArray(body.message) && typeof body.message[0] === 'string') {
+      userMessage = body.message[0];
+    }
+    if (typeof body.code === 'string') code = body.code;
   } catch {
     // тело не JSON
   }
-  return undefined;
+  return new ApiError(`${label} responded ${res.status}`, res.status, userMessage, code);
 }
 
 async function expectJson<T>(res: Response, label: string): Promise<T> {
   if (!res.ok) {
-    throw new ApiError(`${label} responded ${res.status}`, res.status, await userMessageOf(res));
+    throw await apiErrorOf(label, res);
   }
   return (await res.json()) as T;
 }
@@ -268,11 +290,7 @@ export async function deleteDraft(token: string, id: string, clientIp?: string):
     clientIp,
   });
   if (res.status !== 204) {
-    throw new ApiError(
-      `DELETE /v1/me/drafts/:id responded ${res.status}`,
-      res.status,
-      await userMessageOf(res),
-    );
+    throw await apiErrorOf('DELETE /v1/me/drafts/:id', res);
   }
 }
 
@@ -365,9 +383,15 @@ export async function withdrawBid(
 
 // --- Заказчик: отклики на свой заказ
 
-export async function listJobBids(token: string, jobId: string): Promise<JobBidDto[]> {
-  const res = await request(`/v1/me/jobs/${encodeURIComponent(jobId)}/bids`, { token });
-  return expectJson<JobBidDto[]>(res, 'GET /v1/me/jobs/:id/bids');
+/** Отклики на свой заказ по страницам (от ранних к поздним), до 50 на страницу. */
+export async function listJobBids(
+  token: string,
+  jobId: string,
+  page = 1,
+): Promise<Paginated<JobBidDto>> {
+  const query = new URLSearchParams({ page: String(page), limit: String(PAGINATION.MAX_LIMIT) });
+  const res = await request(`/v1/me/jobs/${encodeURIComponent(jobId)}/bids?${query}`, { token });
+  return expectJson<Paginated<JobBidDto>>(res, 'GET /v1/me/jobs/:id/bids');
 }
 
 export async function acceptBid(
@@ -489,11 +513,7 @@ export async function quitJob(
     clientIp,
   });
   if (!res.ok) {
-    throw new ApiError(
-      `POST /v1/jobs/:id/quit responded ${res.status}`,
-      res.status,
-      await userMessageOf(res),
-    );
+    throw await apiErrorOf('POST /v1/jobs/:id/quit', res);
   }
 }
 
@@ -653,11 +673,7 @@ export async function changePassword(
 ): Promise<void> {
   const res = await request('/v1/me/password', { method: 'POST', body: input, token, clientIp });
   if (res.status !== 204) {
-    throw new ApiError(
-      `POST /v1/me/password responded ${res.status}`,
-      res.status,
-      await userMessageOf(res),
-    );
+    throw await apiErrorOf('POST /v1/me/password', res);
   }
 }
 
@@ -673,11 +689,7 @@ export async function revokeSession(token: string, id: string, clientIp?: string
     clientIp,
   });
   if (res.status !== 204) {
-    throw new ApiError(
-      `DELETE /v1/me/sessions/:id responded ${res.status}`,
-      res.status,
-      await userMessageOf(res),
-    );
+    throw await apiErrorOf('DELETE /v1/me/sessions/:id', res);
   }
 }
 
@@ -868,7 +880,7 @@ export async function resolveReport(
 /** Скрыть или вернуть заказ, сообщение или отклик. */
 export async function setContentHidden(
   token: string,
-  kind: 'jobs' | 'messages' | 'bids',
+  kind: 'jobs' | 'messages' | 'bids' | 'reviews',
   id: string,
   input: { hidden: boolean; reason: string },
   clientIp?: string,
@@ -895,4 +907,177 @@ export async function setUserBlocked(
     clientIp,
   });
   return expectJson<BlockedStateDto>(res, 'POST /v1/admin/users/:id/blocked');
+}
+
+// --- Аккаунты: новый пароль по ссылке, пользователи для администратора
+
+/** Новый пароль по ссылке; в ответе — новый вход. */
+export async function resetPassword(
+  input: { token: string; password: string },
+  clientIp?: string,
+  userAgent?: string,
+): Promise<AuthSessionDto> {
+  const res = await request('/v1/auth/password-reset', {
+    method: 'POST',
+    body: input,
+    clientIp,
+    userAgent,
+  });
+  return expectJson<AuthSessionDto>(res, 'POST /v1/auth/password-reset');
+}
+
+export async function listAdminUsers(
+  token: string,
+  q: string,
+  page: number,
+): Promise<Paginated<AdminUserDto>> {
+  const query = new URLSearchParams({ page: String(page) });
+  if (q) query.set('q', q);
+  const res = await request(`/v1/admin/users?${query}`, { token });
+  return expectJson<Paginated<AdminUserDto>>(res, 'GET /v1/admin/users');
+}
+
+export async function issuePasswordReset(
+  token: string,
+  userId: string,
+  clientIp?: string,
+): Promise<PasswordResetLinkDto> {
+  const res = await request(`/v1/admin/users/${encodeURIComponent(userId)}/password-reset`, {
+    method: 'POST',
+    token,
+    clientIp,
+  });
+  return expectJson<PasswordResetLinkDto>(res, 'POST /v1/admin/users/:id/password-reset');
+}
+
+// --- Автопроверка контактов и свои жалобы
+
+export async function listFlags(
+  token: string,
+  status: ReportFilter,
+  page: number,
+): Promise<Paginated<ContentFlagDto>> {
+  const res = await request(`/v1/admin/flags?status=${status}&page=${page}`, { token });
+  return expectJson<Paginated<ContentFlagDto>>(res, 'GET /v1/admin/flags');
+}
+
+export async function resolveFlag(
+  token: string,
+  id: string,
+  status: 'RESOLVED' | 'DISMISSED',
+  clientIp?: string,
+): Promise<ContentFlagDto> {
+  const res = await request(`/v1/admin/flags/${encodeURIComponent(id)}/resolve`, {
+    method: 'POST',
+    body: { status },
+    token,
+    clientIp,
+  });
+  return expectJson<ContentFlagDto>(res, 'POST /v1/admin/flags/:id/resolve');
+}
+
+export async function listMyReports(token: string, page: number): Promise<Paginated<MyReportDto>> {
+  const res = await request(`/v1/reports/mine?page=${page}`, { token });
+  return expectJson<Paginated<MyReportDto>>(res, 'GET /v1/reports/mine');
+}
+
+export async function markReportsSeen(token: string): Promise<void> {
+  const res = await request('/v1/reports/mine/seen', { method: 'POST', token });
+  if (res.status !== 204) {
+    throw new ApiError(`POST /v1/reports/mine/seen responded ${res.status}`, res.status);
+  }
+}
+
+// --- Отзывы и карточка мастера
+
+/** null — заказа нет или он чужой (404). */
+export async function getJobReview(
+  token: string,
+  jobId: string,
+): Promise<JobReviewStateDto | null> {
+  const res = await request(`/v1/me/jobs/${encodeURIComponent(jobId)}/review`, { token });
+  if (res.status === 404) return null;
+  return expectJson<JobReviewStateDto>(res, 'GET /v1/me/jobs/:id/review');
+}
+
+export async function createReview(
+  token: string,
+  jobId: string,
+  input: ReviewInput,
+  clientIp?: string,
+): Promise<ReviewDto> {
+  const res = await request(`/v1/me/jobs/${encodeURIComponent(jobId)}/review`, {
+    method: 'POST',
+    body: input,
+    token,
+    clientIp,
+  });
+  return expectJson<ReviewDto>(res, 'POST /v1/me/jobs/:id/review');
+}
+
+/** null — мастера нет (404). */
+export async function getContractor(
+  publicId: string,
+  page: number,
+): Promise<PublicContractorDto | null> {
+  const res = await request(`/v1/contractors/${encodeURIComponent(publicId)}?page=${page}`);
+  if (res.status === 404) return null;
+  return expectJson<PublicContractorDto>(res, 'GET /v1/contractors/:publicId');
+}
+
+// --- Избранное
+
+export async function listFavorites(token: string, page: number): Promise<Paginated<JobDto>> {
+  const res = await request(`/v1/me/favorites?page=${page}`, { token });
+  return expectJson<Paginated<JobDto>>(res, 'GET /v1/me/favorites');
+}
+
+export async function getFavoriteIds(token: string): Promise<string[]> {
+  const res = await request('/v1/me/favorites/ids', { token });
+  return (await expectJson<FavoriteIdsDto>(res, 'GET /v1/me/favorites/ids')).jobIds;
+}
+
+export async function setFavorite(
+  token: string,
+  jobId: string,
+  favorite: boolean,
+  clientIp?: string,
+): Promise<FavoriteStateDto> {
+  const res = await request(`/v1/me/favorites/${encodeURIComponent(jobId)}`, {
+    method: favorite ? 'PUT' : 'DELETE',
+    token,
+    clientIp,
+  });
+  return expectJson<FavoriteStateDto>(res, `${favorite ? 'PUT' : 'DELETE'} /v1/me/favorites/:id`);
+}
+
+/** Обмен контактами в сделке; null — сделки нет или заказ не виден (404). */
+export async function getContacts(
+  token: string,
+  jobId: string,
+): Promise<ContactExchangeDto | null> {
+  const res = await request(`/v1/jobs/${encodeURIComponent(jobId)}/contacts`, { token });
+  if (res.status === 404) return null;
+  return expectJson<ContactExchangeDto>(res, 'GET /v1/jobs/:id/contacts');
+}
+
+/** Открыть (shared) или скрыть свои контакты второй стороне сделки. */
+export async function setContactsShared(
+  token: string,
+  jobId: string,
+  shared: boolean,
+  clientIp?: string,
+): Promise<ContactExchangeDto> {
+  const res = await request(`/v1/jobs/${encodeURIComponent(jobId)}/contacts`, {
+    method: shared ? 'PUT' : 'DELETE',
+    token,
+    clientIp,
+  });
+  return expectJson<ContactExchangeDto>(res, `${shared ? 'PUT' : 'DELETE'} /v1/jobs/:id/contacts`);
+}
+
+/** Воронка по дням для администратора (только числа). */
+export async function getAnalytics(token: string, days: AnalyticsPeriod): Promise<AnalyticsDto> {
+  const res = await request(`/v1/admin/analytics?days=${days}`, { token });
+  return expectJson<AnalyticsDto>(res, 'GET /v1/admin/analytics');
 }

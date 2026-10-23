@@ -181,4 +181,25 @@ describe('field errors (UX-5)', () => {
     expect(result.fields?.password).toBeTruthy();
     expect(result.values).toEqual({ email: 'a@b.ru' });
   });
+
+  it('a pause after a series of wrong passwords says how long to wait', async () => {
+    sameOrigin();
+    const message =
+      'Слишком много неверных попыток входа для этого адреса. Повторите через 8 с или восстановите пароль.';
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ statusCode: 429, code: 'LOGIN_THROTTLED', message }), {
+        status: 429,
+      }),
+    );
+    const result = await loginAction({}, form({ email: 'a@b.ru', password: 'password-123' }));
+    expect(result.error).toBe(message);
+    // Обычный лимит частоты — прежний общий текст.
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ statusCode: 429, code: 'RATE_LIMITED', message: 'x' }), {
+        status: 429,
+      }),
+    );
+    const limited = await loginAction({}, form({ email: 'a@b.ru', password: 'password-123' }));
+    expect(limited.error).toMatch(/Подождите минуту/);
+  });
 });

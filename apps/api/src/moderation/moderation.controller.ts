@@ -1,7 +1,11 @@
 import type {
+  AdminUserDto,
   BlockedStateDto,
+  ContentFlagDto,
   HiddenStateDto,
+  MyReportDto,
   Paginated,
+  PasswordResetLinkDto,
   ReportDto,
   ReportReceivedDto,
 } from '@agregator/shared';
@@ -16,7 +20,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import type { AuthContext } from '../auth/auth.types';
 import { CurrentAuth } from '../auth/current-auth.decorator';
 import { WriteRateLimited } from '../auth/rate-limit';
@@ -25,16 +29,26 @@ import { SessionGuard } from '../auth/session.guard';
 import { ApiErrors, ApiRole, ApiSession } from '../openapi/decorators';
 import {
   BlockedStateSchema,
+  ContentFlagSchema,
   HiddenStateSchema,
+  PaginatedAdminUserSchema,
+  PaginatedContentFlagSchema,
+  PaginatedMyReportSchema,
   PaginatedReportSchema,
+  PasswordResetLinkSchema,
   ReportReceivedSchema,
   ReportSchema,
 } from '../openapi/schemas';
+import { PaginationQuery } from '../jobs/dto/list-jobs.query';
+import { AdminUsersService } from './admin-users.service';
 import {
   BlockDto,
   CreateReportDto,
   HideDto,
+  ListFlagsQuery,
   ListReportsQuery,
+  ListUsersQuery,
+  ResolveFlagDto,
   ResolveReportDto,
 } from './dto/moderation.dto';
 import { ModerationService } from './moderation.service';
@@ -62,6 +76,23 @@ export class ReportsController {
   ): Promise<ReportReceivedDto> {
     return this.reports.create(auth.user, dto);
   }
+
+  @Get('mine')
+  @ApiOkResponse({ type: PaginatedMyReportSchema, description: 'Свои жалобы и решения по ним' })
+  @ApiErrors(400)
+  mine(
+    @CurrentAuth() auth: AuthContext,
+    @Query() query: PaginationQuery,
+  ): Promise<Paginated<MyReportDto>> {
+    return this.reports.mine(auth.user, query.page);
+  }
+
+  @Post('mine/seen')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({ description: 'Решения по своим жалобам отмечены просмотренными' })
+  async markSeen(@CurrentAuth() auth: AuthContext): Promise<void> {
+    await this.reports.markSeen(auth.user);
+  }
 }
 
 /** Модерация для администратора. Порядок guard'ов: сначала сессия, затем роль. */
@@ -72,7 +103,48 @@ export class ReportsController {
 @UseGuards(SessionGuard, RolesGuard)
 @Roles('ADMIN')
 export class AdminModerationController {
-  constructor(private readonly moderation: ModerationService) {}
+  constructor(
+    private readonly moderation: ModerationService,
+    private readonly users: AdminUsersService,
+  ) {}
+
+  @Get('users')
+  @ApiOkResponse({ type: PaginatedAdminUserSchema })
+  @ApiErrors(400)
+  listUsers(@Query() query: ListUsersQuery): Promise<Paginated<AdminUserDto>> {
+    return this.users.list(query);
+  }
+
+  @Post('users/:id/password-reset')
+  @WriteRateLimited()
+  @ApiCreatedResponse({ type: PasswordResetLinkSchema, description: 'Ссылка для нового пароля' })
+  @ApiErrors(404, 409)
+  issuePasswordReset(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') id: string,
+  ): Promise<PasswordResetLinkDto> {
+    return this.users.issuePasswordReset(auth.user.id, id);
+  }
+
+  @Get('flags')
+  @ApiOkResponse({ type: PaginatedContentFlagSchema })
+  @ApiErrors(400)
+  listFlags(@Query() query: ListFlagsQuery): Promise<Paginated<ContentFlagDto>> {
+    return this.moderation.listFlags(query);
+  }
+
+  @Post('flags/:id/resolve')
+  @HttpCode(HttpStatus.OK)
+  @WriteRateLimited()
+  @ApiOkResponse({ type: ContentFlagSchema })
+  @ApiErrors(400, 404, 409)
+  resolveFlag(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') id: string,
+    @Body() dto: ResolveFlagDto,
+  ): Promise<ContentFlagDto> {
+    return this.moderation.resolveFlag(auth.user.id, id, dto);
+  }
 
   @Get('reports')
   @ApiOkResponse({ type: PaginatedReportSchema })
@@ -131,6 +203,19 @@ export class AdminModerationController {
     @Body() dto: HideDto,
   ): Promise<HiddenStateDto> {
     return this.moderation.setBidHidden(auth.user.id, id, dto);
+  }
+
+  @Post('reviews/:id/hidden')
+  @HttpCode(HttpStatus.OK)
+  @WriteRateLimited()
+  @ApiOkResponse({ type: HiddenStateSchema })
+  @ApiErrors(400, 404)
+  hideReview(
+    @CurrentAuth() auth: AuthContext,
+    @Param('id') id: string,
+    @Body() dto: HideDto,
+  ): Promise<HiddenStateDto> {
+    return this.moderation.setReviewHidden(auth.user.id, id, dto);
   }
 
   @Post('users/:id/blocked')

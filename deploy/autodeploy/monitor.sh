@@ -92,11 +92,17 @@ fi
 
 log "проверок с проблемами: $problems"
 
+# Итог — в STATE_DIR/monitor-status (readiness.sh требует свежий принятый «жив» без проблем).
 heartbeat=$(env_value MONITOR_HEARTBEAT_URL)
 if [ -n "$heartbeat" ]; then
   [ "$problems" -eq 0 ] || heartbeat="${heartbeat%/}/fail"
-  printf 'url = "%s"\n' "$heartbeat" | curl -fsS --max-time 10 -K - > /dev/null ||
+  if printf 'url = "%s"\n' "$heartbeat" | curl -fsS --max-time 10 -K - > /dev/null; then
+    write_status monitor-status heartbeat=accepted "problems=$problems"
+  else
     log 'внешний монитор не ответил (MONITOR_HEARTBEAT_URL)'
+    write_status monitor-status heartbeat=failed "problems=$problems"
+  fi
 else
   log 'внешний монитор не настроен (MONITOR_HEARTBEAT_URL): о падении всего сервера никто не узнает'
+  write_status monitor-status heartbeat=unconfigured "problems=$problems"
 fi

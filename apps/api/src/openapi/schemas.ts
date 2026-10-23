@@ -6,6 +6,7 @@ import {
   JOB_CLOSE_OUTCOMES,
   JOB_STATUSES,
   NOTIFICATION_KINDS,
+  CONTENT_FLAG_KINDS,
   REPORT_REASONS,
   REPORT_STATUSES,
   REPORT_TARGETS,
@@ -17,6 +18,28 @@ import {
   UI_THEMES,
   USER_ROLES,
   type AuthSessionDto,
+  type AdminUserDto,
+  ANALYTICS_METRICS,
+  API_ERROR_CODES,
+  FIELD_ERROR_CODES,
+  type ApiErrorBody,
+  type FieldError,
+  type FieldErrorCode,
+  type AnalyticsDto,
+  type AnalyticsMetric,
+  type AnalyticsSeriesDto,
+  type ContactExchangeDto,
+  type ContentFlagDto,
+  type PartyContactsDto,
+  type ContentFlagKind,
+  type ContractorRatingDto,
+  type FavoriteIdsDto,
+  type FavoriteStateDto,
+  type JobReviewStateDto,
+  type MyReportDto,
+  type PasswordResetLinkDto,
+  type PublicContractorDto,
+  type ReviewDto,
   type BidRejectReason,
   type BidStatus,
   type ContractorProfileDto,
@@ -232,6 +255,17 @@ export class ContractorProfileSchema implements ContractorProfileDto {
   updatedAt!: string | null;
 }
 
+@ApiSchema({ name: 'ContractorRatingDto' })
+export class ContractorRatingSchema implements ContractorRatingDto {
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'Средняя оценка 1–5 с одним знаком; null — отзывов нет',
+  })
+  average!: number | null;
+  @int() count!: number;
+}
+
 class BidFields {
   @ApiProperty() id!: string;
   @ApiProperty() jobId!: string;
@@ -281,9 +315,11 @@ export class PaginatedMyBidSchema implements Paginated<MyBidDto> {
 
 @ApiSchema({ name: 'BidContractor' })
 export class BidContractorSchema {
+  @int({ description: 'Номер публичной карточки мастера' }) publicId!: number;
   @ApiProperty() name!: string;
   @ApiProperty({ type: ContractorProfileSchema, nullable: true })
   profile!: ContractorProfileSchema | null;
+  @ApiProperty({ type: ContractorRatingSchema }) rating!: ContractorRatingSchema;
 }
 
 @ApiSchema({ name: 'JobBidDto' })
@@ -324,21 +360,29 @@ export class HealthSchema {
   @ApiProperty({ enum: ['ok'] }) status!: 'ok';
 }
 
+@ApiSchema({ name: 'FieldError' })
+export class FieldErrorSchema implements FieldError {
+  @ApiProperty({ description: 'Путь к полю через точку: title, items.2.category' }) path!: string;
+  @ApiProperty({ enum: FIELD_ERROR_CODES, enumName: 'FieldErrorCode' }) code!: FieldErrorCode;
+  @ApiProperty() message!: string;
+}
+
 /**
- * Текущий формат ошибок NestJS (до ADR 0002 / PR C). `message` — строка или массив строк
- * (ошибки валидации); `error` есть не у всех исключений (например, у ответов throttler'а нет).
+ * Единый формат ошибок (ADR 0002): машинный `code` есть всегда; `message` — строка, массив —
+ * только у VALIDATION_FAILED (те же тексты, что в fieldErrors).
  */
 @ApiSchema({ name: 'ErrorResponse' })
-export class ErrorSchema {
+export class ErrorSchema implements ApiErrorBody {
   @int() statusCode!: number;
+  @ApiProperty({
+    description: `Машинный код: ${API_ERROR_CODES.join(', ')}; вход через банк — OAUTH_*`,
+  })
+  code!: string;
   @ApiProperty({ oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] })
   message!: string | string[];
-  @ApiProperty({ required: false }) error?: string;
-  @ApiProperty({
-    required: false,
-    description: 'Код ошибки для программы (вход через банк: OAUTH_*)',
-  })
-  code?: string;
+  @ApiProperty({ description: 'Текстовое имя статуса' }) error!: string;
+  @ApiProperty({ type: FieldErrorSchema, isArray: true, required: false })
+  fieldErrors?: FieldErrorSchema[];
 }
 
 @ApiSchema({ name: 'OAuthNeedRoleError' })
@@ -489,6 +533,7 @@ export class NotificationsSummarySchema implements NotificationsSummaryDto {
   @int({ description: 'Непрочитанных всего' }) unread!: number;
   @ApiProperty({ type: [NotificationsSummaryJobSchema], description: 'Заказы с непрочитанным' })
   jobs!: NotificationsSummaryJobSchema[];
+  @int({ description: 'Непросмотренные решения по вашим жалобам' }) reportDecisions!: number;
 }
 
 @ApiSchema({ name: 'ReportReceivedDto' })
@@ -551,4 +596,184 @@ export class HiddenStateSchema implements HiddenStateDto {
 export class BlockedStateSchema implements BlockedStateDto {
   @ApiProperty() id!: string;
   @ApiProperty() blocked!: boolean;
+}
+
+@ApiSchema({ name: 'PasswordResetLinkDto' })
+export class PasswordResetLinkSchema implements PasswordResetLinkDto {
+  @ApiProperty({ description: 'Токен для ссылки /reset/<токен>; показывается один раз' })
+  token!: string;
+  @dateTime() expiresAt!: string;
+}
+
+@ApiSchema({ name: 'AdminUserDto' })
+export class AdminUserSchema implements AdminUserDto {
+  @ApiProperty() id!: string;
+  @int() publicId!: number;
+  @ApiProperty() email!: string;
+  @ApiProperty() name!: string;
+  @ApiProperty({ enum: USER_ROLES, enumName: 'UserRole' }) role!: UserRole;
+  @ApiProperty() blocked!: boolean;
+  @dateTime() createdAt!: string;
+  @int() jobs!: number;
+  @int() bids!: number;
+  @int({ description: 'Открытых жалоб на его заказы, сообщения и отклики' }) openReports!: number;
+}
+
+@ApiSchema({ name: 'PaginatedJobBidDto' })
+export class PaginatedJobBidSchema implements Paginated<JobBidDto> {
+  @ApiProperty({ type: [JobBidSchema] }) items!: JobBidSchema[];
+  @int() page!: number;
+  @int() limit!: number;
+  @int() total!: number;
+}
+
+@ApiSchema({ name: 'PaginatedAdminUserDto' })
+export class PaginatedAdminUserSchema implements Paginated<AdminUserDto> {
+  @ApiProperty({ type: [AdminUserSchema] }) items!: AdminUserSchema[];
+  @int() page!: number;
+  @int() limit!: number;
+  @int() total!: number;
+}
+
+@ApiSchema({ name: 'ReviewDto' })
+export class ReviewSchema implements ReviewDto {
+  @ApiProperty() id!: string;
+  @int() rating!: number;
+  @ApiProperty() text!: string;
+  @ApiProperty() authorName!: string;
+  @ApiProperty() jobTitle!: string;
+  @dateTime() createdAt!: string;
+}
+
+@ApiSchema({ name: 'PublicContractorDto' })
+export class PublicContractorSchema implements PublicContractorDto {
+  @int() publicId!: number;
+  @ApiProperty() name!: string;
+  @ApiProperty({ type: ContractorProfileSchema, nullable: true })
+  profile!: ContractorProfileSchema | null;
+  @ApiProperty({ type: ContractorRatingSchema }) rating!: ContractorRatingSchema;
+  @int() completedJobs!: number;
+  @dateTime() memberSince!: string;
+  @ApiProperty({ type: [ReviewSchema] }) reviews!: ReviewSchema[];
+  @ApiProperty() hasMoreReviews!: boolean;
+}
+
+export class ReviewContractorSchema {
+  @int() publicId!: number;
+  @ApiProperty() name!: string;
+}
+
+@ApiSchema({ name: 'JobReviewStateDto' })
+export class JobReviewStateSchema implements JobReviewStateDto {
+  @ApiProperty() canReview!: boolean;
+  @ApiProperty({ type: ReviewSchema, nullable: true }) review!: ReviewSchema | null;
+  @ApiProperty({ type: ReviewContractorSchema, nullable: true })
+  contractor!: ReviewContractorSchema | null;
+}
+
+@ApiSchema({ name: 'PartyContactsDto' })
+export class PartyContactsSchema implements PartyContactsDto {
+  @ApiProperty() name!: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    pattern: '^\\+7[3489][0-9]{9}$',
+    description: 'null — телефон в профиле не указан',
+  })
+  phone!: string | null;
+  @ApiProperty() email!: string;
+}
+
+@ApiSchema({ name: 'ContactExchangeDto' })
+export class ContactExchangeSchema implements ContactExchangeDto {
+  @ApiProperty({ enum: PLAN_PARTIES, enumName: 'PlanParty', description: 'Кто смотрит' })
+  viewer!: PlanParty;
+  @ApiProperty() counterpartName!: string;
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'Когда я открыл свои контакты; null — не открывал',
+  })
+  mySharedAt!: string | null;
+  @ApiProperty() myPhoneSet!: boolean;
+  @ApiProperty({
+    type: PartyContactsSchema,
+    nullable: true,
+    description: 'Контакты второй стороны; null — она их не открывала',
+  })
+  theirs!: PartyContactsSchema | null;
+}
+
+@ApiSchema({ name: 'AnalyticsSeriesDto' })
+export class AnalyticsSeriesSchema implements AnalyticsSeriesDto {
+  @ApiProperty({ enum: ANALYTICS_METRICS, enumName: 'AnalyticsMetric' }) metric!: AnalyticsMetric;
+  @ApiProperty({ type: 'integer', minimum: 0 }) total!: number;
+  @ApiProperty({ type: 'integer', isArray: true, description: 'По дням, в порядке days' })
+  perDay!: number[];
+}
+
+@ApiSchema({ name: 'AnalyticsDto' })
+export class AnalyticsSchema implements AnalyticsDto {
+  @ApiProperty({ type: String, isArray: true, description: 'YYYY-MM-DD по Москве, по возрастанию' })
+  days!: string[];
+  @ApiProperty({ type: AnalyticsSeriesSchema, isArray: true }) series!: AnalyticsSeriesSchema[];
+}
+
+@ApiSchema({ name: 'FavoriteStateDto' })
+export class FavoriteStateSchema implements FavoriteStateDto {
+  @ApiProperty() jobId!: string;
+  @ApiProperty() favorite!: boolean;
+}
+
+@ApiSchema({ name: 'MyReportDto' })
+export class MyReportSchema implements MyReportDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ enum: REPORT_TARGETS, enumName: 'ReportTarget' }) targetType!: ReportTarget;
+  @ApiProperty({ enum: REPORT_REASONS, enumName: 'ReportReason' }) reason!: ReportReason;
+  @ApiProperty({ enum: REPORT_STATUSES, enumName: 'ReportStatus' }) status!: ReportStatus;
+  @ApiProperty() jobId!: string;
+  @ApiProperty() jobTitle!: string;
+  @ApiProperty({ type: String, nullable: true }) note!: string | null;
+  @dateTime() createdAt!: string;
+  @nullableDateTime() resolvedAt!: string | null;
+  @ApiProperty({ description: 'Решение есть, но ещё не просмотрено' }) unseen!: boolean;
+}
+
+@ApiSchema({ name: 'PaginatedMyReportDto' })
+export class PaginatedMyReportSchema implements Paginated<MyReportDto> {
+  @ApiProperty({ type: [MyReportSchema] }) items!: MyReportSchema[];
+  @int() page!: number;
+  @int() limit!: number;
+  @int() total!: number;
+}
+
+@ApiSchema({ name: 'ContentFlagDto' })
+export class ContentFlagSchema implements ContentFlagDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ enum: ['MESSAGE', 'BID'], enumName: 'ContentFlagTarget' })
+  targetType!: 'MESSAGE' | 'BID';
+  @ApiProperty() targetId!: string;
+  @ApiProperty({ enum: CONTENT_FLAG_KINDS, enumName: 'ContentFlagKind', isArray: true })
+  kinds!: ContentFlagKind[];
+  @ApiProperty({ enum: REPORT_STATUSES, enumName: 'ReportStatus' }) status!: ReportStatus;
+  @ApiProperty() jobId!: string;
+  @ApiProperty() jobTitle!: string;
+  @ApiProperty() excerpt!: string;
+  @ApiProperty() hidden!: boolean;
+  @ApiProperty({ type: ReportAuthorSchema }) author!: ReportAuthorSchema;
+  @dateTime() createdAt!: string;
+}
+
+@ApiSchema({ name: 'PaginatedContentFlagDto' })
+export class PaginatedContentFlagSchema implements Paginated<ContentFlagDto> {
+  @ApiProperty({ type: [ContentFlagSchema] }) items!: ContentFlagSchema[];
+  @int() page!: number;
+  @int() limit!: number;
+  @int() total!: number;
+}
+
+@ApiSchema({ name: 'FavoriteIdsDto' })
+export class FavoriteIdsSchema implements FavoriteIdsDto {
+  @ApiProperty({ type: [String] }) jobIds!: string[];
 }

@@ -7,6 +7,7 @@
 import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
 import { API, WEB, createChecker, registerViaApi } from './lib/forms.mjs';
+import { checkCsp, watchCsp } from './lib/csp-watch.mjs';
 
 const { check, finish } = createChecker();
 // Уникальные названия: карточки жалоб ищутся по заказу, прежние прогоны не мешают.
@@ -46,6 +47,7 @@ async function openJob(title) {
 const browser = await chromium.launch(
   process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
 );
+const cspViolations = watchCsp(browser);
 const host = new URL(WEB).hostname;
 async function contextFor(who, options = {}) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, ...options });
@@ -115,8 +117,15 @@ try {
   // --- Очередь администратора.
   const adminPage = await (await contextFor(admin)).newPage();
   watch(adminPage);
-  await adminPage.goto(`${WEB}/admin/reports`, { waitUntil: 'networkidle' });
   const cards = adminPage.locator('main ul > li').filter({ hasText: jobTitle });
+  // Очередь — старые первыми, по 20 на страницу: в базе, где уже есть открытые жалобы
+  // (повторный прогон, стенд), свои могут оказаться дальше первой страницы.
+  for (let page = 1; page <= 10; page += 1) {
+    await adminPage.goto(`${WEB}/admin/reports${page > 1 ? `?page=${page}` : ''}`, {
+      waitUntil: 'networkidle',
+    });
+    if ((await cards.count()) > 0) break;
+  }
   check('admin sees both complaints in the queue', (await cards.count()) === 2);
   const onMessage = cards.filter({ hasText: 'Сообщение: Мошенничество' });
   check(
@@ -127,7 +136,10 @@ try {
 
   // Скрыть сообщение → заблокировать автора → закрыть жалобу.
   await moderate(onMessage, 'Скрыть сообщение', 'Просьба о предоплате в обход сервиса');
-  await adminPage.getByText('Сообщение скрыто').waitFor();
+  await cards
+    .filter({ hasText: 'Сообщение: Мошенничество' })
+    .getByText('Сообщение скрыто', { exact: true })
+    .waitFor();
   await moderate(
     cards.filter({ hasText: 'Сообщение: Мошенничество' }),
     'Заблокировать автора',
@@ -170,7 +182,11 @@ try {
   // --- Скрыть заказ по жалобе: в каталоге его нет, владелец видит пометку.
   const onJob = cards.filter({ hasText: 'Заказ: Ненастоящий' });
   await moderate(onJob, 'Скрыть заказ', 'Проверка: заказ скрыт по жалобе');
-  await adminPage.getByText('Заказ скрыт').waitFor();
+  // Внутри своей карточки: в очереди могут быть скрытые заказы прежних прогонов.
+  await cards
+    .filter({ hasText: 'Заказ: Ненастоящий' })
+    .getByText('Заказ скрыт', { exact: true })
+    .waitFor();
   const gone = await reporterPage.goto(`${WEB}/jobs/${jobId}`);
   check('a hidden job is gone from the catalog', gone.status() === 404, `${gone.status()}`);
   await ownerPage.reload({ waitUntil: 'networkidle' });
@@ -197,7 +213,8 @@ try {
       'without JS the page says the complaint was sent',
       await noJs.getByText('Жалоба отправлена. Администратор разберёт её.').isVisible(),
     );
-    const { body: queue } = await api(admin, '/v1/admin/reports');
+    // Все жалобы — новые первыми: своя на первой странице, сколько бы открытых ни было в базе.
+    const { body: queue } = await api(admin, '/v1/admin/reports?status=ALL');
     check(
       'without JS a complaint about a bid is sent',
       queue.items.some((r) => r.targetType === 'BID' && r.subject.jobId === second),
@@ -230,4 +247,5 @@ try {
   await browser.close();
 }
 
+checkCsp(check, cspViolations);
 finish('moderation e2e');

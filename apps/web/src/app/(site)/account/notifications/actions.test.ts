@@ -47,14 +47,19 @@ afterEach(() => {
 });
 
 describe('markAllReadAction', () => {
-  it('marks everything read and returns to the list with a notice', async () => {
-    fetchMock.mockResolvedValue(json(200, summary));
+  it('marks everything read, decisions on own reports too, and returns with a notice', async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      url.endsWith('/v1/reports/mine/seen')
+        ? new Response(null, { status: 204 })
+        : json(200, summary),
+    );
     await expect(markAllReadAction({}, new FormData())).rejects.toThrow('NEXT_REDIRECT');
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('http://api.test/v1/me/notifications/read');
+    const calls = Object.fromEntries(fetchMock.mock.calls.map(([url, init]) => [url, init]));
+    const init = calls['http://api.test/v1/me/notifications/read'];
     expect(init.method).toBe('POST');
     expect(init.headers.Authorization).toBe('Bearer tok');
     expect(JSON.parse(init.body)).toEqual({ all: true });
+    expect(calls['http://api.test/v1/reports/mine/seen'].method).toBe('POST');
     expect(state.redirectedTo).toBe('/account/notifications?read=1');
   });
 

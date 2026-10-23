@@ -6,9 +6,11 @@
 // вход показывает ошибку у поля. Цифры — scripts/perf/web-vitals.mjs (Chromium).
 import { devices, webkit } from 'playwright';
 import { WEB, createChecker } from './lib/forms.mjs';
+import { checkCsp, watchCsp } from './lib/csp-watch.mjs';
 
 const { check, finish } = createChecker();
 const browser = await webkit.launch();
+const cspViolations = watchCsp(browser);
 const iphone = devices['iPhone 13'];
 
 async function open(path, options = {}) {
@@ -96,4 +98,5 @@ try {
   await browser.close();
 }
 
+checkCsp(check, cspViolations);
 finish('webkit e2e');

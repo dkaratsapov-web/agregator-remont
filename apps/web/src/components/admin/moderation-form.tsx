@@ -2,6 +2,8 @@
 
 import { useActionState, useId } from 'react';
 import type { ModerationFormState } from '@/app/(site)/admin/reports/actions';
+import { FormArgs } from '@/components/ui/form-args';
+import type { FormArg } from '@/lib/form-args';
 
 export interface ModerationButton {
   label: string;
@@ -15,6 +17,7 @@ export interface ModerationButton {
  * отправляется Server Action — работает и без JS.
  */
 export function ModerationForm({
+  args,
   action,
   summary,
   label,
@@ -22,6 +25,8 @@ export function ModerationForm({
   tone = 'plain',
 }: {
   action: (prev: ModerationFormState, form: FormData) => Promise<ModerationFormState>;
+  /** Параметры действия скрытым полем вместо bind (lib/form-args.ts). */
+  args?: readonly FormArg[];
   summary: string;
   label: string;
   buttons: ModerationButton[];
@@ -45,6 +50,7 @@ export function ModerationForm({
         action={formAction}
         className="mt-2 space-y-2.5 rounded-[12px] border border-line bg-canvas p-3.5"
       >
+        {args ? <FormArgs values={args} /> : null}
         <label htmlFor={`${id}-text`} className="block text-sm font-medium text-ink">
           {label}
         </label>

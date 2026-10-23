@@ -48,6 +48,15 @@ export function LoginForm({
         error={state.fields?.password}
       />
       <SubmitButton pending="Входим…">Войти</SubmitButton>
+      <details className="text-sm text-ink-soft">
+        <summary className="cursor-pointer font-medium text-ink hover:text-accent">
+          Забыли пароль?
+        </summary>
+        <p className="mt-1.5">
+          Напишите в поддержку и назовите email аккаунта: администратор пришлёт ссылку для нового
+          пароля. Ссылка действует сутки и один раз.
+        </p>
+      </details>
       <BankButtons
         links={banks.map((id) => ({
           id,

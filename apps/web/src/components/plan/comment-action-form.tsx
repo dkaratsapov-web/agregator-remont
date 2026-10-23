@@ -4,6 +4,8 @@ import { useActionState, useId } from 'react';
 import { FormError } from '@/components/auth/form-error';
 import type { PlanActionState } from '@/app/(site)/account/plan/actions';
 import { PhotoInput } from '@/components/chat/photo-input';
+import { FormArgs } from '@/components/ui/form-args';
+import type { FormArg } from '@/lib/form-args';
 
 const FIELD =
   'mt-1.5 block w-full rounded-xl border border-line bg-surface px-4 py-3 text-base leading-relaxed text-ink focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-0';
@@ -13,6 +15,7 @@ const FIELD =
  * — форма спрятана за раскрытием, чтобы не нажать случайно. Введённое остаётся после ошибки.
  */
 export function CommentActionForm({
+  args,
   action,
   name = 'comment',
   label,
@@ -24,6 +27,8 @@ export function CommentActionForm({
   photos = false,
 }: {
   action: (state: PlanActionState, form: FormData) => Promise<PlanActionState>;
+  /** Параметры действия скрытым полем вместо bind (lib/form-args.ts). */
+  args?: readonly FormArg[];
   name?: string;
   label: string;
   hint?: string;
@@ -43,6 +48,7 @@ export function CommentActionForm({
       : 'border border-line bg-surface text-ink hover:border-ink/30';
   const form = (
     <form action={formAction} className="space-y-3">
+      {args ? <FormArgs values={args} /> : null}
       <FormError message={state.error} login={state.login} />
       <div>
         <label htmlFor={id} className="block text-sm font-medium text-ink">

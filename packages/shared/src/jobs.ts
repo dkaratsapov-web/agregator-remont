@@ -177,3 +177,20 @@ export interface JobDraftDto {
   /** ISO 8601 */
   updatedAt: string;
 }
+
+/** Избранные заказы (закладки). */
+export const FAVORITE_LIMITS = {
+  /** Сколько заказов можно держать в избранном. */
+  MAX: 200,
+  PAGE: 20,
+} as const;
+
+export interface FavoriteStateDto {
+  jobId: string;
+  favorite: boolean;
+}
+
+/** id заказов в избранном — для пометок в каталоге. */
+export interface FavoriteIdsDto {
+  jobIds: string[];
+}

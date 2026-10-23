@@ -1,4 +1,5 @@
 import {
+  ADMIN_USER_LIMITS,
   MODERATION_LIMITS,
   REPORT_FILTERS,
   REPORT_LIMITS,
@@ -86,4 +87,29 @@ export class BlockDto extends ModerationReason {
   @IsBoolean()
   @ApiProperty({ description: 'true — заблокировать, false — разблокировать' })
   blocked!: boolean;
+}
+
+export class ListUsersQuery extends PaginationQuery {
+  @IsOptional()
+  @Transform(trimText)
+  @IsString()
+  @MaxLength(ADMIN_USER_LIMITS.QUERY_MAX)
+  @ApiPropertyOptional({
+    maxLength: ADMIN_USER_LIMITS.QUERY_MAX,
+    description: 'Часть email или имени либо номер аккаунта (ID)',
+  })
+  q?: string;
+}
+
+export class ListFlagsQuery extends PaginationQuery {
+  @IsOptional()
+  @IsIn(REPORT_FILTERS)
+  @ApiPropertyOptional({ enum: REPORT_FILTERS, default: 'OPEN' })
+  status: ReportFilter = 'OPEN';
+}
+
+export class ResolveFlagDto {
+  @IsIn(['RESOLVED', 'DISMISSED'], { message: 'Решение: меры приняты или нарушения нет' })
+  @ApiProperty({ enum: ['RESOLVED', 'DISMISSED'] })
+  status!: 'RESOLVED' | 'DISMISSED';
 }

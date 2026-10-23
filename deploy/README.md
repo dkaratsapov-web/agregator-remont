@@ -106,6 +106,7 @@ sudo rm /var/lib/agregator-deploy/failed             # повторить ком
 ```bash
 journalctl -u agregator-deploy -n 80 --no-pager | grep agregator-deploy
 sudo bash deploy/autodeploy/inventory.sh > report.txt   # отчёт только для чтения, без секретов
+sudo bash deploy/autodeploy/readiness.sh                # готовность к запуску: ГОТОВО / НУЖНО по пунктам, итог GO / NO-GO
 ```
 
 | Причина в журнале                     | Что делать                                                                                                                                                                  |

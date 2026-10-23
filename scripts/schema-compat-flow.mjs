@@ -1,11 +1,13 @@
 // Сценарий для schema-compat-test.sh: node scripts/schema-compat-flow.mjs <old|new> <API_URL>
-// Описывает переход «базовый коммит → этот PR» (сейчас: модерация поверх уведомлений).
+// Описывает переход «базовый коммит → этот PR» (сейчас: аккаунты и доверие поверх модерации —
+// сброс пароля, отзывы, избранное, автопроверка контактов).
 // old — прежний API работает на новой схеме: заказ, отклик, выбор исполнителя, план, сдача этапа,
 // сообщение, закрытие с исходом, отказ исполнителя (удаление плана); пишет id в COMPAT_STATE.
 // Прежний API жалоб, скрытия и блокировки не знает.
 // new — текущий API читает данные прежнего: заказы видны в каталоге (не скрыты), этап, переписка
-// и уведомления на месте, сессии прежнего API действуют (аккаунты не заблокированы); на заказ
-// прежнего API можно пожаловаться.
+// и уведомления на месте, сессии прежнего API действуют, на заказ можно пожаловаться; по заказу,
+// закрытому прежним API как выполненный, можно оставить отзыв, он попадает на карточку мастера;
+// заказ прежнего API добавляется в избранное.
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const [mode, API] = process.argv.slice(2);
@@ -184,6 +186,36 @@ if (mode === 'old') {
     'a job of the old API can be reported',
     report.status === 201 && report.body.duplicate === false,
     `got ${report.status}`,
+  );
+  const reviewState = await call(`/v1/me/jobs/${state.closedJob}/review`, {
+    token: state.customer,
+  });
+  check(
+    'a job completed with the old API can be reviewed',
+    reviewState.status === 200 && reviewState.body.canReview === true,
+    `got ${reviewState.status}`,
+  );
+  const reviewed = await call(`/v1/me/jobs/${state.closedJob}/review`, {
+    method: 'POST',
+    token: state.customer,
+    body: { rating: 5, text: 'Отзыв после обновления' },
+  });
+  check('the review is saved', reviewed.status === 201, `got ${reviewed.status}`);
+  const me = await call('/v1/me', { token: state.contractor });
+  const card = await call(`/v1/contractors/${me.body?.publicId}`);
+  check(
+    'the contractor of the old API has a card with the rating',
+    card.status === 200 && card.body.rating.count === 1 && card.body.completedJobs === 1,
+    `got ${card.status}`,
+  );
+  const favorite = await call(`/v1/me/favorites/${state.workJob}`, {
+    method: 'PUT',
+    token: reporter,
+  });
+  check(
+    'a job of the old API goes to favorites',
+    favorite.status === 200,
+    `got ${favorite.status}`,
   );
   const closedChat = await call(`/v1/jobs/${state.closedJob}/messages`, { token: state.customer });
   check(

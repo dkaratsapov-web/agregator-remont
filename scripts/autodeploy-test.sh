@@ -54,6 +54,9 @@ if [ "$1" = compose ]; then
   case " $* " in
     # Откат: применённые миграции живой базы (DB_MIGRATIONS, по одной в строке).
     *" exec "*_prisma_migrations*) [ "${EXEC_FAIL:-0}" = 1 ] && exit 1; printf '%b' "${DB_MIGRATIONS:-}" ;;
+    # Откат на версию без модерации: столбцы hidden_at в базе и число скрытого.
+    *" exec "*information_schema*) [ "${EXEC_FAIL:-0}" = 1 ] && exit 1; printf '%s' "${DB_MODERATION_COLUMNS:-0}" ;;
+    *" exec "*hidden_at*) printf '%s' "${DB_HIDDEN:-0}" ;;
     *" exec "*) [ "${EXEC_FAIL:-0}" = 1 ] && exit 1; printf 'PGDMP-stub' ;;
     *" build "*) [ "${BUILD_FAIL:-0}" = 1 ] && exit 1 ;;
     *" up "*) [ "${UP_FAIL:-0}" = 1 ] && exit 1 ;;
@@ -68,17 +71,25 @@ STUB
 # curl: GitHub API из файлов в $API_DIR; сайт — коды из переменных, главная со ссылками на статику.
 cat > "$WORK/bin/curl" << 'STUB'
 #!/usr/bin/env bash
-url='' out=''
+url='' out='' head=0 argv="$*"
 while [ $# -gt 0 ]; do
   case "$1" in
     -o) out=$2; shift ;;
+    -sI) head=1 ;;
     # Адрес из stdin (notify.sh, heartbeat): строка «url = "..."».
-    -K) [ "$2" = - ] && url=$(sed -n 's/^url = "\(.*\)"$/\1/p'); shift ;;
+    -K) if [ "$2" = - ]; then
+          config=$(cat)
+          url=$(printf '%s\n' "$config" | sed -n 's/^url = "\(.*\)"$/\1/p')
+          printf '%s\n' "$config" | grep -q '^header = "Authorization: Bearer ' &&
+            echo 'auth header from stdin' >> "${CURL_ARGS_LOG:-/dev/null}"
+        fi
+        shift ;;
     http*) url=$1 ;;
   esac
   shift
 done
 echo "curl $url" >> "$CURL_LOG"
+echo "argv: $argv" >> "${CURL_ARGS_LOG:-/dev/null}"
 case "$url" in
   *api.github.invalid*)
     [ "${API_FAIL:-0}" = 1 ] && { echo 'curl: (22) The requested URL returned error: 429' >&2; exit 22; }
@@ -92,21 +103,48 @@ case "$url" in
           printf '[{"number":1,"merged_at":"2026-10-19T00:00:00Z","merge_commit_sha":"%s","base":{"ref":"main"}}]' "$sha"
         fi ;;
       */jobs\?*page=2*) cat "$API_DIR/jobs2.json" ;;
+      */rules/branches/*) cat "$API_DIR/rules.json" 2> /dev/null || echo '[]' ;;
+      */rulesets/*) cat "$API_DIR/ruleset-${url##*/}.json" 2> /dev/null || exit 22 ;;
+      */commits/main) printf '{"sha":"%s"}' "${REMOTE_SHA:-}" ;;
       */jobs\?*) cat "$API_DIR/jobs1.json" ;;
     esac
     exit 0 ;;
 esac
 case "$url" in
   *hooks.invalid*) exit 0 ;;
-  */jobs) code=${PRIVATE_CODE:-401} ;;
+  */jobs | */account) code=${PRIVATE_CODE:-401} ;;
+  http://*) code=${HTTP_CODE:-308} ;;
   */_next/static/*|*/landing/*) code=${ASSET_CODE:-200} ;;
   *) code=${HOME_CODE:-200}
      [ -n "$out" ] && [ "$out" != /dev/null ] &&
        printf '<script src="/_next/static/chunks/app.js"></script><img src="/landing/flight-v3/desktop-poster.avif">' > "$out" ;;
 esac
+if [ "$head" = 1 ]; then
+  printf 'HTTP/2 %s\r\n' "$code"
+  [ "${NO_HSTS:-0}" = 1 ] || printf 'Strict-Transport-Security: max-age=31536000\r\n'
+  printf 'X-Frame-Options: DENY\r\nX-Content-Type-Options: nosniff\r\nContent-Security-Policy: default-src self\r\n'
+  exit 0
+fi
 printf '%s' "$code"
 STUB
-chmod +x "$WORK/bin/docker" "$WORK/bin/curl"
+# systemctl и openssl для readiness.sh: таймеры работают (TIMERS_DOWN=1 — нет), сертификат
+# действует долго.
+cat > "$WORK/bin/systemctl" << 'STUB'
+#!/usr/bin/env bash
+case "$1" in
+  is-active) [ "${TIMERS_DOWN:-0}" = 1 ] && exit 3; exit 0 ;;
+  is-failed) exit 1 ;;
+esac
+exit 0
+STUB
+cat > "$WORK/bin/openssl" << 'STUB'
+#!/usr/bin/env bash
+case "$1" in
+  x509) echo 'notAfter=Dec 31 00:00:00 2099 GMT' ;;
+esac
+exit 0
+STUB
+chmod +x "$WORK/bin/docker" "$WORK/bin/curl" "$WORK/bin/systemctl" "$WORK/bin/openssl"
 
 export PATH="$WORK/bin:$PATH"
 export REPO_DIR="$WORK/server" STATE_DIR="$WORK/state" LOCK_FILE="$WORK/lock"
@@ -520,15 +558,22 @@ check 'monitor: failed channel is a problem, heartbeat /fail' \
   "$(logged 'не доставлено') $(grep -c 'hc.invalid/ping/abc/fail' "$CURL_LOG")" '1 1'
 # Всё в порядке: копия вне сервера свежая, восстановление проверено, канал работает.
 printf 'NOTIFY_WEBHOOK_URL=https://hooks.invalid/agregator\nMONITOR_HEARTBEAT_URL=https://hc.invalid/ping/abc\nBACKUP_RCLONE_REMOTE=store:bk\nBACKUP_AGE_RECIPIENT=age1test\n' > "$ENV_FILE"
+# Проверочное уведомление вручную (notify.sh "проверка") — доставка отмечается для readiness.sh.
+rm -f "$WORK/state/notify-status"
+notify_run
+check 'notify by hand: delivery recorded' "$(logged '^exit') $(sed -n 's/^result=//p' "$WORK/state/notify-status")" '0 ok'
 backup
 printf 'result=ok\nat=%s\n' "$(date +%s)" > "$WORK/state/restore-status"
 printf 'result=ok\nat=%s\n' "$(date +%s)" > "$WORK/state/notify-status"
 monitor
 check 'monitor: healthy server sends a plain heartbeat' \
   "$(logged 'проверок с проблемами: 0') $(grep -c 'hc.invalid/ping/abc$' "$CURL_LOG") $(grep -c '/fail' "$CURL_LOG")" '1 1 0'
+check 'monitor: records the accepted heartbeat for readiness.sh' \
+  "$(sed -n 's/^heartbeat=//p' "$WORK/state/monitor-status") $(sed -n 's/^problems=//p' "$WORK/state/monitor-status")" 'accepted 0'
 printf 'result=failed\nreason=pg_restore\nat=%s\n' "$(date +%s)" > "$WORK/state/restore-status"
 monitor
 check 'monitor: failed restore check is reported' "$(logged 'восстановления не прошла') $(grep -c '/fail' "$CURL_LOG")" '1 1'
+check 'monitor: records problems for readiness.sh' "$(sed -n 's/^problems=//p' "$WORK/state/monitor-status")" 1
 printf 'result=ok\nat=%s\n' "$(date +%s)" > "$WORK/state/restore-status"
 sed -i 's/^at=.*/at=1/' "$WORK/state/backup-status"
 monitor
@@ -630,6 +675,123 @@ run
 marked=$(deployed)
 DB_MIGRATIONS='0_init\n3\n4' rollback
 check 'rollback over rollback-safe migration: allowed' "$(logged '^exit') $(failed)" "0 $marked"
+# Откат на версию без модерации, когда в базе есть скрытое модератором: отказ и варианты.
+all_green
+rm -f "$WORK/state/failed"
+run
+hiding=$(deployed)
+DB_MODERATION_COLUMNS=3 DB_HIDDEN=2 DB_MIGRATIONS='0_init\n3\n4' rollback
+check 'rollback to a version without moderation with hidden content: refused' \
+  "$(logged 'раскрыл бы скрытое') $(logged 'скрыто модератором: 2') $(deployed) $(docker_calls 'up -d')" "1 1 $hiding 0"
+DB_MODERATION_COLUMNS=3 DB_HIDDEN=0 DB_MIGRATIONS='0_init\n3\n4' rollback
+check 'rollback without hidden content: allowed' "$(logged '^exit') $(failed)" "0 $hiding"
+
+# 15. Готовность сервера (readiness.sh): GO только при доказанной готовности — main защищён
+# четырьмя обязательными задачами CI по имени, ruleset включён и без обхода; доставка
+# уведомлений подтверждена и свежая; внешний монитор недавно принял «жив»; развёрнут ровно
+# коммит из main. Любое отклонение — NO-GO с действием; значения из deploy/.env не печатаются.
+ready() { bash "$ROOT/deploy/autodeploy/readiness.sh" > "$WORK/out.log" 2>&1 || echo "exit $?" >> "$WORK/out.log"; }
+cp "$WORK/server/deploy/.env" "$WORK/env.saved"
+printf 'NOTIFY_TELEGRAM_TOKEN=secret-token-value\nNOTIFY_TELEGRAM_CHAT=42\nMONITOR_HEARTBEAT_URL=https://hc.invalid/secret-ping\n' >> "$WORK/server/deploy/.env"
+rules_with() { # обязательные проверки через |
+  python3 - "$1" > "$API_DIR/rules.json" << 'PY'
+import json, sys
+checks = [{"context": c} for c in sys.argv[1].split("|") if c]
+rules = [{"type": t, "ruleset_id": 7} for t in ("deletion", "non_fast_forward", "pull_request")]
+rules.append({"type": "required_status_checks", "ruleset_id": 7,
+              "parameters": {"required_status_checks": checks}})
+print(json.dumps(rules))
+PY
+}
+ruleset() { printf '{"id":7,"name":"main","enforcement":"%s"%s}' "$1" "$2" > "$API_DIR/ruleset-7.json"; }
+state_at() { mkdir -p "$WORK/state" && printf '%s\n' "${@:3}" "at=$(($(date +%s) - $2))" > "$WORK/state/$1"; }
+good() {
+  rules_with "$REQUIRED"
+  ruleset active ',"bypass_actors":[]'
+  state_at backup-status 0 mode=offsite-hash-checked
+  state_at restore-status 0 result=ok
+  state_at notify-status 0 result=ok
+  state_at monitor-status 0 heartbeat=accepted problems=0
+}
+REQUIRED=$(bash -c ". '$ROOT/deploy/autodeploy/lib.sh'; echo \"\$REQUIRED_JOBS_DEFAULT\"")
+current=$(deployed)
+good
+DB_MIGRATIONS=0 REMOTE_SHA=$current ready
+check 'readiness: everything proven — GO' "$(logged '^Итог: GO') $(logged '^НУЖНО') $(logged '^exit')" '1 0 0'
+check 'readiness: no secret values printed' "$(grep -c 'secret-token-value\|secret-ping' "$WORK/out.log" || true)" 0
+no_go() { # название, ожидаемый текст
+  DB_MIGRATIONS=0 REMOTE_SHA=${REMOTE:-$current} ready
+  check "readiness: $1 — NO-GO" "$(logged '^Итог: NO-GO') $(logged "$2") $(logged '^exit 1')" '1 1 1'
+  good
+}
+rules_with 'a|b|c|d'
+no_go 'four checks that are not the CI jobs' 'не обязательны проверки CI: Lint, typecheck, test, build'
+ruleset active ',"bypass_actors":[{"actor_type":"RepositoryRole"}]'
+no_go 'a bypass actor' 'есть обход (1)'
+ruleset active ''
+no_go 'bypass list not visible without a token' 'список обхода не виден'
+ruleset evaluate ',"bypass_actors":[]'
+no_go 'ruleset only evaluated' 'enforcement=evaluate'
+rm -f "$API_DIR/ruleset-7.json"
+no_go 'ruleset not readable' 'ruleset 7 не прочитан'
+REMOTE=0123456789abcdef0123456789abcdef01234567 no_go 'deployed behind main' 'обновление в пути или отстало'
+rm -f "$WORK/state/notify-status"
+no_go 'notification delivery never tested' 'доставка не проверялась'
+state_at notify-status $((40 * 86400)) result=ok
+no_go 'notification delivery stale' 'последняя доставка 40 дн. назад'
+state_at notify-status 0 result=failed
+no_go 'last notification failed' 'последнее не доставлено'
+state_at monitor-status $((3 * 3600)) heartbeat=accepted problems=0
+no_go 'monitor heartbeat stale' 'последний сигнал 180 мин назад'
+state_at monitor-status 0 heartbeat=failed problems=0
+no_go 'monitor heartbeat not accepted' 'сигнал не принят (failed)'
+state_at monitor-status 0 heartbeat=accepted problems=2
+no_go 'monitor sees problems' 'видит проблем: 2'
+# Закрыто по умолчанию: правила без ruleset_id не доказывают отсутствие обхода.
+python3 - "$REQUIRED" > "$API_DIR/rules.json" << 'PY'
+import json, sys
+checks = [{"context": c} for c in sys.argv[1].split("|")]
+rules = [{"type": t} for t in ("deletion", "non_fast_forward", "pull_request")]
+rules.append({"type": "required_status_checks", "parameters": {"required_status_checks": checks}})
+print(json.dumps(rules))
+PY
+no_go 'all rules and names present but no ruleset_id' 'правила без ruleset_id'
+rules_with "$REQUIRED"
+printf '%s\n' '{"rules": "not a list"}' > "$WORK/odd.json"
+check 'ruleset check: empty required list, odd format and a full page are not ok' \
+  "$(python3 "$ROOT/deploy/autodeploy/ruleset_check.py" '' < "$API_DIR/rules.json") | $(python3 "$ROOT/deploy/autodeploy/ruleset_check.py" "$REQUIRED" < "$WORK/odd.json") | $(python3 -c 'import json; print(json.dumps({"rules": [{"type": "deletion", "ruleset_id": 7}] * 100, "rulesets": [{"id": 7, "enforcement": "active", "bypass_actors": []}]}))' | python3 "$ROOT/deploy/autodeploy/ruleset_check.py" "$REQUIRED" | grep -o 'ответ мог быть неполным')" \
+  'список обязательных задач CI пуст | ответ GitHub о правилах в неожиданном формате | ответ мог быть неполным'
+# Время из будущего, мусор и пропущенное время не считаются свежими, даже при result=ok.
+state_at notify-status -86400 result=ok
+no_go 'notification time in the future' 'Уведомления: время в файле состояния неверное или в будущем'
+printf 'result=ok\nat=soon\n' > "$WORK/state/notify-status"
+no_go 'notification time is garbage' 'Уведомления: время в файле состояния неверное'
+printf 'result=ok\n' > "$WORK/state/notify-status"
+no_go 'notification without a time' 'Уведомления: время в файле состояния неверное'
+state_at monitor-status -86400 heartbeat=accepted problems=0
+no_go 'monitor time in the future' 'Внешний монитор: время в файле состояния неверное'
+state_at backup-status -86400 mode=offsite-hash-checked
+no_go 'backup time in the future' 'Копии базы: время в файле состояния неверное'
+state_at restore-status -86400 result=ok
+no_go 'restore check time in the future' 'Проверка восстановления: время в файле состояния неверное'
+# Небольшое расхождение часов (до 5 минут) — ещё GO.
+state_at notify-status -120 result=ok
+DB_MIGRATIONS=0 REMOTE_SHA=$current ready
+check 'readiness: a clock 2 minutes ahead is tolerated — GO' "$(logged '^Итог: GO')" 1
+good
+rm -f "$API_DIR/rules.json" "$API_DIR/ruleset-7.json"
+state_at backup-status 0 mode=local-only
+TIMERS_DOWN=1 NO_HSTS=1 DB_MIGRATIONS=0 REMOTE_SHA=$current ready
+check 'readiness: several gaps — NO-GO with the steps' \
+  "$(logged '^Итог: NO-GO') $(logged 'Защита main') $(logged 'копии только на сервере') $(logged 'Таймер agregator-backup не работает') $(logged 'нет strict-transport-security') $(logged '^exit 1')" \
+  '1 1 1 1 1 1'
+# Токен для чтения правил передаётся заголовком через stdin, не аргументом curl.
+good
+CURL_ARGS_LOG="$WORK/curl-args.log" READINESS_GITHUB_TOKEN=secret-github-token DB_MIGRATIONS=0 REMOTE_SHA=$current ready
+check 'readiness: GitHub token sent as a header via stdin, never in curl arguments or output' \
+  "$(grep -c 'auth header from stdin' "$WORK/curl-args.log" | awk '{print ($1 > 0)}') $(cat "$WORK/curl-args.log" "$WORK/out.log" | grep -c 'secret-github-token')" '1 0'
+cp "$WORK/env.saved" "$WORK/server/deploy/.env"
+rm -f "$WORK/state/backup-status" "$WORK/state/restore-status" "$WORK/state/monitor-status" "$API_DIR/rules.json" "$API_DIR/ruleset-7.json"
 
 # Секреты не попадают в журнал (в .env на сервере их нет, но проверяем, что .env не печатается).
 check 'no .env in log' "$(grep -c 'DOMAIN=' "$WORK/out.log" || true)" 0

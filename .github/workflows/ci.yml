@@ -16,7 +16,8 @@ jobs:
   verify:
     name: Lint, typecheck, test, build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Обычно ~10 минут; запас на две попытки установки браузеров при медленном зеркале Ubuntu.
+    timeout-minutes: 35
 
     services:
       postgres:
@@ -90,7 +91,7 @@ jobs:
 
       - name: Autodeploy script (shellcheck and scenarios)
         run: |
-          shellcheck -x deploy/autodeploy/*.sh deploy/backup/*.sh scripts/autodeploy-test.sh scripts/perf/*.sh scripts/image-secrets-check.sh scripts/drills.sh scripts/schema-compat-test.sh scripts/migration-check-test.sh
+          shellcheck -x deploy/autodeploy/*.sh deploy/backup/*.sh scripts/autodeploy-test.sh scripts/perf/*.sh scripts/image-secrets-check.sh scripts/drills.sh scripts/schema-compat-test.sh scripts/migration-check-test.sh scripts/ci-install-browsers.sh
           bash scripts/autodeploy-test.sh
           bash scripts/migration-check-test.sh
 
@@ -133,7 +134,9 @@ jobs:
           bash scripts/schema-compat-test.sh FETCH_HEAD
 
       - name: Install Chromium for browser checks
-        run: pnpm exec playwright install --with-deps chromium webkit
+        # Медленное зеркало Ubuntu не должно съедать время задачи: таймауты, повтор, предел шага.
+        timeout-minutes: 22
+        run: bash scripts/ci-install-browsers.sh
 
       - name: Smoke and integration tests (production build)
         env:
@@ -178,6 +181,10 @@ jobs:
           # Модерация: жалобы на заказ и сообщение, очередь, скрытие, блокировка автора (выход и
           # отказ при входе), жалоба на отклик без JS, 320 px (фаза 2).
           node scripts/moderation-e2e.mjs
+          # Аккаунты и доверие: ссылка для нового пароля от администратора (без JS), отзыв и
+          # карточка мастера, рейтинг в откликах, избранное, «Переписки», «Мои жалобы», подсказка
+          # о контактах; формы без JS отвечают ошибкой и не подвешивают сервер (docs/NO_JS_FORMS.md).
+          node scripts/accounts-e2e.mjs
           # Доступность из аудита (UX-1…14), замеры LCP/CLS/INP и видео пролёта на главной.
           node scripts/ux-e2e.mjs
           # Safari (WebKit, iPhone): поведение главной, видео, reduced motion, вход (ТЗ #40, п. 8).

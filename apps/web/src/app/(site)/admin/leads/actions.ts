@@ -11,6 +11,7 @@ import {
 import { setLeadProcessed } from '@/lib/api';
 import { safeRedirectPath } from '@/lib/redirect';
 import { getClientIp } from '@/lib/session';
+import { argBool, argString, readFormArgs } from '@/lib/form-args';
 
 export interface LeadToggleState {
   error?: string;
@@ -41,4 +42,12 @@ export async function setLeadProcessedAction(
     };
   }
   redirect(back);
+}
+
+// --- Формы: параметры скрытым полем args вместо bind (lib/form-args.ts, docs/NO_JS_FORMS.md).
+
+/** args: [leadId, processed, returnTo] */
+export async function setLeadProcessedFormAction(prev: LeadToggleState, form: FormData) {
+  const [id, processed, returnTo] = readFormArgs(form);
+  return setLeadProcessedAction(argString(id), argBool(processed), argString(returnTo), prev, form);
 }

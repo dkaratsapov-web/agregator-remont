@@ -2,6 +2,7 @@ import { DRAFT_LIMITS, type JobDraftDto } from '@agregator/shared';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { ENTITY_ID_PATTERN } from '../common/text';
+import { UsageCounters } from '../analytics/usage';
 import { PrismaService } from '../prisma/prisma.service';
 import { draftDetails, draftItems, toJobDraftDto } from './draft.mapper';
 import { SaveDraftDto } from './dto/draft-input.dto';
@@ -15,7 +16,10 @@ const NOT_FOUND = 'Черновик не найден';
  */
 @Injectable()
 export class DraftsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly usage: UsageCounters,
+  ) {}
 
   async list(ownerId: string): Promise<JobDraftDto[]> {
     const drafts = await this.prisma.jobDraft.findMany({
@@ -42,6 +46,7 @@ export class DraftsService {
       }
       return tx.jobDraft.create({ data: { ...toData(dto), ownerId } });
     });
+    this.usage.add('DRAFTS_STARTED');
     return toJobDraftDto(draft);
   }
 

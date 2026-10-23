@@ -319,7 +319,7 @@ describe('Moderation (e2e)', () => {
         .send({ hidden: true, reason: 'Реклама в отклике' })
         .expect(200);
       const { body } = await http().get(`/v1/me/jobs/${jobId}/bids`).set(owner.auth).expect(200);
-      expect(body.map((b: { id: string }) => b.id)).toEqual([goodBid]);
+      expect(body.items.map((b: { id: string }) => b.id)).toEqual([goodBid]);
       await http().post(`/v1/me/jobs/${jobId}/bids/${spamBid}/accept`).set(owner.auth).expect(404);
       await http().post(`/v1/me/jobs/${jobId}/bids/${goodBid}/accept`).set(owner.auth).expect(200);
       await http()

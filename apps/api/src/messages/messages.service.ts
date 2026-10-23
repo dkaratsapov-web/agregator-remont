@@ -10,6 +10,7 @@ import {
   toPhotoDto,
   type UploadedPhoto,
 } from '../photos/photos.service';
+import { flagContacts } from '../moderation/content-flags';
 import { PrismaService } from '../prisma/prisma.service';
 import { SendMessageDto } from './dto/message.dto';
 
@@ -99,6 +100,13 @@ export class MessagesService {
         { jobId, contractorId: deal.contractorId, uploaderId: userId, messageId: message.id },
         photos,
       );
+      await flagContacts(tx, {
+        type: 'MESSAGE',
+        id: message.id,
+        jobId,
+        authorId: userId,
+        text: dto.body,
+      });
       await notifyMessage(tx, {
         actorId: userId,
         userId: deal.viewer === 'OWNER' ? deal.contractorId : deal.ownerId,

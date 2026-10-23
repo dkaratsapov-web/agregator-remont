@@ -17,9 +17,10 @@ import {
   sessionExpired,
   type SessionExpiredState,
 } from '@/lib/action-helpers';
-import { ApiError, createReport } from '@/lib/api';
+import { ApiError, createReport, markReportsSeen } from '@/lib/api';
 import { safeRedirectPath } from '@/lib/redirect';
 import { getClientIp } from '@/lib/session';
+import { argString, readFormArgs } from '@/lib/form-args';
 
 export interface ReportFormState {
   error?: string;
@@ -99,4 +100,35 @@ export async function reportAction(
     outcome = status === 404 ? 'gone' : status === 429 ? 'limit' : 'failed';
   }
   return done(result, outcome);
+}
+
+/**
+ * Человек открыл «Мои жалобы»: решения просмотрены и пропадают из значка. Вызывается со страницы
+ * (ReportsSeen), без перехода; без JS решения отмечаются кнопкой «Отметить все прочитанными».
+ */
+export async function markReportsSeenAction(): Promise<{ ok: boolean }> {
+  if (!(await isTrustedOrigin())) return { ok: false };
+  const token = await requireSessionToken('/account/reports');
+  try {
+    await markReportsSeen(token);
+    return { ok: true };
+  } catch (error) {
+    if (!isUnauthorized(error)) console.error('Reports: failed to mark decisions seen', error);
+    return { ok: false };
+  }
+}
+
+/** Форма «Пожаловаться»; args: [targetType, targetId, returnTo] (lib/form-args.ts). */
+export async function reportFormAction(
+  prev: ReportFormState,
+  form: FormData,
+): Promise<ReportFormState> {
+  const [targetType, targetId, returnTo] = readFormArgs(form);
+  return reportAction(
+    argString(targetType) as ReportTarget,
+    argString(targetId),
+    argString(returnTo),
+    prev,
+    form,
+  );
 }

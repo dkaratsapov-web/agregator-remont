@@ -91,6 +91,8 @@ export interface NotificationsSummaryDto {
   unread: number;
   /** Заказы с непрочитанным — для пометок в списках заказов. */
   jobs: { jobId: string; unread: number }[];
+  /** Решения по вашим жалобам, которые вы ещё не открыли («Мои жалобы»); входят в значок. */
+  reportDecisions: number;
 }
 
 /**

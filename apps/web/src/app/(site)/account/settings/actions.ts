@@ -18,6 +18,7 @@ import {
   requireSessionToken,
 } from '@/lib/action-helpers';
 import {
+  ApiError,
   changePassword,
   revokeOtherSessions,
   revokeSession,
@@ -25,6 +26,7 @@ import {
   updateProfile,
 } from '@/lib/api';
 import { getClientIp } from '@/lib/session';
+import { argString, readFormArgs } from '@/lib/form-args';
 
 const SETTINGS = '/account/settings';
 
@@ -102,6 +104,10 @@ export async function passwordAction(_prev: SettingsState, form: FormData): Prom
     await changePassword(token, { currentPassword, newPassword }, await getClientIp());
   } catch (error) {
     redirectIfUnauthorized(error, SETTINGS);
+    // Пауза после серии неверных паролей (общая со входом): API называет, сколько ждать.
+    if (error instanceof ApiError && error.code === 'LOGIN_THROTTLED' && error.userMessage) {
+      return { error: error.userMessage };
+    }
     return {
       error: apiErrorMessage(error, {
         429: 'Слишком много попыток. Подождите минуту и попробуйте снова.',
@@ -144,4 +150,12 @@ export async function revokeOthersAction(
     redirectIfUnauthorized(error, SETTINGS);
     return { error: apiErrorMessage(error) };
   }
+}
+
+// --- Формы: параметры скрытым полем args вместо bind (lib/form-args.ts, docs/NO_JS_FORMS.md).
+
+/** args: [sessionId] */
+export async function revokeSessionFormAction(prev: SettingsState, form: FormData) {
+  const [id] = readFormArgs(form);
+  return revokeSessionAction(argString(id), prev, form);
 }

@@ -14,6 +14,7 @@ describe('Auth rate limit (e2e)', () => {
     await prisma.bid.deleteMany();
     await prisma.job.deleteMany({ where: { ownerId: { not: null } } });
     await prisma.user.deleteMany();
+    await prisma.loginFailure.deleteMany();
     app = await createTestApp();
   });
 
@@ -32,7 +33,9 @@ describe('Auth rate limit (e2e)', () => {
     for (let i = 0; i < 3; i += 1) {
       await attempt().expect(401);
     }
-    await attempt().expect(429);
+    // Именно лимит по IP (а не пауза после серии неверных паролей к адресу — та после пяти).
+    const limited = await attempt().expect(429);
+    expect(limited.body.code).toBe('RATE_LIMITED');
     await request(app.getHttpServer()).get('/v1/jobs').expect(200);
   });
 });

@@ -1,6 +1,7 @@
 import { JOB_CATEGORY_LABELS, type JobDraftDto } from '@agregator/shared';
 import Link from 'next/link';
-import { deleteDraftAction } from '@/app/(site)/account/jobs/actions';
+import { deleteDraftFormAction } from '@/app/(site)/account/jobs/actions';
+import { FormArgs } from '@/components/ui/form-args';
 import { formatDate } from '@/lib/format';
 import { DeleteDraftButton } from './delete-draft-button';
 
@@ -34,7 +35,8 @@ export function DraftList({ drafts }: { drafts: JobDraftDto[] }) {
               >
                 Продолжить
               </Link>
-              <form action={deleteDraftAction.bind(null, draft.id)}>
+              <form action={deleteDraftFormAction}>
+                <FormArgs values={[draft.id]} />
                 <DeleteDraftButton />
               </form>
             </span>

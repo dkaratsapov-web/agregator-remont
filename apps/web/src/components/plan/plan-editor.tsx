@@ -5,6 +5,8 @@ import { useActionState, useEffect, useMemo, useRef, useState } from 'react';
 import { FormError } from '@/components/auth/form-error';
 import type { PlanActionState } from '@/app/(site)/account/plan/actions';
 import { STAGE_ROWS, stageField, type StageRowValues } from '@/lib/plan-form';
+import { FormArgs } from '@/components/ui/form-args';
+import type { FormArg } from '@/lib/form-args';
 
 const FIELD =
   'mt-1 block w-full rounded-xl border bg-surface px-3.5 py-2.5 text-base text-ink focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-offset-0';
@@ -17,11 +19,14 @@ const filled = (row: StageRowValues) => Boolean(row.title || row.description || 
  * Без JS видны все строки; с JS — заполненные и одна пустая, «Добавить этап» открывает следующую.
  */
 export function PlanEditor({
+  args,
   action,
   stages,
   sequential,
 }: {
   action: (state: PlanActionState, form: FormData) => Promise<PlanActionState>;
+  /** Параметры действия скрытым полем вместо bind (lib/form-args.ts). */
+  args?: readonly FormArg[];
   stages: JobStageDto[];
   sequential: boolean;
 }) {
@@ -51,6 +56,7 @@ export function PlanEditor({
 
   return (
     <form ref={formRef} action={formAction} className="space-y-5" noValidate>
+      {args ? <FormArgs values={args} /> : null}
       <FormError message={state.error} login={state.login} />
       <ol className="space-y-4">
         {rows.map((row, index) => {

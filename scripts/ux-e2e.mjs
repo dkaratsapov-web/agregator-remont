@@ -5,12 +5,14 @@
 /* global window, document, getComputedStyle, MutationObserver -- выполняется в браузере через page.evaluate */
 import { chromium } from 'playwright';
 import { API, WEB, createChecker, registerViaApi } from './lib/forms.mjs';
+import { checkCsp, watchCsp } from './lib/csp-watch.mjs';
 
 const { check, finish } = createChecker();
 const customer = await registerViaApi('CUSTOMER');
 const browser = await chromium.launch(
   process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
 );
+const cspViolations = watchCsp(browser);
 const host = new URL(WEB).hostname;
 const cookies = customer.cookie.split('; ').map((pair) => {
   const [name, value] = pair.split('=');
@@ -419,7 +421,16 @@ try {
       timeout: 20_000,
     });
     check('flight: forward and reverse clips load after the page', true);
-    await page.waitForTimeout(1500);
+    // Обратный ролик сайт включает, только когда у него есть данные (иначе доезд без видео,
+    // flight-video.tsx). Адрес появляется раньше данных: на медленной машине CI ждём данные.
+    await page.waitForFunction(
+      () =>
+        [...document.querySelectorAll('video')].every(
+          (v) => v.readyState >= 2, // HAVE_CURRENT_DATA
+        ),
+      null,
+      { timeout: 30_000 },
+    );
     await page.evaluate(() =>
       window.scrollTo({ top: window.innerHeight * 2.5, behavior: 'instant' }),
     );
@@ -439,8 +450,12 @@ try {
       await page.mouse.wheel(0, -200);
       await page.waitForTimeout(250);
     }
-    await page.waitForTimeout(1500);
-    const reverseShown = await page.evaluate(() => window.__reverseShown);
+    const reverseShown = await page
+      .waitForFunction(() => window.__reverseShown === true, null, { timeout: 8_000 })
+      .then(
+        () => true,
+        () => false,
+      );
     check('flight: scrolling up plays the reverse clip', reverseShown);
     await page.context().close();
 
@@ -477,4 +492,5 @@ try {
   await browser.close();
 }
 
+checkCsp(check, cspViolations);
 finish('ux e2e');

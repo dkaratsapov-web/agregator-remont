@@ -145,7 +145,7 @@ describe('My jobs concurrency (e2e)', () => {
       expect(mine.body.items[0].jobChangedAt).toBe(edited.body.updatedAt);
       const forOwner = await http().get(`/v1/me/jobs/${job.id}/bids`).set(owner.auth).expect(200);
       expect(
-        forOwner.body.filter((x: { jobChangedAt: string | null }) => x.jobChangedAt),
+        forOwner.body.items.filter((x: { jobChangedAt: string | null }) => x.jobChangedAt),
       ).toHaveLength(2);
     });
   });

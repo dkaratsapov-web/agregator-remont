@@ -3,6 +3,7 @@
 // Требует запущенные API и web (production-сборка), как jobs-integration.
 import { chromium } from 'playwright';
 import { API, WEB, createChecker, registerViaApi } from './lib/forms.mjs';
+import { checkCsp, watchCsp } from './lib/csp-watch.mjs';
 
 const { check, finish } = createChecker();
 const owner = await registerViaApi('CUSTOMER');
@@ -15,6 +16,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const browser = await chromium.launch(
   process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
 );
+const cspViolations = watchCsp(browser);
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 const host = new URL(WEB).hostname;
 await context.addCookies(
@@ -181,4 +183,5 @@ try {
   await browser.close();
 }
 
+checkCsp(check, cspViolations);
 finish('drafts e2e');

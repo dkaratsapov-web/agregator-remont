@@ -77,14 +77,20 @@ export class NotificationsService {
   }
 
   async summary(userId: string): Promise<NotificationsSummaryDto> {
-    const groups = await this.prisma.notification.groupBy({
-      by: ['jobId'],
-      where: { userId, readAt: null },
-      _count: { _all: true },
-      _max: { createdAt: true },
-      orderBy: { _max: { createdAt: 'desc' } },
-    });
+    const [groups, reportDecisions] = await Promise.all([
+      this.prisma.notification.groupBy({
+        by: ['jobId'],
+        where: { userId, readAt: null },
+        _count: { _all: true },
+        _max: { createdAt: true },
+        orderBy: { _max: { createdAt: 'desc' } },
+      }),
+      this.prisma.report.count({
+        where: { reporterId: userId, status: { not: 'OPEN' }, reporterSeenAt: null },
+      }),
+    ]);
     return {
+      reportDecisions,
       unread: groups.reduce((sum, group) => sum + group._count._all, 0),
       jobs: groups
         .slice(0, NOTIFICATION_LIMITS.SUMMARY_JOBS)

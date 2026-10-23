@@ -7,7 +7,9 @@ import {
 } from '@nestjs/common';
 import { Prisma, type User } from '@prisma/client';
 import { writeAudit } from '../audit/audit';
+import { LoginThrottle, loginKey } from '../auth/login-throttle';
 import { hashPassword, verifyPassword } from '../auth/password';
+import { LoginThrottled } from '../common/api-error';
 import { ENTITY_ID_PATTERN } from '../common/text';
 import { PrismaService } from '../prisma/prisma.service';
 import { processAvatar } from './avatar';
@@ -19,7 +21,11 @@ import { toUserDto } from './user.mapper';
 /** Личный кабинет: профиль, оформление, пароль, устройства и фото. Только для себя. */
 @Injectable()
 export class AccountService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly throttle: LoginThrottle;
+
+  constructor(private readonly prisma: PrismaService) {
+    this.throttle = new LoginThrottle(prisma);
+  }
 
   async updateProfile(user: User, dto: UpdateProfileDto): Promise<UserDto> {
     const data: Prisma.UserUpdateInput = {};
@@ -64,11 +70,22 @@ export class AccountService {
     if (dto.newPassword.toLowerCase() === user.email) {
       throw new BadRequestException('Пароль не должен совпадать с email');
     }
+    // Та же серия неверных паролей, что у входа: тот, кто завладел открытой сессией, не
+    // подберёт пароль через смену быстрее, чем через вход (release gate 2, docs/SECURITY.md).
+    const key = loginKey(user.email);
+    const wait = await this.throttle.attempt(key);
+    if (wait > 0) {
+      throw new LoginThrottled(
+        wait,
+        `Слишком много неверных попыток ввести текущий пароль. Повторите через ${wait} с.`,
+      );
+    }
     const passwordHash = await hashPassword(dto.newPassword);
     await this.prisma.$transaction(async (tx) => {
       const [row] = await tx.$queryRaw<{ password_hash: string }[]>`
         SELECT password_hash FROM users WHERE id = ${user.id} FOR UPDATE`;
       if (!row || !(await verifyPassword(row.password_hash, dto.currentPassword))) {
+        // Попытка уже записана в серию в attempt().
         throw new BadRequestException('Текущий пароль указан неверно');
       }
       if ((await tx.session.count({ where: { id: sessionId, userId: user.id } })) === 0) {
@@ -86,6 +103,7 @@ export class AccountService {
         changes: { otherSessions: { from: count, to: 0 } },
       });
     });
+    await this.throttle.clear(key);
   }
 
   async listSessions(user: User, sessionId: string): Promise<SessionDto[]> {

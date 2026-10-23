@@ -9,7 +9,9 @@ import {
   loginUser,
   logoutSession,
   registerUser,
+  resetPassword,
 } from '@/lib/api';
+import { clearResetToken, readResetToken } from '@/lib/password-reset';
 import {
   bankErrorCode,
   bankErrorMessage,
@@ -31,7 +33,7 @@ import {
 export interface AuthFormState {
   error?: string;
   /** Ошибки у полей формы (подсвечиваются, первое поле получает фокус). */
-  fields?: Partial<Record<'name' | 'email' | 'password', string>>;
+  fields?: Partial<Record<'name' | 'email' | 'password' | 'repeat', string>>;
   /** Введённые значения (кроме пароля), чтобы не очищать форму при ошибке. */
   values?: Record<string, string>;
 }
@@ -43,6 +45,8 @@ const field = (form: FormData, key: string, max: number): string => {
 
 function messageFor(error: unknown): string {
   if (error instanceof ApiError) {
+    // Пауза после серии неверных паролей к адресу: API называет, сколько ждать.
+    if (error.code === 'LOGIN_THROTTLED' && error.userMessage) return error.userMessage;
     if (error.status === 429) return 'Слишком много попыток. Подождите минуту и попробуйте снова.';
     // Сообщения с подсказкой, что делать дальше.
     if (error.status === 401) return 'Неверный email или пароль. Проверьте раскладку и Caps Lock.';
@@ -133,6 +137,58 @@ export async function loginAction(_prev: AuthFormState, form: FormData): Promise
     };
   }
   redirect(next);
+}
+
+/** Новый пароль по ссылке администратора (lib/password-reset.ts): затем сразу вход. */
+export async function resetPasswordAction(
+  _prev: AuthFormState,
+  form: FormData,
+): Promise<AuthFormState> {
+  if (!(await isTrustedOrigin())) return { error: FOREIGN_ORIGIN };
+  const password = field(form, 'password', AUTH_LIMITS.PASSWORD_MAX + 1);
+  const repeat = field(form, 'repeat', AUTH_LIMITS.PASSWORD_MAX + 1);
+  if (password.length < AUTH_LIMITS.PASSWORD_MIN || password.length > AUTH_LIMITS.PASSWORD_MAX) {
+    const message = `Пароль: от ${AUTH_LIMITS.PASSWORD_MIN} до ${AUTH_LIMITS.PASSWORD_MAX} символов.`;
+    return { error: 'Проверьте поля, отмеченные ниже.', fields: { password: message } };
+  }
+  if (repeat !== password) {
+    return {
+      error: 'Проверьте поля, отмеченные ниже.',
+      fields: { repeat: 'Пароли не совпадают. Введите тот же пароль ещё раз.' },
+    };
+  }
+  const token = await readResetToken();
+  if (!token) {
+    return {
+      error: 'Ссылка не найдена или устарела. Откройте ссылку из сообщения администратора ещё раз.',
+    };
+  }
+  try {
+    const session = await resetPassword(
+      { token, password },
+      await getClientIp(),
+      await getUserAgent(),
+    );
+    await setSessionCookie(session.token, session.expiresAt);
+    await clearResetToken();
+  } catch (error) {
+    if (
+      error instanceof ApiError &&
+      error.status === 400 &&
+      /ссылк/i.test(error.userMessage ?? '')
+    ) {
+      await clearResetToken();
+    }
+    if (
+      error instanceof ApiError &&
+      error.status === 400 &&
+      /email/.test(error.userMessage ?? '')
+    ) {
+      return { error: 'Проверьте поля, отмеченные ниже.', fields: { password: error.userMessage } };
+    }
+    return { error: messageFor(error) };
+  }
+  redirect('/account?password=reset');
 }
 
 /** Завершение входа через банк: аккаунта не было, человек выбрал роль (lib/bank-login.ts). */

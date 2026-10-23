@@ -8,6 +8,11 @@ env_value() {
   sed -n "s/^$1=//p" "$file" | tail -n 1 | sed -e "s/^['\"]//" -e "s/['\"]\$//"
 }
 
+# Обязательные задачи CI (точные имена job): автообновление требует их зелёными по SHA
+# (deploy.sh), а проверка готовности — обязательными в правилах ветки main (readiness.sh).
+# shellcheck disable=SC2034 # читают deploy.sh и readiness.sh
+REQUIRED_JOBS_DEFAULT='Lint, typecheck, test, build|Docker stack (compose)|Docker stack behind Caddy (proxy)|Disaster drills (backup, restore, broken release, rollback)'
+
 # Каталог состояния сервера: что развёрнуто, итоги копий и проверок (читает monitor.sh).
 : "${STATE_DIR:=/var/lib/agregator-deploy}"
 

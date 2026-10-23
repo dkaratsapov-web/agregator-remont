@@ -1,6 +1,144 @@
 {
   "components": {
     "schemas": {
+      "AdminUserDto": {
+        "additionalProperties": false,
+        "properties": {
+          "bids": {
+            "type": "integer"
+          },
+          "blocked": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "jobs": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "openReports": {
+            "description": "Открытых жалоб на его заказы, сообщения и отклики",
+            "type": "integer"
+          },
+          "publicId": {
+            "type": "integer"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserRole"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "publicId",
+          "email",
+          "name",
+          "role",
+          "blocked",
+          "createdAt",
+          "jobs",
+          "bids",
+          "openReports"
+        ],
+        "type": "object"
+      },
+      "AnalyticsDto": {
+        "additionalProperties": false,
+        "properties": {
+          "days": {
+            "description": "YYYY-MM-DD по Москве, по возрастанию",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyticsSeriesDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "days",
+          "series"
+        ],
+        "type": "object"
+      },
+      "AnalyticsMetric": {
+        "enum": [
+          "CUSTOMERS_REGISTERED",
+          "CONTRACTORS_REGISTERED",
+          "CATALOG_VIEWS",
+          "JOB_VIEWS",
+          "DRAFTS_STARTED",
+          "JOBS_PUBLISHED",
+          "BIDS_PLACED",
+          "CONTRACTORS_CHOSEN",
+          "MESSAGES_SENT",
+          "JOBS_COMPLETED",
+          "REVIEWS_LEFT",
+          "CONTACTS_SHARED"
+        ],
+        "type": "string",
+        "x-enum-kind": "open",
+        "x-extensible-enum": [
+          "CUSTOMERS_REGISTERED",
+          "CONTRACTORS_REGISTERED",
+          "CATALOG_VIEWS",
+          "JOB_VIEWS",
+          "DRAFTS_STARTED",
+          "JOBS_PUBLISHED",
+          "BIDS_PLACED",
+          "CONTRACTORS_CHOSEN",
+          "MESSAGES_SENT",
+          "JOBS_COMPLETED",
+          "REVIEWS_LEFT",
+          "CONTACTS_SHARED"
+        ]
+      },
+      "AnalyticsSeriesDto": {
+        "additionalProperties": false,
+        "properties": {
+          "metric": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AnalyticsMetric"
+              }
+            ]
+          },
+          "perDay": {
+            "description": "По дням, в порядке days",
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "total": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "metric",
+          "total",
+          "perDay"
+        ],
+        "type": "object"
+      },
       "AuthSessionDto": {
         "additionalProperties": false,
         "properties": {
@@ -37,11 +175,20 @@
             ],
             "nullable": true,
             "type": "object"
+          },
+          "publicId": {
+            "description": "Номер публичной карточки мастера",
+            "type": "integer"
+          },
+          "rating": {
+            "$ref": "#/components/schemas/ContractorRatingDto"
           }
         },
         "required": [
+          "publicId",
           "name",
-          "profile"
+          "profile",
+          "rating"
         ],
         "type": "object"
       },
@@ -51,7 +198,12 @@
           "OTHER_ACCEPTED",
           "JOB_CLOSED"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "open",
+        "x-extensible-enum": [
+          "OTHER_ACCEPTED",
+          "JOB_CLOSED"
+        ]
       },
       "BidStatus": {
         "enum": [
@@ -60,7 +212,8 @@
           "REJECTED",
           "WITHDRAWN"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "BlockDto": {
         "additionalProperties": false,
@@ -131,6 +284,137 @@
         },
         "type": "object"
       },
+      "ContactExchangeDto": {
+        "additionalProperties": false,
+        "properties": {
+          "counterpartName": {
+            "type": "string"
+          },
+          "myPhoneSet": {
+            "type": "boolean"
+          },
+          "mySharedAt": {
+            "description": "Когда я открыл свои контакты; null — не открывал",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "theirs": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PartyContactsDto"
+              }
+            ],
+            "description": "Контакты второй стороны; null — она их не открывала",
+            "nullable": true,
+            "type": "object"
+          },
+          "viewer": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlanParty"
+              }
+            ],
+            "description": "Кто смотрит"
+          }
+        },
+        "required": [
+          "viewer",
+          "counterpartName",
+          "mySharedAt",
+          "myPhoneSet",
+          "theirs"
+        ],
+        "type": "object"
+      },
+      "ContentFlagDto": {
+        "additionalProperties": false,
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/ReportAuthorSchema"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "jobId": {
+            "type": "string"
+          },
+          "jobTitle": {
+            "type": "string"
+          },
+          "kinds": {
+            "items": {
+              "$ref": "#/components/schemas/ContentFlagKind"
+            },
+            "type": "array"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReportStatus"
+              }
+            ]
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "targetType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContentFlagTarget"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "targetType",
+          "targetId",
+          "kinds",
+          "status",
+          "jobId",
+          "jobTitle",
+          "excerpt",
+          "hidden",
+          "author",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "ContentFlagKind": {
+        "enum": [
+          "PHONE",
+          "EMAIL",
+          "LINK",
+          "MESSENGER"
+        ],
+        "type": "string",
+        "x-enum-kind": "open",
+        "x-extensible-enum": [
+          "PHONE",
+          "EMAIL",
+          "LINK",
+          "MESSENGER"
+        ]
+      },
+      "ContentFlagTarget": {
+        "enum": [
+          "MESSAGE",
+          "BID"
+        ],
+        "type": "string",
+        "x-enum-kind": "closed"
+      },
       "ContractorProfileDto": {
         "additionalProperties": false,
         "properties": {
@@ -166,6 +450,24 @@
           "cities",
           "experienceYears",
           "updatedAt"
+        ],
+        "type": "object"
+      },
+      "ContractorRatingDto": {
+        "additionalProperties": false,
+        "properties": {
+          "average": {
+            "description": "Средняя оценка 1–5 с одним знаком; null — отзывов нет",
+            "nullable": true,
+            "type": "number"
+          },
+          "count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "average",
+          "count"
         ],
         "type": "object"
       },
@@ -328,7 +630,8 @@
             "enum": [
               true
             ],
-            "type": "boolean"
+            "type": "boolean",
+            "x-enum-kind": "closed"
           },
           "name": {
             "maxLength": 80,
@@ -386,21 +689,48 @@
         ],
         "type": "object"
       },
+      "CreateReviewDto": {
+        "additionalProperties": false,
+        "properties": {
+          "rating": {
+            "maximum": 5,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "text": {
+            "default": "",
+            "maxLength": 1000,
+            "type": "string"
+          }
+        },
+        "required": [
+          "rating"
+        ],
+        "type": "object"
+      },
       "Currency": {
         "enum": [
           "RUB"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "ErrorResponse": {
         "additionalProperties": false,
         "properties": {
           "code": {
-            "description": "Код ошибки для программы (вход через банк: OAUTH_*)",
+            "description": "Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, LOGIN_THROTTLED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_*",
             "type": "string"
           },
           "error": {
+            "description": "Текстовое имя статуса",
             "type": "string"
+          },
+          "fieldErrors": {
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            },
+            "type": "array"
           },
           "message": {
             "oneOf": [
@@ -421,9 +751,87 @@
         },
         "required": [
           "statusCode",
+          "code",
+          "message",
+          "error"
+        ],
+        "type": "object"
+      },
+      "FavoriteIdsDto": {
+        "additionalProperties": false,
+        "properties": {
+          "jobIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "jobIds"
+        ],
+        "type": "object"
+      },
+      "FavoriteStateDto": {
+        "additionalProperties": false,
+        "properties": {
+          "favorite": {
+            "type": "boolean"
+          },
+          "jobId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "jobId",
+          "favorite"
+        ],
+        "type": "object"
+      },
+      "FieldError": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FieldErrorCode"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "description": "Путь к полю через точку: title, items.2.category",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "code",
           "message"
         ],
         "type": "object"
+      },
+      "FieldErrorCode": {
+        "enum": [
+          "INVALID",
+          "REQUIRED",
+          "TOO_SHORT",
+          "TOO_LONG",
+          "OUT_OF_RANGE",
+          "UNKNOWN_FIELD"
+        ],
+        "type": "string",
+        "x-enum-kind": "open",
+        "x-extensible-enum": [
+          "INVALID",
+          "REQUIRED",
+          "TOO_SHORT",
+          "TOO_LONG",
+          "OUT_OF_RANGE",
+          "UNKNOWN_FIELD"
+        ]
       },
       "Health": {
         "additionalProperties": false,
@@ -432,7 +840,8 @@
             "enum": [
               "ok"
             ],
-            "type": "string"
+            "type": "string",
+            "x-enum-kind": "closed"
           }
         },
         "required": [
@@ -553,7 +962,20 @@
           "DESIGN",
           "OTHER"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "open",
+        "x-extensible-enum": [
+          "REPAIR_TURNKEY",
+          "PLUMBING",
+          "ELECTRICAL",
+          "TILING",
+          "FINISHING",
+          "FLOORING",
+          "ROOFING",
+          "WINDOWS_DOORS",
+          "DESIGN",
+          "OTHER"
+        ]
       },
       "JobCloseOutcome": {
         "description": "Исход закрытого заказа; null — не закрыт или закрыт до появления поля",
@@ -561,7 +983,8 @@
           "COMPLETED",
           "CANCELLED"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "JobDraftDto": {
         "additionalProperties": false,
@@ -961,6 +1384,38 @@
         ],
         "type": "object"
       },
+      "JobReviewStateDto": {
+        "additionalProperties": false,
+        "properties": {
+          "canReview": {
+            "type": "boolean"
+          },
+          "contractor": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReviewContractorSchema"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "review": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReviewDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "canReview",
+          "review",
+          "contractor"
+        ],
+        "type": "object"
+      },
       "JobStageDto": {
         "additionalProperties": false,
         "properties": {
@@ -1037,7 +1492,8 @@
           "IN_PROGRESS",
           "CLOSED"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "LeadDto": {
         "additionalProperties": false,
@@ -1080,7 +1536,8 @@
             "enum": [
               true
             ],
-            "type": "boolean"
+            "type": "boolean",
+            "x-enum-kind": "closed"
           }
         },
         "required": [
@@ -1100,7 +1557,12 @@
               "sber",
               "tbank"
             ],
-            "type": "string"
+            "type": "string",
+            "x-enum-kind": "open",
+            "x-extensible-enum": [
+              "sber",
+              "tbank"
+            ]
           }
         },
         "required": [
@@ -1137,7 +1599,8 @@
             "enum": [
               true
             ],
-            "type": "boolean"
+            "type": "boolean",
+            "x-enum-kind": "closed"
           },
           "ids": {
             "description": "Перечисленные уведомления",
@@ -1256,6 +1719,71 @@
         ],
         "type": "object"
       },
+      "MyReportDto": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "jobId": {
+            "type": "string"
+          },
+          "jobTitle": {
+            "type": "string"
+          },
+          "note": {
+            "nullable": true,
+            "type": "string"
+          },
+          "reason": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReportReason"
+              }
+            ]
+          },
+          "resolvedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReportStatus"
+              }
+            ]
+          },
+          "targetType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReportTarget"
+              }
+            ]
+          },
+          "unseen": {
+            "description": "Решение есть, но ещё не просмотрено",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "targetType",
+          "reason",
+          "status",
+          "jobId",
+          "jobTitle",
+          "note",
+          "createdAt",
+          "resolvedAt",
+          "unseen"
+        ],
+        "type": "object"
+      },
       "NotificationData": {
         "additionalProperties": false,
         "properties": {
@@ -1361,7 +1889,24 @@
           "JOB_CLOSED",
           "MESSAGE"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "open",
+        "x-extensible-enum": [
+          "BID_RECEIVED",
+          "BID_WITHDRAWN",
+          "BID_ACCEPTED",
+          "BID_REJECTED",
+          "PLAN_PROPOSED",
+          "PLAN_APPROVED",
+          "PLAN_RETURNED",
+          "PLAN_AUTHOR_CHANGED",
+          "STAGE_SUBMITTED",
+          "STAGE_ACCEPTED",
+          "STAGE_REWORK",
+          "CONTRACTOR_QUIT",
+          "JOB_CLOSED",
+          "MESSAGE"
+        ]
       },
       "NotificationsPageDto": {
         "additionalProperties": false,
@@ -1399,6 +1944,10 @@
             },
             "type": "array"
           },
+          "reportDecisions": {
+            "description": "Непросмотренные решения по вашим жалобам",
+            "type": "integer"
+          },
           "unread": {
             "description": "Непрочитанных всего",
             "type": "integer"
@@ -1406,7 +1955,8 @@
         },
         "required": [
           "unread",
-          "jobs"
+          "jobs",
+          "reportDecisions"
         ],
         "type": "object"
       },
@@ -1510,11 +2060,18 @@
         "additionalProperties": false,
         "properties": {
           "code": {
-            "description": "Код ошибки для программы (вход через банк: OAUTH_*)",
+            "description": "Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, LOGIN_THROTTLED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_*",
             "type": "string"
           },
           "error": {
+            "description": "Текстовое имя статуса",
             "type": "string"
+          },
+          "fieldErrors": {
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            },
+            "type": "array"
           },
           "message": {
             "oneOf": [
@@ -1544,7 +2101,9 @@
         },
         "required": [
           "statusCode",
+          "code",
           "message",
+          "error",
           "pending",
           "name"
         ],
@@ -1558,7 +2117,12 @@
               "sber",
               "tbank"
             ],
-            "type": "string"
+            "type": "string",
+            "x-enum-kind": "open",
+            "x-extensible-enum": [
+              "sber",
+              "tbank"
+            ]
           },
           "title": {
             "type": "string"
@@ -1721,6 +2285,87 @@
         ],
         "type": "object"
       },
+      "PaginatedAdminUserDto": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminUserDto"
+            },
+            "type": "array"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total"
+        ],
+        "type": "object"
+      },
+      "PaginatedContentFlagDto": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ContentFlagDto"
+            },
+            "type": "array"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total"
+        ],
+        "type": "object"
+      },
+      "PaginatedJobBidDto": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/JobBidDto"
+            },
+            "type": "array"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total"
+        ],
+        "type": "object"
+      },
       "PaginatedJobDto": {
         "additionalProperties": false,
         "properties": {
@@ -1802,6 +2447,33 @@
         ],
         "type": "object"
       },
+      "PaginatedMyReportDto": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MyReportDto"
+            },
+            "type": "array"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total"
+        ],
+        "type": "object"
+      },
       "PaginatedOwnJobDto": {
         "additionalProperties": false,
         "properties": {
@@ -1853,6 +2525,67 @@
           "page",
           "limit",
           "total"
+        ],
+        "type": "object"
+      },
+      "PartyContactsDto": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "description": "null — телефон в профиле не указан",
+            "nullable": true,
+            "pattern": "^\\+7[3489][0-9]{9}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "phone",
+          "email"
+        ],
+        "type": "object"
+      },
+      "PasswordResetDto": {
+        "additionalProperties": false,
+        "properties": {
+          "password": {
+            "maxLength": 128,
+            "minLength": 10,
+            "type": "string"
+          },
+          "token": {
+            "description": "Токен из ссылки /reset/<токен>",
+            "maxLength": 64,
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "password"
+        ],
+        "type": "object"
+      },
+      "PasswordResetLinkDto": {
+        "additionalProperties": false,
+        "properties": {
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "token": {
+            "description": "Токен для ссылки /reset/<токен>; показывается один раз",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "expiresAt"
         ],
         "type": "object"
       },
@@ -1924,7 +2657,8 @@
           "OWNER",
           "CONTRACTOR"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "PlanStatus": {
         "enum": [
@@ -1932,7 +2666,8 @@
           "PROPOSED",
           "APPROVED"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "PlanVersionDto": {
         "additionalProperties": false,
@@ -1944,6 +2679,56 @@
         },
         "required": [
           "version"
+        ],
+        "type": "object"
+      },
+      "PublicContractorDto": {
+        "additionalProperties": false,
+        "properties": {
+          "completedJobs": {
+            "type": "integer"
+          },
+          "hasMoreReviews": {
+            "type": "boolean"
+          },
+          "memberSince": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "profile": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContractorProfileDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "publicId": {
+            "type": "integer"
+          },
+          "rating": {
+            "$ref": "#/components/schemas/ContractorRatingDto"
+          },
+          "reviews": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "publicId",
+          "name",
+          "profile",
+          "rating",
+          "completedJobs",
+          "memberSince",
+          "reviews",
+          "hasMoreReviews"
         ],
         "type": "object"
       },
@@ -2116,7 +2901,15 @@
           "FAKE",
           "OTHER"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "open",
+        "x-extensible-enum": [
+          "SPAM",
+          "FRAUD",
+          "ABUSE",
+          "FAKE",
+          "OTHER"
+        ]
       },
       "ReportReceivedDto": {
         "additionalProperties": false,
@@ -2141,7 +2934,8 @@
           "RESOLVED",
           "DISMISSED"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "ReportSubjectDto": {
         "additionalProperties": false,
@@ -2186,7 +2980,25 @@
           "MESSAGE",
           "BID"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
+      },
+      "ResolveFlagDto": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "enum": [
+              "RESOLVED",
+              "DISMISSED"
+            ],
+            "type": "string",
+            "x-enum-kind": "closed"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
       },
       "ResolveReportDto": {
         "additionalProperties": false,
@@ -2201,7 +3013,8 @@
               "RESOLVED",
               "DISMISSED"
             ],
-            "type": "string"
+            "type": "string",
+            "x-enum-kind": "closed"
           }
         },
         "required": [
@@ -2226,6 +3039,55 @@
         "required": [
           "version",
           "reason"
+        ],
+        "type": "object"
+      },
+      "ReviewContractorSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "publicId": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "publicId",
+          "name"
+        ],
+        "type": "object"
+      },
+      "ReviewDto": {
+        "additionalProperties": false,
+        "properties": {
+          "authorName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "jobTitle": {
+            "type": "string"
+          },
+          "rating": {
+            "type": "integer"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "rating",
+          "text",
+          "authorName",
+          "jobTitle",
+          "createdAt"
         ],
         "type": "object"
       },
@@ -2337,7 +3199,8 @@
           "CUSTOMER",
           "CONTRACTOR"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "SessionDto": {
         "additionalProperties": false,
@@ -2418,14 +3281,16 @@
           "ACCEPTED",
           "REWORK"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "UiMotion": {
         "enum": [
           "system",
           "reduced"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "UiPreferences": {
         "additionalProperties": false,
@@ -2465,7 +3330,8 @@
           "normal",
           "large"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "UiTheme": {
         "enum": [
@@ -2473,7 +3339,8 @@
           "dark",
           "system"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       },
       "UpdateJobDto": {
         "additionalProperties": false,
@@ -2751,7 +3618,8 @@
           "CONTRACTOR",
           "ADMIN"
         ],
-        "type": "string"
+        "type": "string",
+        "x-enum-kind": "closed"
       }
     },
     "securitySchemes": {
@@ -2765,7 +3633,7 @@
   },
   "info": {
     "contact": {},
-    "description": "Публичный контракт API маркетплейса. Ошибки — в текущем формате NestJS.",
+    "description": "Публичный контракт API маркетплейса. Ошибки — с машинным code (ADR 0002). Перечни помечены x-enum-kind: open — может пополняться, closed — нет (ADR 0001).",
     "title": "Agregator Remont API",
     "version": "1.0.0"
   },
@@ -2823,6 +3691,88 @@
         ]
       }
     },
+    "/v1/admin/analytics": {
+      "get": {
+        "operationId": "Analytics_report",
+        "parameters": [
+          {
+            "description": "Период, дней",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "enum": [
+                7,
+                30,
+                90
+              ],
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/v1/admin/bids/{id}/hidden": {
       "post": {
         "operationId": "AdminModeration_hideBid",
@@ -2852,6 +3802,215 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HiddenStateDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Конфликт с текущим состоянием ресурса"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/flags": {
+      "get": {
+        "operationId": "AdminModeration_listFlags",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 10000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 12,
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "OPEN",
+              "enum": [
+                "OPEN",
+                "RESOLVED",
+                "DISMISSED",
+                "ALL"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedContentFlagDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/flags/{id}/resolve": {
+      "post": {
+        "operationId": "AdminModeration_resolveFlag",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveFlagDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentFlagDto"
                 }
               }
             },
@@ -3524,6 +4683,200 @@
         ]
       }
     },
+    "/v1/admin/reviews/{id}/hidden": {
+      "post": {
+        "operationId": "AdminModeration_hideReview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HideDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HiddenStateDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/users": {
+      "get": {
+        "operationId": "AdminModeration_listUsers",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 10000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 12,
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Часть email или имени либо номер аккаунта (ID)",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedAdminUserDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/v1/admin/users/{id}/blocked": {
       "post": {
         "operationId": "AdminModeration_block",
@@ -3567,6 +4920,91 @@
               }
             },
             "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Конфликт с текущим состоянием ресурса"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v1/admin/users/{id}/password-reset": {
+      "post": {
+        "operationId": "AdminModeration_issuePasswordReset",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordResetLinkDto"
+                }
+              }
+            },
+            "description": "Ссылка для нового пароля"
           },
           "401": {
             "content": {
@@ -4060,6 +5498,76 @@
         ]
       }
     },
+    "/v1/auth/password-reset": {
+      "post": {
+        "operationId": "Auth_resetPassword",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-client-user-agent",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSessionDto"
+                }
+              }
+            },
+            "description": "Пароль изменён, выполнен вход"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/v1/auth/register": {
       "post": {
         "operationId": "Auth_register",
@@ -4127,6 +5635,77 @@
         },
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/v1/contractors/{publicId}": {
+      "get": {
+        "operationId": "ContractorsPublic_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "publicId",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicContractorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "tags": [
+          "contractors"
         ]
       }
     },
@@ -4384,6 +5963,197 @@
         ],
         "tags": [
           "bids"
+        ]
+      }
+    },
+    "/v1/jobs/{jobId}/contacts": {
+      "delete": {
+        "operationId": "Contacts_hide",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactExchangeDto"
+                }
+              }
+            },
+            "description": "Мои контакты снова скрыты"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "contacts"
+        ]
+      },
+      "get": {
+        "operationId": "Contacts_state",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactExchangeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "contacts"
+        ]
+      },
+      "put": {
+        "operationId": "Contacts_share",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactExchangeDto"
+                }
+              }
+            },
+            "description": "Мои контакты открыты второй стороне"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "contacts"
         ]
       }
     },
@@ -6685,6 +8455,269 @@
         ]
       }
     },
+    "/v1/me/favorites": {
+      "get": {
+        "operationId": "Favorites_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 10000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 12,
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedJobDto"
+                }
+              }
+            },
+            "description": "Избранные заказы, новые первыми"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "favorites"
+        ]
+      }
+    },
+    "/v1/me/favorites/ids": {
+      "get": {
+        "operationId": "Favorites_ids",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FavoriteIdsDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "favorites"
+        ]
+      }
+    },
+    "/v1/me/favorites/{jobId}": {
+      "delete": {
+        "operationId": "Favorites_remove",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FavoriteStateDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "favorites"
+        ]
+      },
+      "put": {
+        "operationId": "Favorites_add",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FavoriteStateDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Конфликт с текущим состоянием ресурса"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "favorites"
+        ]
+      }
+    },
     "/v1/me/jobs": {
       "get": {
         "operationId": "MyJobs_list",
@@ -7142,6 +9175,28 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 10000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 12,
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -7149,14 +9204,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/JobBidDto"
-                  },
-                  "type": "array"
+                  "$ref": "#/components/schemas/PaginatedJobBidDto"
                 }
               }
             },
             "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
           },
           "401": {
             "content": {
@@ -7299,6 +9361,184 @@
         ],
         "tags": [
           "bids"
+        ]
+      }
+    },
+    "/v1/me/jobs/{jobId}/review": {
+      "get": {
+        "operationId": "JobReview_state",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobReviewStateDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "reviews"
+        ]
+      },
+      "post": {
+        "operationId": "JobReview_create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "jobId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReviewDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Роль не допускает операцию"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Конфликт с текущим состоянием ресурса"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "reviews"
         ]
       }
     },
@@ -8099,6 +10339,124 @@
               }
             },
             "description": "Ресурса нет или он принадлежит другому пользователю"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/v1/reports/mine": {
+      "get": {
+        "operationId": "Reports_mine",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 10000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 12,
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedMyReportDto"
+                }
+              }
+            },
+            "description": "Свои жалобы и решения по ним"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/v1/reports/mine/seen": {
+      "post": {
+        "operationId": "Reports_markSeen",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Решения по своим жалобам отмечены просмотренными"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
           },
           "429": {
             "content": {
