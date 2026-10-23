@@ -1018,7 +1018,7 @@ function OrderStamp({
       <div className="border-b border-ink/20 px-4 py-3">
         <p className="text-xs text-ink-soft">Заказ</p>
         <p className="mt-0.5 font-display text-[17px] font-semibold leading-snug tracking-[-0.01em] text-ink [overflow-wrap:anywhere]">
-          {title || <span className="text-ink-soft/70">Без названия</span>}
+          {title || <span className="text-ink-soft">Без названия</span>}
         </p>
       </div>
       <dl className="grid grid-cols-[7.25rem_minmax(0,1fr)]">
