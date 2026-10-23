@@ -68,7 +68,9 @@ try {
     );
     check(`${name}: the account is still there`, (await me(who)) === 200);
 
-    // Верный пароль: страница входа с пометкой, сессия больше не действует.
+    // Верный пароль: страница входа с пометкой, сессия больше не действует. Страница настроек
+    // открывается заново: без JS после ошибки она ещё дорисовывается, и форма «прыгает».
+    await page.goto(`${WEB}/account/settings#data`, { waitUntil: 'load' });
     const again = page.locator('form', {
       has: page.getByRole('button', { name: 'Удалить аккаунт' }),
     });
