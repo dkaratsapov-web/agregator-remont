@@ -654,6 +654,18 @@ model ContactShare {
   @@map("contact_shares")
 }
 
+/// Серия неверных паролей к одному адресу (защита от перебора с многих IP). Ключ — SHA-256
+/// адреса в нижнем регистре: так же для несуществующих аккаунтов, сам адрес не хранится.
+/// Строка удаляется при успешном входе; старые чистит ежечасная очистка.
+model LoginFailure {
+  emailHash String   @id @map("email_hash") @db.VarChar(64)
+  failures  Int
+  lastAt    DateTime @map("last_at")
+
+  @@index([lastAt])
+  @@map("login_failures")
+}
+
 /// Счётчики шагов, которых нет в других таблицах (просмотры каталога и карточек, начатые
 /// черновики): число за день по Москве, без людей, адресов и cookie (docs/ANALYTICS.md).
 model UsageCounter {

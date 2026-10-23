@@ -109,6 +109,29 @@ export const PASSWORD_RESET_LIMITS = {
   TTL_HOURS: 24,
 } as const;
 
+/**
+ * Защита от перебора пароля к одному адресу (с любых IP): первые FREE_FAILURES неверных
+ * попыток подряд — без паузы, дальше перед каждой следующей — пауза BASE_DELAY_S, удваивается
+ * до MAX_DELAY_S. Потолок — пауза, а не блокировка: чужие попытки не запирают владельца.
+ * Серия ошибок обнуляется успешным входом или через WINDOW_MIN минут без попыток.
+ */
+export const LOGIN_THROTTLE = {
+  FREE_FAILURES: 5,
+  BASE_DELAY_S: 2,
+  MAX_DELAY_S: 60,
+  WINDOW_MIN: 15,
+} as const;
+
+/** Пауза перед следующей попыткой после failures неверных подряд, секунд. */
+export function loginDelaySeconds(failures: number): number {
+  if (failures < LOGIN_THROTTLE.FREE_FAILURES) return 0;
+  const steps = failures - LOGIN_THROTTLE.FREE_FAILURES;
+  return Math.min(
+    LOGIN_THROTTLE.MAX_DELAY_S,
+    LOGIN_THROTTLE.BASE_DELAY_S * 2 ** Math.min(steps, 10),
+  );
+}
+
 export interface PasswordResetInput {
   /** Токен из ссылки `/reset/<токен>`. */
   token: string;

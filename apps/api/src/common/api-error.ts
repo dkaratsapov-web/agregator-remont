@@ -6,6 +6,9 @@ import { HttpException } from '@nestjs/common';
  * Фильтр ошибок дополняет тело полем `error` и отдаёт его как есть.
  */
 export class ApiError extends HttpException {
+  /** Через сколько секунд можно повторить: фильтр ставит заголовок Retry-After. */
+  retryAfterSeconds?: number;
+
   constructor(
     status: number,
     readonly code: ApiErrorCode,
@@ -22,8 +25,6 @@ export class ApiError extends HttpException {
  * говорит человеку, когда можно снова.
  */
 export class QuotaExceeded extends ApiError {
-  readonly retryAfterSeconds: number;
-
   constructor(
     message: string,
     oldest: Date | null | undefined,
@@ -34,5 +35,17 @@ export class QuotaExceeded extends ApiError {
     this.retryAfterSeconds = oldest
       ? Math.max(1, Math.ceil((oldest.getTime() + windowMs - now) / 1000))
       : Math.ceil(windowMs / 1000);
+  }
+}
+
+/** Слишком много неверных паролей к одному адресу подряд: пауза перед следующей попыткой. */
+export class LoginThrottled extends ApiError {
+  constructor(seconds: number) {
+    super(
+      429,
+      'LOGIN_THROTTLED',
+      `Слишком много неверных попыток входа для этого адреса. Повторите через ${seconds} с или восстановите пароль.`,
+    );
+    this.retryAfterSeconds = seconds;
   }
 }

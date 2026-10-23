@@ -45,6 +45,8 @@ const field = (form: FormData, key: string, max: number): string => {
 
 function messageFor(error: unknown): string {
   if (error instanceof ApiError) {
+    // Пауза после серии неверных паролей к адресу: API называет, сколько ждать.
+    if (error.code === 'LOGIN_THROTTLED' && error.userMessage) return error.userMessage;
     if (error.status === 429) return 'Слишком много попыток. Подождите минуту и попробуйте снова.';
     // Сообщения с подсказкой, что делать дальше.
     if (error.status === 401) return 'Неверный email или пароль. Проверьте раскладку и Caps Lock.';

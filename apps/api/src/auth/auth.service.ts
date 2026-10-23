@@ -21,7 +21,8 @@ import {
   isWellFormedSessionToken,
   SESSION_TTL_MS,
 } from './session-token';
-import { ApiError } from '../common/api-error';
+import { ApiError, LoginThrottled } from '../common/api-error';
+import { LoginThrottle, loginKey } from './login-throttle';
 
 const INVALID_CREDENTIALS = 'Неверный email или пароль';
 const RESET_INVALID =
@@ -33,7 +34,11 @@ const LAST_SEEN_STEP_MS = 60 * 60 * 1000;
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly throttle: LoginThrottle;
+
+  constructor(private readonly prisma: PrismaService) {
+    this.throttle = new LoginThrottle(prisma);
+  }
 
   async register(dto: RegisterDto, userAgent?: string): Promise<AuthSessionDto> {
     if (dto.password.toLowerCase() === dto.email) {
@@ -58,12 +63,19 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, userAgent?: string): Promise<AuthSessionDto> {
+    // Перебор пароля к одному адресу с многих IP: после серии ошибок — пауза (без проверки
+    // пароля, чтобы не тратить на перебор процессор). Одинаково для любых адресов.
+    const key = loginKey(dto.email);
+    const wait = await this.throttle.wait(key);
+    if (wait > 0) throw new LoginThrottled(wait);
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     // Пароль проверяется и для несуществующего email, чтобы не раскрывать его по времени ответа.
     const valid = await verifyPassword(user?.passwordHash ?? (await getDummyHash()), dto.password);
     if (!user || !valid) {
+      await this.throttle.fail(key);
       throw new ApiError(401, 'INVALID_CREDENTIALS', INVALID_CREDENTIALS);
     }
+    await this.throttle.clear(key);
     // О блокировке говорим только после верного пароля: иначе по ответу можно было бы
     // узнавать заблокированные адреса.
     if (user.blockedAt) throw new ForbiddenException(ACCOUNT_BLOCKED);

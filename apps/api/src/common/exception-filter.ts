@@ -13,7 +13,7 @@ import { Prisma } from '@prisma/client';
 import { ThrottlerException } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import type { AuthenticatedRequest } from '../auth/auth.types';
-import { ApiError, QuotaExceeded } from './api-error';
+import { ApiError } from './api-error';
 
 /** Код по статусу — для ошибок без более точного кода (ADR 0002, раздел 5). */
 const STATUS_CODES: Record<number, ApiErrorCode> = {
@@ -156,7 +156,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
         error: STATUS_TEXT[429],
       };
     }
-    if (exception instanceof QuotaExceeded && !res.headersSent) {
+    if (exception instanceof ApiError && exception.retryAfterSeconds && !res.headersSent) {
       res.setHeader('Retry-After', exception.retryAfterSeconds);
     }
     if (exception instanceof HttpException) {
