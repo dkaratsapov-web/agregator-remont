@@ -2,6 +2,7 @@
 // страница заказа и каталог по дополнительной категории. Требует запущенные API и web.
 import { chromium } from 'playwright';
 import { API, WEB, createChecker, registerViaApi } from './lib/forms.mjs';
+import { checkCsp, watchCsp } from './lib/csp-watch.mjs';
 
 const { check, finish } = createChecker();
 const owner = await registerViaApi('CUSTOMER');
@@ -9,6 +10,7 @@ const owner = await registerViaApi('CUSTOMER');
 const browser = await chromium.launch(
   process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
 );
+const cspViolations = watchCsp(browser);
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 const host = new URL(WEB).hostname;
 await context.addCookies(
@@ -104,4 +106,5 @@ try {
   await browser.close();
 }
 
+checkCsp(check, cspViolations);
 finish('job items e2e');

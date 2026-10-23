@@ -4,6 +4,7 @@
 // Требует запущенные API и web (production-сборка), как drafts-e2e.
 import { chromium } from 'playwright';
 import { API, WEB, actionForm, createChecker, registerViaApi } from './lib/forms.mjs';
+import { checkCsp, watchCsp } from './lib/csp-watch.mjs';
 
 const { check, finish } = createChecker();
 const customer = await registerViaApi('CUSTOMER');
@@ -46,6 +47,7 @@ const placeBid = async (jobId) =>
 const browser = await chromium.launch(
   process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
 );
+const cspViolations = watchCsp(browser);
 const host = new URL(WEB).hostname;
 const cookiesOf = (user) =>
   user.cookie.split('; ').map((pair) => {
@@ -313,4 +315,5 @@ try {
   await browser.close();
 }
 
+checkCsp(check, cspViolations);
 finish('mvp e2e');

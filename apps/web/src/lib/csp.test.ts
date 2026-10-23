@@ -18,6 +18,7 @@ describe('buildCsp', () => {
     expect(directive(csp, 'frame-ancestors')).toEqual(["'none'"]);
     expect(directive(csp, 'base-uri')).toEqual(["'self'"]);
     expect(directive(csp, 'connect-src')).toEqual(["'self'"]);
+    expect(directive(csp, 'report-uri')).toEqual(['/csp-report']);
   });
 
   it('dev policy allows what Next.js HMR needs', () => {

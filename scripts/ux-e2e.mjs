@@ -5,12 +5,14 @@
 /* global window, document, getComputedStyle, MutationObserver -- выполняется в браузере через page.evaluate */
 import { chromium } from 'playwright';
 import { API, WEB, createChecker, registerViaApi } from './lib/forms.mjs';
+import { checkCsp, watchCsp } from './lib/csp-watch.mjs';
 
 const { check, finish } = createChecker();
 const customer = await registerViaApi('CUSTOMER');
 const browser = await chromium.launch(
   process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
 );
+const cspViolations = watchCsp(browser);
 const host = new URL(WEB).hostname;
 const cookies = customer.cookie.split('; ').map((pair) => {
   const [name, value] = pair.split('=');
@@ -490,4 +492,5 @@ try {
   await browser.close();
 }
 
+checkCsp(check, cspViolations);
 finish('ux e2e');

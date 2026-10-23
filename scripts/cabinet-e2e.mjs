@@ -4,6 +4,7 @@
 // Требует запущенные API и web (production-сборка), как drafts-e2e.
 import { chromium } from 'playwright';
 import { API, WEB, createChecker, registerViaApi } from './lib/forms.mjs';
+import { checkCsp, watchCsp } from './lib/csp-watch.mjs';
 
 const { check, finish } = createChecker();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -12,6 +13,7 @@ const contractor = await registerViaApi('CONTRACTOR');
 const browser = await chromium.launch(
   process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
 );
+const cspViolations = watchCsp(browser);
 const host = new URL(WEB).hostname;
 // Регистрация в браузере идёт через web → API: свой адрес, чтобы не делить лимит на вход
 // с другими скриптами CI.
@@ -189,4 +191,5 @@ try {
   await browser.close();
 }
 
+checkCsp(check, cspViolations);
 finish('cabinet e2e');

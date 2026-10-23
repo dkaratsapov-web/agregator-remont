@@ -8,12 +8,14 @@
 // Требует запущенные API и web (production-сборка), как cabinet-e2e.
 import { chromium } from 'playwright';
 import { API, WEB, createChecker } from './lib/forms.mjs';
+import { checkCsp, watchCsp } from './lib/csp-watch.mjs';
 
 const { check, finish } = createChecker();
 const stamp = Date.now();
 const browser = await chromium.launch(
   process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
 );
+const cspViolations = watchCsp(browser);
 const phone = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true };
 const customerContext = await browser.newContext(phone);
 const contractorContext = await browser.newContext(phone);
@@ -197,4 +199,5 @@ try {
   await browser.close();
 }
 
+checkCsp(check, cspViolations);
 finish('journey e2e');

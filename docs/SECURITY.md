@@ -58,7 +58,8 @@
 ```
 default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';
 img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self';
-worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';
+report-uri /csp-report
 ```
 
 - В production нет `unsafe-eval` (проверяется unit-тестом и smoke-тестом в CI). В dev
@@ -66,8 +67,21 @@ worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame
 - Проверено в Chromium (Playwright) на `/`, `/jobs`, фильтре, карточке, 404 и `/offline`:
   0 нарушений, service worker регистрируется.
 
+- **Все браузерные сценарии CI проверяют отсутствие нарушений** (`scripts/lib/csp-watch.mjs`):
+  сценарий собирает сообщения CSP из консоли всех вкладок и падает, если они есть. Это 13
+  сценариев, Chromium и WebKit, гость, заказчик, подрядчик и администратор, с JS и без. Сторож
+  проверен намеренным нарушением: чужая картинка и чужой скрипт пойманы.
+- **Отчёты настоящих браузеров** приходят на `POST /csp-report` (`apps/web/src/app/csp-report`)
+  и пишутся в журнал web строкой `{"event":"csp-violation",…}`. Без данных людей: директива,
+  источник без пути и параметров, путь страницы без query и с замаскированными токенами.
+  Не больше 60 строк в минуту на процесс, отброшенные считаются строкой
+  `csp-violation-dropped`. В закрытом тесте адрес за паролем тестировщика (новых открытых
+  адресов в Caddy нет). Посмотреть на сервере:
+  `docker compose logs web --since 168h | grep csp-violation`.
+
 План перехода на enforce (до публичного релиза):
-1. Добавить сбор отчётов (`report-to`/`report-uri`) на собственный эндпоинт и наблюдать.
+1. ~~Сбор отчётов на собственный адрес~~ — сделано (`report-uri /csp-report`). Дальше —
+   неделя закрытого теста без строк `csp-violation` в журнале web.
 2. Перейти на nonce: генерация в `proxy.ts` (бывший middleware), `script-src 'self' 'nonce-…' 'strict-dynamic'`,
    убрать `'unsafe-inline'` из `script-src`. Учесть, что nonce делает все страницы динамическими.
 3. Переключить заголовок на `Content-Security-Policy`, добавить `upgrade-insecure-requests`.

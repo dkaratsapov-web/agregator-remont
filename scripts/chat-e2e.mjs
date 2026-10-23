@@ -6,6 +6,7 @@
 // Требует запущенные API и web (production-сборка), как plan-e2e.
 import { chromium } from 'playwright';
 import { API, WEB, createChecker, registerViaApi } from './lib/forms.mjs';
+import { checkCsp, watchCsp } from './lib/csp-watch.mjs';
 
 const { check, finish } = createChecker();
 const owner = await registerViaApi('CUSTOMER');
@@ -57,6 +58,7 @@ async function dealViaApi(title) {
 const browser = await chromium.launch(
   process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {},
 );
+const cspViolations = watchCsp(browser);
 const host = new URL(WEB).hostname;
 async function contextFor(who, options = {}) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 1000 }, ...options });
@@ -230,4 +232,5 @@ try {
   await browser.close();
 }
 
+checkCsp(check, cspViolations);
 finish('chat e2e');
