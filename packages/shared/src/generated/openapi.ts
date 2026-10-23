@@ -1076,6 +1076,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/price-estimates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PriceEstimates_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/reports": {
         parameters: {
             query?: never;
@@ -1781,6 +1797,23 @@ export interface components {
         PlanStatus: "DRAFT" | "PROPOSED" | "APPROVED";
         PlanVersionDto: {
             version: number;
+        };
+        PriceEstimateDto: {
+            /** @description Сколько откликов учтено */
+            bids: number;
+            category: components["schemas"]["JobCategory"];
+            /** @description Город, по которому посчитано; null — по всем городам */
+            city: string | null;
+            /** @description Верхняя четверть, ₽ (округлено) */
+            high: number;
+            /** @description Нижняя четверть цен откликов, ₽ (округлено) */
+            low: number;
+            /** @description Медиана, ₽ (округлено) */
+            median: number;
+        };
+        PriceEstimatesDto: {
+            /** @description Только категории с достаточными данными */
+            items: components["schemas"]["PriceEstimateDto"][];
         };
         PublicContractorDto: {
             completedJobs: number;
@@ -6864,6 +6897,55 @@ export interface operations {
             };
             /** @description Ресурса нет или он принадлежит другому пользователю */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    PriceEstimates_list: {
+        parameters: {
+            query?: {
+                /** @description Город заказа; неизвестный город — оценка по всем городам */
+                city?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceEstimatesDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

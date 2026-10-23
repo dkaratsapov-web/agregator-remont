@@ -38,6 +38,7 @@ import type {
   ReportSubjectDto,
 } from './moderation';
 import type { AnalyticsDto, AnalyticsSeriesDto } from './analytics';
+import type { PriceEstimateDto, PriceEstimatesDto } from './price-estimates';
 import type { ApiErrorBody, FieldError } from './errors';
 import type { ContactExchangeDto, PartyContactsDto } from './contacts';
 import type { Paginated } from './pagination';
@@ -108,6 +109,8 @@ export type ContractChecks = [
   // Аналитика без персональных данных.
   Expect<Equal<AnalyticsSeriesDto, Schemas['AnalyticsSeriesDto']>>,
   Expect<Equal<AnalyticsDto, Schemas['AnalyticsDto']>>,
+  Expect<Equal<PriceEstimateDto, Schemas['PriceEstimateDto']>>,
+  Expect<Equal<PriceEstimatesDto, Schemas['PriceEstimatesDto']>>,
   // Единый формат ошибок (ADR 0002).
   Expect<Equal<FieldError, Schemas['FieldError']>>,
   Expect<Equal<ApiErrorBody, Schemas['ErrorResponse']>>,

@@ -2,6 +2,7 @@ import 'server-only';
 import type {
   AdminUserDto,
   AnalyticsDto,
+  PriceEstimatesDto,
   AnalyticsPeriod,
   AuthSessionDto,
   ContactExchangeDto,
@@ -1080,4 +1081,11 @@ export async function setContactsShared(
 export async function getAnalytics(token: string, days: AnalyticsPeriod): Promise<AnalyticsDto> {
   const res = await request(`/v1/admin/analytics?days=${days}`, { token });
   return expectJson<AnalyticsDto>(res, 'GET /v1/admin/analytics');
+}
+
+/** Сколько обычно просят мастера по категориям: подсказка к бюджету в форме заказа. */
+export async function getPriceEstimates(token: string, city?: string): Promise<PriceEstimatesDto> {
+  const query = city ? `?city=${encodeURIComponent(city)}` : '';
+  const res = await request(`/v1/price-estimates${query}`, { token });
+  return expectJson<PriceEstimatesDto>(res, 'GET /v1/price-estimates');
 }

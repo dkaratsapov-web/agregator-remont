@@ -26,6 +26,8 @@ import {
   type FieldError,
   type FieldErrorCode,
   type AnalyticsDto,
+  type PriceEstimateDto,
+  type PriceEstimatesDto,
   type AnalyticsMetric,
   type AnalyticsSeriesDto,
   type ContactExchangeDto,
@@ -718,6 +720,30 @@ export class AnalyticsSchema implements AnalyticsDto {
   @ApiProperty({ type: String, isArray: true, description: 'YYYY-MM-DD по Москве, по возрастанию' })
   days!: string[];
   @ApiProperty({ type: AnalyticsSeriesSchema, isArray: true }) series!: AnalyticsSeriesSchema[];
+}
+
+@ApiSchema({ name: 'PriceEstimateDto' })
+export class PriceEstimateSchema implements PriceEstimateDto {
+  @ApiProperty({ enum: JOB_CATEGORIES, enumName: 'JobCategory' }) category!: JobCategory;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Город, по которому посчитано; null — по всем городам',
+  })
+  city!: string | null;
+  @int({ description: 'Нижняя четверть цен откликов, ₽ (округлено)' }) low!: number;
+  @int({ description: 'Медиана, ₽ (округлено)' }) median!: number;
+  @int({ description: 'Верхняя четверть, ₽ (округлено)' }) high!: number;
+  @int({ description: 'Сколько откликов учтено' }) bids!: number;
+}
+
+@ApiSchema({ name: 'PriceEstimatesDto' })
+export class PriceEstimatesSchema implements PriceEstimatesDto {
+  @ApiProperty({
+    type: [PriceEstimateSchema],
+    description: 'Только категории с достаточными данными',
+  })
+  items!: PriceEstimateSchema[];
 }
 
 @ApiSchema({ name: 'FavoriteStateDto' })

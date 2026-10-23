@@ -2682,6 +2682,64 @@
         ],
         "type": "object"
       },
+      "PriceEstimateDto": {
+        "additionalProperties": false,
+        "properties": {
+          "bids": {
+            "description": "Сколько откликов учтено",
+            "type": "integer"
+          },
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/JobCategory"
+              }
+            ]
+          },
+          "city": {
+            "description": "Город, по которому посчитано; null — по всем городам",
+            "nullable": true,
+            "type": "string"
+          },
+          "high": {
+            "description": "Верхняя четверть, ₽ (округлено)",
+            "type": "integer"
+          },
+          "low": {
+            "description": "Нижняя четверть цен откликов, ₽ (округлено)",
+            "type": "integer"
+          },
+          "median": {
+            "description": "Медиана, ₽ (округлено)",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "category",
+          "city",
+          "low",
+          "median",
+          "high",
+          "bids"
+        ],
+        "type": "object"
+      },
+      "PriceEstimatesDto": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "description": "Только категории с достаточными данными",
+            "items": {
+              "$ref": "#/components/schemas/PriceEstimateDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
       "PublicContractorDto": {
         "additionalProperties": false,
         "properties": {
@@ -10282,6 +10340,73 @@
         ],
         "tags": [
           "me"
+        ]
+      }
+    },
+    "/v1/price-estimates": {
+      "get": {
+        "operationId": "PriceEstimates_list",
+        "parameters": [
+          {
+            "description": "Город заказа; неизвестный город — оценка по всем городам",
+            "in": "query",
+            "name": "city",
+            "required": false,
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceEstimatesDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "jobs"
         ]
       }
     },

@@ -26,6 +26,7 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { FavoritesModule } from './favorites/favorites.module';
 import { ContactsModule } from './contacts/contacts.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { PriceEstimatesModule } from './price-estimates/price-estimates.module';
 import { UsageModule } from './analytics/usage';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 
@@ -70,6 +71,7 @@ import { MaintenanceModule } from './maintenance/maintenance.module';
     FavoritesModule,
     ContactsModule,
     AnalyticsModule,
+    PriceEstimatesModule,
     UsageModule,
     MaintenanceModule,
   ],

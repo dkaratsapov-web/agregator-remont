@@ -28,6 +28,7 @@ import { requireCustomerPage } from '@/lib/customer';
 import { MarkSeen } from '@/components/notifications/mark-seen';
 import { getUnreadSummary, unreadForJob } from '@/lib/notifications-server';
 import { formatAmount, formatBudget, formatDate } from '@/lib/format';
+import { loadPriceEstimates } from '@/lib/price-estimate-server';
 import { closeJobFormAction, updateJobFormAction } from '../actions';
 
 export const metadata: Metadata = { title: 'Мой заказ', robots: { index: false } };
@@ -59,10 +60,11 @@ export default async function MyJobPage({
   let chat: Awaited<ReturnType<typeof getMessages>> = null;
   let review: Awaited<ReturnType<typeof getJobReview>> = null;
   let contacts: Awaited<ReturnType<typeof getContacts>> = null;
+  let priceEstimates: Awaited<ReturnType<typeof loadPriceEstimates>> = [];
   try {
     job = await getMyJob(token, id);
     if (job) {
-      [bids, plan, chat, review, contacts] = await Promise.all([
+      [bids, plan, chat, review, contacts, priceEstimates] = await Promise.all([
         listJobBids(token, job.id, bidsPage),
         // План и переписка есть только у заказа с выбранным исполнителем.
         job.status === 'OPEN' ? Promise.resolve(null) : getPlan(token, job.id),
@@ -71,6 +73,8 @@ export default async function MyJobPage({
         job.closeOutcome === 'COMPLETED' ? getJobReview(token, job.id) : Promise.resolve(null),
         // Контакты — у сделки с выбранным исполнителем, по согласию сторон.
         job.status === 'OPEN' ? Promise.resolve(null) : getContacts(token, job.id),
+        // Подсказка к бюджету — только пока заказ можно править.
+        job.status === 'OPEN' ? loadPriceEstimates(token, job.city) : Promise.resolve([]),
       ]);
     }
   } catch (error) {
@@ -316,6 +320,7 @@ export default async function MyJobPage({
                 extraItems: JSON.stringify(job.extraItems),
               }}
               version={job.updatedAt}
+              priceEstimates={priceEstimates}
               submitLabel="Сохранить изменения"
               pendingLabel="Сохраняем…"
             />
