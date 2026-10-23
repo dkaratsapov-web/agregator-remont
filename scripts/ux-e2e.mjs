@@ -81,6 +81,25 @@ try {
     await page.context().close();
   }
 
+  // --- «Как это работает» в шапке: подсказка на месте, без перехода на главную.
+  {
+    const page = await newPage({ width: 1280, height: 900 });
+    await page.goto(`${WEB}/jobs`, { waitUntil: 'load' });
+    await page.locator('header').getByRole('button', { name: 'Как это работает' }).click();
+    const hint = page.locator('[popover]:popover-open');
+    check('header hint: opens in place', (await hint.count()) === 1);
+    check('header hint: stays on the page', new URL(page.url()).pathname === '/jobs', page.url());
+    const box = await hint.boundingBox();
+    check(
+      'header hint: sits under the header',
+      box !== null && box.y > 40 && box.y < 120,
+      `${box?.y}`,
+    );
+    await page.keyboard.press('Escape');
+    check('header hint: Escape closes it', (await hint.count()) === 0);
+    await page.context().close();
+  }
+
   // --- UX-2: скрытые кнопки первого экрана не получают фокус.
   {
     const page = await newPage();

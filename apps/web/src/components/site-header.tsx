@@ -3,6 +3,7 @@ import { getUnreadSummary } from '@/lib/notifications-server';
 import { getCurrentUser } from '@/lib/session';
 import { AccountMenu } from './account-menu';
 import { HeaderSearch } from './header-search';
+import { HowItWorksHint } from './how-it-works-hint';
 import { Wordmark } from './landing/wordmark';
 import { NavLink } from './nav-link';
 
@@ -28,7 +29,7 @@ export async function SiteHeader() {
             <div className="flex items-center gap-0.5 rounded-[12px] border border-line bg-surface/70 p-1 max-[400px]:hidden">
               <NavLink href="/jobs">Заказы</NavLink>
               <span className="hidden sm:contents">
-                <NavLink href="/#how-it-works">Как это работает</NavLink>
+                <HowItWorksHint buttonClassName="inline-flex min-h-9 items-center rounded-[9px] px-3.5 text-sm font-semibold text-ink-soft transition-colors duration-150 hover:bg-ink/5 hover:text-ink aria-expanded:bg-ink/5 aria-expanded:text-ink" />
               </span>
             </div>
             {user ? (
