@@ -8,6 +8,7 @@ import { getDraft } from '@/lib/api';
 import { isEntityId } from '@/lib/action-helpers';
 import { requireCustomerPage } from '@/lib/customer';
 import { formatAmount } from '@/lib/format';
+import { loadPriceEstimates } from '@/lib/price-estimate-server';
 import type { JobFormValues } from '@/lib/job-form';
 import { createJobAction } from '../actions';
 
@@ -32,23 +33,29 @@ export default async function NewJobPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [{ token }, params] = await Promise.all([
+  const [{ token, user }, params] = await Promise.all([
     requireCustomerPage('/account/jobs/new'),
     searchParams,
   ]);
   if (!token) return <CustomersOnly />;
 
   const requested = typeof params.draft === 'string' ? params.draft : null;
-  let draft: JobDraftDto | null = null;
-  let draftMissing = false;
-  if (requested && isEntityId(requested)) {
+  const loadDraft = async (): Promise<JobDraftDto | null> => {
+    if (!requested || !isEntityId(requested)) return null;
     try {
-      draft = await getDraft(token, requested);
+      return await getDraft(token, requested);
     } catch (error) {
       console.error('New job: failed to load draft', error);
+      return null;
     }
-    draftMissing = draft === null;
-  }
+  };
+  // Оценки — по городу профиля; город черновика, если другой, форма возьмёт из оценок по
+  // всем городам.
+  const [draft, priceEstimates] = await Promise.all([
+    loadDraft(),
+    loadPriceEstimates(token, user.city),
+  ]);
+  const draftMissing = Boolean(requested && isEntityId(requested)) && draft === null;
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 pb-16 pt-10 sm:px-6 md:pt-14 lg:px-10">
@@ -85,6 +92,7 @@ export default async function NewJobPage({
           draftId={draft?.id ?? null}
           draftVersion={draft?.updatedAt ?? null}
           requestId={randomUUID()}
+          priceEstimates={priceEstimates}
           submitLabel="Опубликовать заказ"
           pendingLabel="Публикуем…"
         />

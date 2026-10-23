@@ -4,11 +4,11 @@ import { motion, useMotionValueEvent, useScroll, useSpring } from 'motion/react'
 import { useState } from 'react';
 import { AccountMenu } from '../account-menu';
 import { HeaderSearch } from '../header-search';
+import { HowItWorksHint } from '../how-it-works-hint';
 import { useViewer } from './viewer';
 import { Wordmark } from './wordmark';
 
 const LINKS = [
-  { href: '#how-it-works', label: 'Как это работает' },
   { href: '#features', label: 'Возможности' },
   { href: '#about', label: 'О сервисе' },
 ];
@@ -35,6 +35,8 @@ export function LandingHeader() {
           <Wordmark />
         </a>
         <nav aria-label="Разделы главной" className="hidden items-center gap-1 md:flex">
+          {/* Не якорь, а подсказка — как в шапке кабинета. */}
+          <HowItWorksHint buttonClassName="inline-flex min-h-11 items-center rounded-full px-3.5 text-sm font-medium text-ink-soft transition-colors duration-150 hover:bg-ink/5 hover:text-ink aria-expanded:bg-ink/5 aria-expanded:text-ink" />
           {LINKS.map((link) => (
             <a
               key={link.href}

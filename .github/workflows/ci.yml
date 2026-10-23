@@ -147,6 +147,9 @@ jobs:
           WEB_TRUST_PROXY_HOPS: '1'
           WEB_PUBLIC_ORIGIN: http://localhost:3000
           AUTH_RATE_LIMIT_PER_MIN: '3'
+          # Сценарии создают отклики и сразу проверяют оценку цены: кэш оценок выключен
+          # (на сервере — 10 минут, docs/PRICE_ESTIMATES.md).
+          PRICE_ESTIMATES_CACHE_SEC: '0'
         run: |
           # Логин и пароль тестировщика (страница /gate) проверяет web: хеш тот же, что в deploy/.env.
           export BASIC_AUTH_USER=tester
@@ -185,6 +188,9 @@ jobs:
           # карточка мастера, рейтинг в откликах, избранное, «Переписки», «Мои жалобы», подсказка
           # о контактах; формы без JS отвечают ошибкой и не подвешивают сервер (docs/NO_JS_FORMS.md).
           node scripts/accounts-e2e.mjs
+          # Оценка цены под бюджетом по откликам сервиса: с JS и без, нет для заказа из нескольких
+          # работ (docs/PRICE_ESTIMATES.md).
+          node scripts/price-estimate-e2e.mjs
           # Доступность из аудита (UX-1…14), замеры LCP/CLS/INP и видео пролёта на главной.
           node scripts/ux-e2e.mjs
           # Safari (WebKit, iPhone): поведение главной, видео, reduced motion, вход (ТЗ #40, п. 8).

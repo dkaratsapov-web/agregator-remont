@@ -28,11 +28,12 @@
 | Избранное и «Переписки» в кабинете | Реализовано; корзина материалов — «Скоро» | `apps/api/src/favorites`, `app/(site)/account/{favorites,chats}` | `accounts.e2e-spec.ts`, `scripts/accounts-e2e.mjs` |
 | Переписка по заказу и фото-отчёты к этапам | Реализовано (фото в базе до S3 — решение владельца по пределам) | `apps/api/src/messages`, `apps/api/src/photos`, `docs/JOB_CHAT.md` | `messages.e2e-spec.ts`, `scripts/chat-e2e.mjs` |
 | План, этапы работ и приёмка этапа | Реализовано без денег | `apps/api/src/plans`, `docs/JOB_PLAN.md` | `plans.e2e-spec.ts`, `scripts/plan-e2e.mjs` |
+| Оценка цены под бюджетом в форме заказа | Реализовано: по откликам сервиса, по городу или всем городам; только при достаточных данных | `apps/api/src/price-estimates`, `docs/PRICE_ESTIMATES.md` | `price-estimates.e2e-spec.ts`, `scripts/price-estimate-e2e.mjs` |
 | Безопасная сделка, резервирование денег, оплата по этапам, арбитраж | В планах, отдельный этап с провайдером и юристами; проект — `docs/PAYMENTS_DESIGN.md` (кода денег нет) | — | — |
 | Корзина материалов по смете, партнёры (Лемана ПРО, «Петрович»), доставка | В планах, договорённостей с партнёрами нет | — | — |
 | Интеграция с ФНС и банками для юрлиц и самозанятых | В планах | — | — |
 | Восстановление пароля | Реализовано без почты: одноразовая ссылка от администратора или команды на сервере; по email — когда будет почтовый провайдер | `apps/api/src/auth/password-reset.ts`, `docs/ACCOUNTS.md` | `accounts.e2e-spec.ts`, `scripts/accounts-e2e.mjs` |
-| Рейтинг по выполненным заказам, отзывы, карточка мастера | Реализовано; оценка цены и ИИ-помощник в заказе — в планах | `apps/api/src/reviews`, `docs/ACCOUNTS.md` | `accounts.e2e-spec.ts`, `scripts/accounts-e2e.mjs` |
+| Рейтинг по выполненным заказам, отзывы, карточка мастера | Реализовано; ИИ-помощник в заказе — в планах | `apps/api/src/reviews`, `docs/ACCOUNTS.md` | `accounts.e2e-spec.ts`, `scripts/accounts-e2e.mjs` |
 | Приложения iOS и Android | В планах (API готовится: `docs/MOBILE_READINESS_AUDIT.md`) | — | — |
 
 ## Обещания на сайте

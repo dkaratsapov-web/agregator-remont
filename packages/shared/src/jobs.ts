@@ -100,6 +100,24 @@ export const JOB_SEARCH = {
   QUERY_MAX: 100,
 } as const;
 
+/** Порядок каталога: сначала новые; по бюджету — заказы без бюджета в конце. */
+export const JOB_SORTS = ['new', 'budget_desc', 'budget_asc'] as const;
+export type JobSort = (typeof JOB_SORTS)[number];
+export const JOB_SORT_LABELS: Record<JobSort, string> = {
+  new: 'Сначала новые',
+  budget_desc: 'Бюджет: сначала больше',
+  budget_asc: 'Бюджет: сначала меньше',
+};
+
+/** Фильтр каталога «Опубликован за»: последние сутки, неделя или месяц. */
+export const JOB_POSTED_DAYS = [1, 7, 30] as const;
+export type JobPostedDays = (typeof JOB_POSTED_DAYS)[number];
+export const JOB_POSTED_LABELS: Record<JobPostedDays, string> = {
+  1: 'Сутки',
+  7: 'Неделя',
+  30: 'Месяц',
+};
+
 /** Поля, которые заказчик задаёт сам. Владелец, статус и даты задаёт только сервер. */
 export interface JobInput {
   title: string;

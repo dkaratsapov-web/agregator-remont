@@ -1134,6 +1134,11 @@ describe('API contract (e2e)', () => {
       await check('get', AN, http().get(AN), 401);
       await check('get', AN, as(http().get(AN), owner), 403);
 
+      const PE = '/v1/price-estimates';
+      await check('get', PE, as(http().get(`${PE}?city=Москва`), owner), 200);
+      await check('get', PE, as(http().get(`${PE}?city=${'x'.repeat(101)}`), owner), 400);
+      await check('get', PE, http().get(PE), 401);
+
       const FL = '/v1/admin/flags';
       const flags = await check('get', FL, as(http().get(FL), admin), 200);
       expect(flags.body.items).toEqual(

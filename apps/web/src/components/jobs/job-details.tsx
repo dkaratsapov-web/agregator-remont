@@ -42,79 +42,63 @@ export function JobDetails({
         </Heading>
         <p className="text-sm text-ink-soft tabular-nums">Ответов: {items.length}</p>
       </div>
-      <div className="mt-4 space-y-3">
-        {sections.map((section) => {
-          const units = toUnits(section.items);
-          return (
-            <div
-              key={section.id}
-              className="overflow-hidden rounded-[14px] border border-line bg-surface"
-            >
-              <Sub className="border-b border-line px-5 py-3 text-sm font-semibold text-ink sm:px-6">
+      <div className="spec mt-3">
+        {sections.map((section, s) => (
+          <div key={section.id} className="spec-section">
+            <Sub className="spec-head">
+              <span className="font-display text-[13px] font-semibold tracking-[-0.01em] text-ink">
                 {section.title}
-              </Sub>
-              <dl
-                className={`gap-x-10 px-5 py-4 sm:px-6 sm:py-5 ${units.length > 1 ? 'md:columns-2' : ''}`}
-              >
-                {units.map(({ item, children }) => (
-                  <div key={item.id} className="mb-5 break-inside-avoid last:mb-0">
-                    <dt className="text-sm text-ink-soft">{item.label}</dt>
-                    <dd className="mt-1">
-                      <AnswerValue item={item} />
-                      {children.length > 0 ? (
-                        <dl className="mt-3 space-y-3 border-l-2 border-accent/25 pl-3.5">
-                          {children.map((child) => (
-                            <div
-                              key={child.id}
-                              style={{ marginLeft: `${(child.depth - 1) * 0.875}rem` }}
-                            >
-                              <dt className="text-[13px] text-ink-soft">{child.label}</dt>
-                              <dd className="mt-0.5">
-                                <AnswerValue item={child} />
-                              </dd>
-                            </div>
-                          ))}
-                        </dl>
-                      ) : null}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          );
-        })}
+              </span>
+            </Sub>
+            <dl className="spec-grid">
+              {section.items.map((item, i) => (
+                <div
+                  key={item.id}
+                  style={{ '--i': s * 4 + i } as React.CSSProperties}
+                  className={`spec-cell ${item.depth > 0 ? 'spec-cell--sub' : ''}`}
+                >
+                  <dt className="text-[12.5px] leading-snug text-ink-soft">{item.label}</dt>
+                  <dd className="mt-1">
+                    <AnswerValue item={item} />
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ))}
       </div>
     </section>
   );
 }
 
-/** Ответ верхнего уровня вместе со всеми вложенными уточнениями. */
-function toUnits(items: readonly JobDetailItem[]) {
-  const units: { item: JobDetailItem; children: JobDetailItem[] }[] = [];
-  for (const item of items) {
-    const last = units[units.length - 1];
-    if (item.depth > 0 && last) last.children.push(item);
-    else units.push({ item, children: [] });
-  }
-  return units;
-}
+/** Число с единицей («10 м²», «10 м пог.»): число крупно, как замер рулеткой. */
+const MEASURE = /^(\d[\d\s.,]*)\s+(\S.*)$/;
 
 function AnswerValue({ item }: { item: JobDetailItem }) {
   if (item.values.length > 1) {
     return (
-      <ul className="flex flex-wrap gap-1.5 pt-0.5">
+      <ul className="flex flex-wrap gap-x-3 gap-y-1">
         {item.values.map((value) => (
-          <li
-            key={value}
-            className="rounded-[7px] border border-line bg-canvas px-2.5 py-1 text-sm font-medium text-ink"
-          >
+          <li key={value} className="flex items-center gap-1.5 text-sm font-medium text-ink">
+            <span aria-hidden="true" className="size-1.5 shrink-0 rounded-[1px] bg-accent" />
             {value}
           </li>
         ))}
       </ul>
     );
   }
-  return <span className="text-[15px] font-medium leading-snug text-ink">{item.value}</span>;
+  const measure = MEASURE.exec(item.value);
+  if (measure) {
+    return (
+      <span className="inline-flex items-baseline gap-1 text-ink">
+        <span className="font-display text-[17px] font-semibold tabular-nums tracking-[-0.02em]">
+          {measure[1].trim()}
+        </span>
+        <span className="text-[13px] text-ink-soft">{measure[2]}</span>
+      </span>
+    );
+  }
+  return <span className="text-sm font-medium leading-snug text-ink">{item.value}</span>;
 }
 
 /** Ключевые ответы анкеты короткими плашками (карточка в каталоге, шапка заказа). */

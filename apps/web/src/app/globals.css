@@ -306,3 +306,127 @@ body:has(.auth-screen) .site-footer {
     opacity: 0.8;
   }
 }
+
+/* --- «Подробности» заказа: спецификация в стиле штампа чертежа (components/jobs/job-details.tsx).
+ * Ровная сетка ячеек с волосяными линиями; шапка раздела — полоса штриховки, как разрез на
+ * чертеже. Анимация одна, при загрузке: штриховка прорисовывается, ячейки проявляются по
+ * очереди. Только CSS: работает без JS, при «меньше движения» — сразу итоговый вид. */
+.spec {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.spec-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 2.5rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-sunken);
+  isolation: isolate;
+}
+.spec-section + .spec-section .spec-head {
+  border-top: 1px solid var(--line);
+}
+/* Штриховка справа, гаснет к заголовку. */
+.spec-head::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 0 30%;
+  z-index: -1;
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 26%, transparent) 0 1.5px,
+    transparent 1.5px 8px
+  );
+  mask-image: linear-gradient(90deg, transparent, #000 45%);
+}
+.spec-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Правая и нижняя линии крайних ячеек уходят за край и обрезаются рамкой. */
+  margin: 0 -1px -1px 0;
+}
+@media (min-width: 40rem) {
+  .spec-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 80rem) {
+  .spec-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.spec-cell {
+  position: relative;
+  min-width: 0;
+  min-height: 4.25rem;
+  padding: 0.75rem 1rem;
+  box-shadow:
+    inset -1px 0 0 var(--line),
+    inset 0 -1px 0 var(--line);
+  transition: background-color 200ms var(--ease-out);
+}
+/* Уточнение к ответу слева: уголок-выноска перед подписью. */
+.spec-cell--sub dt::before {
+  content: '';
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.4rem;
+  margin-right: 0.35rem;
+  border-left: 1.5px solid var(--accent);
+  border-bottom: 1.5px solid var(--accent);
+  vertical-align: 0.2em;
+}
+/* Метка в углу ячейки при наведении — как отметка на чертеже. */
+.spec-cell::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1.25rem;
+  height: 2px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 240ms var(--ease-out);
+}
+@media (hover: hover) {
+  .spec-cell:hover {
+    background: color-mix(in srgb, var(--surface-sunken) 55%, var(--surface));
+  }
+  .spec-cell:hover::after {
+    transform: scaleX(1);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .spec-head::after {
+    animation: spec-hatch 700ms var(--ease-out) both;
+  }
+  .spec-cell {
+    animation: spec-cell-in 420ms var(--ease-out) both;
+    animation-delay: calc(min(var(--i, 0), 16) * 28ms + 120ms);
+  }
+}
+@keyframes spec-hatch {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes spec-cell-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

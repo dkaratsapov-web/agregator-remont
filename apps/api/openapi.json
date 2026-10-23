@@ -1416,6 +1416,15 @@
         ],
         "type": "object"
       },
+      "JobSort": {
+        "enum": [
+          "new",
+          "budget_desc",
+          "budget_asc"
+        ],
+        "type": "string",
+        "x-enum-kind": "closed"
+      },
       "JobStageDto": {
         "additionalProperties": false,
         "properties": {
@@ -2679,6 +2688,109 @@
         },
         "required": [
           "version"
+        ],
+        "type": "object"
+      },
+      "PriceEstimateDto": {
+        "additionalProperties": false,
+        "properties": {
+          "bids": {
+            "description": "Сколько откликов учтено",
+            "type": "integer"
+          },
+          "category": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/JobCategory"
+              }
+            ]
+          },
+          "city": {
+            "description": "Город, по которому посчитано; null — по всем городам",
+            "nullable": true,
+            "type": "string"
+          },
+          "high": {
+            "description": "Верхняя четверть, ₽ (округлено)",
+            "type": "integer"
+          },
+          "low": {
+            "description": "Нижняя четверть цен откликов, ₽ (округлено)",
+            "type": "integer"
+          },
+          "median": {
+            "description": "Медиана, ₽ (округлено)",
+            "type": "integer"
+          },
+          "perSqm": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PriceSqmDto"
+              }
+            ],
+            "description": "Цена за м² по заказам с площадью работ в анкете: по городу или, если там мало, по всем городам; null — мало и там",
+            "nullable": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "category",
+          "city",
+          "low",
+          "median",
+          "high",
+          "bids",
+          "perSqm"
+        ],
+        "type": "object"
+      },
+      "PriceEstimatesDto": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "description": "Только категории с достаточными данными",
+            "items": {
+              "$ref": "#/components/schemas/PriceEstimateDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "PriceSqmDto": {
+        "additionalProperties": false,
+        "properties": {
+          "bids": {
+            "description": "Сколько откликов учтено",
+            "type": "integer"
+          },
+          "city": {
+            "description": "Город, по которому посчитана цена за м²; null — по всем городам",
+            "nullable": true,
+            "type": "string"
+          },
+          "high": {
+            "description": "Верхняя четверть, ₽ (округлено)",
+            "type": "integer"
+          },
+          "low": {
+            "description": "Нижняя четверть, ₽ (округлено)",
+            "type": "integer"
+          },
+          "median": {
+            "description": "Медиана, ₽ (округлено)",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "low",
+          "median",
+          "high",
+          "bids",
+          "city"
         ],
         "type": "object"
       },
@@ -5771,6 +5883,60 @@
               "maxLength": 100,
               "minLength": 2,
               "type": "string"
+            }
+          },
+          {
+            "description": "Бюджет от, ₽: верхняя граница бюджета заказа не меньше. Заказы без бюджета не входят",
+            "in": "query",
+            "name": "budgetFrom",
+            "required": false,
+            "schema": {
+              "maximum": 1000000000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Бюджет до, ₽: нижняя граница бюджета заказа не больше. Заказы без бюджета не входят",
+            "in": "query",
+            "name": "budgetTo",
+            "required": false,
+            "schema": {
+              "maximum": 1000000000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Опубликован за последние N дней",
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "enum": [
+                1,
+                7,
+                30
+              ],
+              "type": "number"
+            }
+          },
+          {
+            "description": "Только заказы без откликов (отозванные и скрытые не считаются)",
+            "in": "query",
+            "name": "noBids",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "new — сначала новые; budget_desc — по нижней границе бюджета, budget_asc — по верхней; без бюджета в конце",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/JobSort"
             }
           }
         ],
@@ -10282,6 +10448,73 @@
         ],
         "tags": [
           "me"
+        ]
+      }
+    },
+    "/v1/price-estimates": {
+      "get": {
+        "operationId": "PriceEstimates_list",
+        "parameters": [
+          {
+            "description": "Город заказа; неизвестный город — оценка по всем городам",
+            "in": "query",
+            "name": "city",
+            "required": false,
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceEstimatesDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "jobs"
         ]
       }
     },

@@ -21,6 +21,7 @@ export const OPEN_API_ENUMS = [
 export const CLOSED_API_ENUMS = [
   'JobStatus',
   'JobCloseOutcome',
+  'JobSort',
   'BidStatus',
   'PlanStatus',
   'StageStatus',

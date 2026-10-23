@@ -12,6 +12,8 @@ import {
   validateJobDetails,
   type JobCategory,
   type JobDetails,
+  type PriceEstimateDto,
+  workArea,
 } from '@agregator/shared';
 import { useActionState, useCallback, useEffect, useRef, useState } from 'react';
 import { saveDraftAction, type JobFormState } from '@/app/(site)/account/jobs/actions';
@@ -21,6 +23,7 @@ import { SubmitButton } from '@/components/auth/submit-button';
 import { CityCombobox } from '@/components/ui/city-combobox';
 import { CITY_GROUPS, CITY_OPTIONS } from '@/lib/city-options';
 import { formatBudget } from '@/lib/format';
+import { estimateText, pickEstimate } from '@/lib/price-estimate';
 import { Select } from '@/components/ui/select';
 import {
   checkJobForm,
@@ -57,6 +60,8 @@ interface Props {
   requestId?: string;
   /** Правка: updatedAt заказа на момент открытия формы. Изменён в другой вкладке → ошибка. */
   version?: string;
+  /** Сколько обычно просят мастера (lib/price-estimate.ts): подсказка под бюджетом. */
+  priceEstimates?: readonly PriceEstimateDto[];
 }
 
 /** Пауза после последней правки перед автосохранением черновика. */
@@ -154,6 +159,7 @@ export function JobForm({
   draftVersion,
   requestId,
   version,
+  priceEstimates = [],
 }: Props) {
   const [state, formAction] = useActionState<JobFormState, FormData>(action, {});
   const values = { ...initial, ...state.values };
@@ -190,6 +196,7 @@ export function JobForm({
       setLive((current) => ({ ...current, [name]: target.value }));
     }
   };
+  const estimate = pickEstimate(priceEstimates, category, city);
   const [issues, setIssues] = useState<JobFormIssue[]>(state.issues ?? []);
   const [lastState, setLastState] = useState(state);
   if (state !== lastState) {
@@ -776,6 +783,19 @@ export function JobForm({
                   Оставьте пустым, если бюджет по договорённости.
                 </p>
               )}
+              {/* Только для заказа из одной работы: цены откликов на заказы из нескольких работ
+                  не относятся к одной категории (docs/PRICE_ESTIMATES.md). */}
+              {estimate && extras.length === 0 ? (
+                <p
+                  data-testid="price-estimate"
+                  className="mt-3 rounded-xl border border-line bg-canvas px-4 py-3 text-sm leading-relaxed text-ink"
+                >
+                  {estimateText(
+                    estimate,
+                    category ? workArea(category, answersByCategory[category] ?? {}) : null,
+                  )}
+                </p>
+              ) : null}
             </fieldset>
             <div>
               <label htmlFor="field-description" className="block text-sm font-medium text-ink">

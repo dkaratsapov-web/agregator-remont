@@ -1076,6 +1076,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/price-estimates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PriceEstimates_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/reports": {
         parameters: {
             query?: never;
@@ -1465,6 +1481,8 @@ export interface components {
             contractor: components["schemas"]["ReviewContractorSchema"] | null;
             review: components["schemas"]["ReviewDto"] | null;
         };
+        /** @enum {string} */
+        JobSort: "new" | "budget_desc" | "budget_asc";
         JobStageDto: {
             /** Format: date-time */
             acceptedAt: string | null;
@@ -1781,6 +1799,37 @@ export interface components {
         PlanStatus: "DRAFT" | "PROPOSED" | "APPROVED";
         PlanVersionDto: {
             version: number;
+        };
+        PriceEstimateDto: {
+            /** @description Сколько откликов учтено */
+            bids: number;
+            category: components["schemas"]["JobCategory"];
+            /** @description Город, по которому посчитано; null — по всем городам */
+            city: string | null;
+            /** @description Верхняя четверть, ₽ (округлено) */
+            high: number;
+            /** @description Нижняя четверть цен откликов, ₽ (округлено) */
+            low: number;
+            /** @description Медиана, ₽ (округлено) */
+            median: number;
+            /** @description Цена за м² по заказам с площадью работ в анкете: по городу или, если там мало, по всем городам; null — мало и там */
+            perSqm: components["schemas"]["PriceSqmDto"] | null;
+        };
+        PriceEstimatesDto: {
+            /** @description Только категории с достаточными данными */
+            items: components["schemas"]["PriceEstimateDto"][];
+        };
+        PriceSqmDto: {
+            /** @description Сколько откликов учтено */
+            bids: number;
+            /** @description Город, по которому посчитана цена за м²; null — по всем городам */
+            city: string | null;
+            /** @description Верхняя четверть, ₽ (округлено) */
+            high: number;
+            /** @description Нижняя четверть, ₽ (округлено) */
+            low: number;
+            /** @description Медиана, ₽ (округлено) */
+            median: number;
         };
         PublicContractorDto: {
             completedJobs: number;
@@ -3527,6 +3576,16 @@ export interface operations {
                 city?: string;
                 /** @description Поиск подстроки в названии и описании без учёта регистра */
                 q?: string;
+                /** @description Бюджет от, ₽: верхняя граница бюджета заказа не меньше. Заказы без бюджета не входят */
+                budgetFrom?: number;
+                /** @description Бюджет до, ₽: нижняя граница бюджета заказа не больше. Заказы без бюджета не входят */
+                budgetTo?: number;
+                /** @description Опубликован за последние N дней */
+                days?: 1 | 7 | 30;
+                /** @description Только заказы без откликов (отозванные и скрытые не считаются) */
+                noBids?: boolean;
+                /** @description new — сначала новые; budget_desc — по нижней границе бюджета, budget_asc — по верхней; без бюджета в конце */
+                sort?: components["schemas"]["JobSort"];
             };
             header?: never;
             path?: never;
@@ -6864,6 +6923,55 @@ export interface operations {
             };
             /** @description Ресурса нет или он принадлежит другому пользователю */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    PriceEstimates_list: {
+        parameters: {
+            query?: {
+                /** @description Город заказа; неизвестный город — оценка по всем городам */
+                city?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceEstimatesDto"];
+                };
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
