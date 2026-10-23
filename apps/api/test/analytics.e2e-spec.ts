@@ -1,4 +1,5 @@
 import { ANALYTICS_METRICS, type AnalyticsDto } from '@agregator/shared';
+import { Logger } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
@@ -159,6 +160,19 @@ describe('Analytics without personal data (e2e)', () => {
     expect((await prisma.usageCounter.findFirstOrThrow()).count).toBe(5);
     await usage.flush();
     expect((await prisma.usageCounter.findFirstOrThrow()).count).toBe(6);
+
+    // Последний сброс при остановке не удался: потеря видна в журнале, а не тихая.
+    usage.add('CATALOG_VIEWS');
+    usage.add('JOB_VIEWS');
+    const lostWrite = jest
+      .spyOn(app.get(PrismaService), '$executeRaw')
+      .mockRejectedValueOnce(new Error('connection lost'));
+    const logged = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    await usage.onModuleDestroy();
+    lostWrite.mockRestore();
+    expect(logged).toHaveBeenCalledWith('counters lost at shutdown: 2');
+    logged.mockRestore();
+    usage.onModuleInit();
   });
 
   it('only an admin sees it; the period is 7, 30 or 90 days', async () => {

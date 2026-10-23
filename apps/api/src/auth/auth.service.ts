@@ -66,13 +66,13 @@ export class AuthService {
     // Перебор пароля к одному адресу с многих IP: после серии ошибок — пауза (без проверки
     // пароля, чтобы не тратить на перебор процессор). Одинаково для любых адресов.
     const key = loginKey(dto.email);
-    const wait = await this.throttle.wait(key);
+    const wait = await this.throttle.attempt(key);
     if (wait > 0) throw new LoginThrottled(wait);
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     // Пароль проверяется и для несуществующего email, чтобы не раскрывать его по времени ответа.
     const valid = await verifyPassword(user?.passwordHash ?? (await getDummyHash()), dto.password);
     if (!user || !valid) {
-      await this.throttle.fail(key);
+      // Попытка уже записана в серию в attempt().
       throw new ApiError(401, 'INVALID_CREDENTIALS', INVALID_CREDENTIALS);
     }
     await this.throttle.clear(key);

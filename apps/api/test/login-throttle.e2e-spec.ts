@@ -2,7 +2,8 @@ import { LOGIN_THROTTLE, loginDelaySeconds } from '@agregator/shared';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
-import { loginKey } from '../src/auth/login-throttle';
+import { LoginThrottle, loginKey } from '../src/auth/login-throttle';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { CleanupService } from '../src/maintenance/cleanup.service';
 import { createTestApp } from './create-app';
 import { signUp } from './helpers';
@@ -116,6 +117,30 @@ describe('Login throttling per address and scheduled cleanup (e2e, release gate 
     ).toBe(1);
   });
 
+  it('the pause in the database matches loginDelaySeconds at every step', async () => {
+    const throttle = new LoginThrottle(app.get(PrismaService));
+    const now = new Date();
+    for (const failures of [1, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16, 50]) {
+      const delay = loginDelaySeconds(failures);
+      const key = loginKey(`step-${failures}@example.ru`);
+      const at = (secondsAgo: number) =>
+        prisma.loginFailure.upsert({
+          where: { emailHash: key },
+          create: { emailHash: key, failures, lastAt: new Date(now.getTime() - secondsAgo * 1000) },
+          update: { failures, lastAt: new Date(now.getTime() - secondsAgo * 1000) },
+        });
+      if (delay > 0) {
+        await at(delay - 1);
+        expect(await throttle.attempt(key, now)).toBe(1);
+      }
+      await at(delay);
+      expect(await throttle.attempt(key, now)).toBe(0);
+      expect(
+        (await prisma.loginFailure.findUniqueOrThrow({ where: { emailHash: key } })).failures,
+      ).toBe(failures + 1);
+    }
+  });
+
   it('the current password in account settings shares the series with login', async () => {
     const user = await signUp(app, 'CUSTOMER');
     const email = await emailOf(user.id);
@@ -140,6 +165,30 @@ describe('Login throttling per address and scheduled cleanup (e2e, release gate 
     await change(PASSWORD).expect(204);
     expect(await prisma.loginFailure.count()).toBe(0);
     await login(email, 'brand-new-password-1').expect(200);
+  });
+
+  it('parallel attempts cannot slip through together when the pause ends', async () => {
+    const user = await signUp(app, 'CUSTOMER');
+    const email = await emailOf(user.id);
+    for (let i = 0; i < LOGIN_THROTTLE.FREE_FAILURES; i += 1) await login(email, WRONG);
+    await rewind(email, LOGIN_THROTTLE.BASE_DELAY_S + 1);
+    // Пауза закончилась: из пачки одновременных попыток проверяется только одна.
+    const logins = await Promise.all(Array.from({ length: 10 }, () => login(email, WRONG)));
+    expect(logins.map((r) => r.status).sort()).toEqual([401, ...Array(9).fill(429)]);
+
+    await rewind(email, LOGIN_THROTTLE.MAX_DELAY_S + 1);
+    const changes = await Promise.all(
+      Array.from({ length: 10 }, () =>
+        http()
+          .post('/v1/me/password')
+          .set(user.auth)
+          .send({ currentPassword: WRONG, newPassword: 'brand-new-password-1' }),
+      ),
+    );
+    expect(changes.map((r) => r.status).sort()).toEqual([400, ...Array(9).fill(429)]);
+    expect((await prisma.loginFailure.findFirstOrThrow()).failures).toBe(
+      LOGIN_THROTTLE.FREE_FAILURES + 2,
+    );
   });
 
   it('scheduled cleanup removes expired sessions, old reset links and finished series only', async () => {

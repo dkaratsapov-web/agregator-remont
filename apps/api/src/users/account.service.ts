@@ -73,7 +73,7 @@ export class AccountService {
     // Та же серия неверных паролей, что у входа: тот, кто завладел открытой сессией, не
     // подберёт пароль через смену быстрее, чем через вход (release gate 2, docs/SECURITY.md).
     const key = loginKey(user.email);
-    const wait = await this.throttle.wait(key);
+    const wait = await this.throttle.attempt(key);
     if (wait > 0) {
       throw new LoginThrottled(
         wait,
@@ -85,7 +85,7 @@ export class AccountService {
       const [row] = await tx.$queryRaw<{ password_hash: string }[]>`
         SELECT password_hash FROM users WHERE id = ${user.id} FOR UPDATE`;
       if (!row || !(await verifyPassword(row.password_hash, dto.currentPassword))) {
-        await this.throttle.fail(key);
+        // Попытка уже записана в серию в attempt().
         throw new BadRequestException('Текущий пароль указан неверно');
       }
       if ((await tx.session.count({ where: { id: sessionId, userId: user.id } })) === 0) {

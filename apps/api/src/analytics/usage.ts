@@ -32,9 +32,15 @@ export class UsageCounters implements OnModuleInit, OnModuleDestroy {
     this.timer.unref();
   }
 
+  /** Последний сброс при остановке. Не удался — числа теряются, и это видно в журнале. */
   async onModuleDestroy(): Promise<void> {
     if (this.timer) clearInterval(this.timer);
     await this.flush();
+    if (this.pending.size > 0) {
+      const lost = [...this.pending.values()].reduce((sum, n) => sum + n, 0);
+      this.logger.error(`counters lost at shutdown: ${lost}`);
+      this.pending.clear();
+    }
   }
 
   /** +1 к счётчику за сегодня (по Москве); в базу — при следующем сбросе. */
