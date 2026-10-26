@@ -34,6 +34,7 @@ const ROLE_LINKS: Record<UserRole, MenuLink[]> = {
     { href: '/admin/reports', label: 'Жалобы' },
     { href: '/admin/users', label: 'Пользователи' },
     { href: '/admin/analytics', label: 'Аналитика' },
+    { href: '/admin/feedback', label: 'Обращения' },
     { href: '/admin/leads', label: 'Заявки на тестирование' },
     { href: '/jobs', label: 'Каталог заказов' },
   ],
@@ -44,6 +45,7 @@ const SECTION_LINKS: MenuLink[] = [
   { href: '/account/favorites', label: 'Избранное' },
   { href: '/account/chats', label: 'Переписки' },
   { href: '/account/reports', label: 'Мои жалобы' },
+  { href: '/account/feedback', label: 'Поддержка' },
   { href: '/account/cart', label: 'Корзина', soon: true },
 ];
 

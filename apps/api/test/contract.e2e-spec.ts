@@ -1441,6 +1441,59 @@ describe('API contract (e2e)', () => {
     }
   });
 
+  it('feedback endpoints match openapi.json', async () => {
+    const high = {
+      RATE_LIMIT_PER_MIN: '1000',
+      AUTH_RATE_LIMIT_PER_MIN: '1000',
+      WRITE_RATE_LIMIT_PER_MIN: '1000',
+    };
+    await withApp(high, async (app) => {
+      const http = () => request(app.getHttpServer());
+      const check = async (
+        method: 'get' | 'post',
+        template: string,
+        req: request.Test,
+        status: number,
+      ) => {
+        const res = await req;
+        expect(res.status).toBe(status);
+        expectContract(res, method, template);
+        return res;
+      };
+      const user = await signUp(app, 'CUSTOMER');
+      const admin = await signUpAdmin(app, prisma);
+      const body = { kind: 'QUESTION', body: 'Как пригласить мастера на заказ?', page: '/jobs' };
+
+      const MINE = '/v1/me/feedback';
+      const created = await check('post', MINE, http().post(MINE).set(user.auth).send(body), 201);
+      await check('post', MINE, http().post(MINE).set(user.auth).send({ kind: 'BUG' }), 400);
+      await check('post', MINE, http().post(MINE).send(body), 401);
+      await check('get', MINE, http().get(MINE).set(user.auth), 200);
+      await check('get', MINE, http().get(MINE), 401);
+
+      const LIST = '/v1/admin/feedback';
+      await check('get', LIST, http().get(`${LIST}?status=open`).set(admin.auth), 200);
+      await check('get', LIST, http().get(`${LIST}?status=all`).set(admin.auth), 400);
+      await check('get', LIST, http().get(LIST), 401);
+      await check('get', LIST, http().get(LIST).set(user.auth), 403);
+
+      const REPLY = '/v1/admin/feedback/{id}/reply';
+      const url = `/v1/admin/feedback/${created.body.id}/reply`;
+      const reply = { reply: 'Откройте заказ и нажмите «Пригласить».' };
+      await check('post', REPLY, http().post(url).set(admin.auth).send({ reply: '' }), 400);
+      await check('post', REPLY, http().post(url).send(reply), 401);
+      await check('post', REPLY, http().post(url).set(user.auth).send(reply), 403);
+      await check(
+        'post',
+        REPLY,
+        http().post('/v1/admin/feedback/missing/reply').set(admin.auth).send(reply),
+        404,
+      );
+      await check('post', REPLY, http().post(url).set(admin.auth).send(reply), 200);
+      await check('post', REPLY, http().post(url).set(admin.auth).send(reply), 409);
+    });
+  });
+
   it('account data endpoints (export, delete) match openapi.json', async () => {
     const high = {
       RATE_LIMIT_PER_MIN: '1000',

@@ -14,7 +14,7 @@ export const LEAD_LIMITS = {
 } as const;
 
 /** Версия текста политики: сохраняется вместе с согласием. */
-export const PRIVACY_POLICY_VERSION = '2026-10-23';
+export const PRIVACY_POLICY_VERSION = '2026-10-26';
 
 export interface PrivacyOperator {
   /** ИП или организация, как в ЕГРИП/ЕГРЮЛ. */

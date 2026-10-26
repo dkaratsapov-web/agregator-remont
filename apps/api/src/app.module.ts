@@ -13,6 +13,7 @@ import { HealthController } from './health/health.controller';
 import { JobsModule } from './jobs/jobs.module';
 import { BidsModule } from './bids/bids.module';
 import { ContractorsModule } from './contractors/contractors.module';
+import { FeedbackModule } from './feedback/feedback.module';
 import { LeadsModule } from './leads/leads.module';
 import { MyJobsModule } from './my-jobs/my-jobs.module';
 import { OAuthModule } from './oauth/oauth.module';
@@ -61,6 +62,7 @@ import { MaintenanceModule } from './maintenance/maintenance.module';
     BidsModule,
     ContractorsModule,
     LeadsModule,
+    FeedbackModule,
     OAuthModule,
     PlansModule,
     MessagesModule,

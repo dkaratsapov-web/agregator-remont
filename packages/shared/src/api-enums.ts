@@ -13,6 +13,7 @@ export const OPEN_API_ENUMS = [
   'NotificationKind',
   'ContentFlagKind',
   'ReportReason',
+  'FeedbackKind',
   'BidRejectReason',
   'AnalyticsMetric',
   'FieldErrorCode',

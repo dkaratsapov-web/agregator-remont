@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { FeedbackLink } from './feedback/feedback-link';
 import { Wordmark } from './landing/wordmark';
 
 export function SiteFooter() {
@@ -14,6 +15,7 @@ export function SiteFooter() {
             Открыть каталог
           </Link>
         </p>
+        <FeedbackLink className="font-medium text-ink underline underline-offset-4" />
       </div>
     </footer>
   );

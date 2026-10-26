@@ -1,5 +1,8 @@
 import 'server-only';
 import type {
+  AdminFeedbackDto,
+  FeedbackDto,
+  FeedbackInput,
   AdminUserDto,
   AnalyticsDto,
   PriceEstimatesDto,
@@ -623,6 +626,50 @@ export async function fetchJobPhoto(
 export async function submitLead(input: LeadInput, clientIp?: string): Promise<void> {
   const res = await request('/v1/leads', { method: 'POST', body: input, clientIp });
   await expectJson<{ received: true }>(res, 'POST /v1/leads');
+}
+
+// --- Обратная связь тестировщиков (docs/FEEDBACK.md)
+
+export async function sendFeedback(
+  token: string,
+  input: FeedbackInput,
+  clientIp?: string,
+): Promise<FeedbackDto> {
+  const res = await request('/v1/me/feedback', { method: 'POST', body: input, token, clientIp });
+  return expectJson<FeedbackDto>(res, 'POST /v1/me/feedback');
+}
+
+export async function listMyFeedback(token: string): Promise<FeedbackDto[]> {
+  const res = await request('/v1/me/feedback', { token });
+  return expectJson<FeedbackDto[]>(res, 'GET /v1/me/feedback');
+}
+
+export type FeedbackFilter = 'open' | 'answered';
+
+export async function listFeedback(
+  token: string,
+  page: number,
+  status?: FeedbackFilter,
+): Promise<Paginated<AdminFeedbackDto>> {
+  const query = new URLSearchParams({ page: String(page), limit: '20' });
+  if (status) query.set('status', status);
+  const res = await request(`/v1/admin/feedback?${query.toString()}`, { token });
+  return expectJson<Paginated<AdminFeedbackDto>>(res, 'GET /v1/admin/feedback');
+}
+
+export async function replyFeedback(
+  token: string,
+  id: string,
+  reply: string,
+  clientIp?: string,
+): Promise<AdminFeedbackDto> {
+  const res = await request(`/v1/admin/feedback/${encodeURIComponent(id)}/reply`, {
+    method: 'POST',
+    body: { reply },
+    token,
+    clientIp,
+  });
+  return expectJson<AdminFeedbackDto>(res, 'POST /v1/admin/feedback/:id/reply');
 }
 
 export type LeadFilter = 'new' | 'processed';

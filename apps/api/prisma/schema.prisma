@@ -76,6 +76,7 @@ enum AuditAction {
   CONTACTS_HIDDEN
   ACCOUNT_DELETED
   ACCOUNT_EXPORTED
+  FEEDBACK_REPLIED
 }
 
 // Синхронизировано с BID_STATUSES в packages/shared/src/bids.ts.
@@ -232,6 +233,8 @@ model User {
   contentFlags     ContentFlag[]      @relation("ContentFlagAuthor")
   flagsResolved    ContentFlag[]      @relation("ContentFlagResolver")
   contactShares    ContactShare[]
+  feedback         Feedback[]         @relation("FeedbackAuthor")
+  feedbackReplies  Feedback[]         @relation("FeedbackReplier")
 
   @@map("users")
 }
@@ -706,4 +709,33 @@ model ContentFlag {
   @@unique([targetType, targetId])
   @@index([status, createdAt])
   @@map("content_flags")
+}
+
+// Синхронизировано с FEEDBACK_KINDS в packages/shared/src/feedback.ts.
+enum FeedbackKind {
+  BUG
+  IDEA
+  QUESTION
+}
+
+/// Обращение участника тестирования: ошибка, идея или вопрос (docs/FEEDBACK.md). Длины и формат
+/// адреса страницы ограничены CHECK в миграции.
+model Feedback {
+  id          String       @id @default(cuid())
+  userId      String       @map("user_id")
+  user        User         @relation("FeedbackAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  kind        FeedbackKind
+  body        String
+  /// Путь страницы сайта, с которой написали (/account/…); null — не указан.
+  page        String?      @db.VarChar(200)
+  /// Ответ администратора; null — ещё не ответили.
+  reply       String?
+  repliedAt   DateTime?    @map("replied_at")
+  repliedById String?      @map("replied_by_id")
+  repliedBy   User?        @relation("FeedbackReplier", fields: [repliedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([repliedAt, createdAt(sort: Desc)])
+  @@map("feedback")
 }
