@@ -34,6 +34,11 @@ export default async function LoginPage({
           Зарегистрируйтесь
         </Link>
       </p>
+      {one('deleted') === '1' ? (
+        <p role="status" className="mt-4 rounded-[10px] bg-ok-tint px-4 py-3 text-sm text-ink">
+          Аккаунт удалён: личные данные стёрты, все входы завершены.
+        </p>
+      ) : null}
       <div className="mt-6 [@media(max-height:46rem)]:mt-4">
         <LoginForm next={target} banks={banks.map((b) => b.id)} error={bankError} />
       </div>

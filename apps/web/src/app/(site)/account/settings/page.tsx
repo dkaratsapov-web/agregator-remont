@@ -1,5 +1,6 @@
 import { USER_ROLE_LABELS, type SessionDto } from '@agregator/shared';
 import type { Metadata } from 'next';
+import { AccountData } from '@/components/account/account-data';
 import { AppearanceForm } from '@/components/account/appearance-form';
 import { CopyId } from '@/components/account/copy-id';
 import { AvatarUploader } from '@/components/account/avatar-uploader';
@@ -21,6 +22,7 @@ const SECTIONS = [
   { id: 'security', title: 'Пароль' },
   { id: 'banks', title: 'Вход через банк' },
   { id: 'devices', title: 'Устройства' },
+  { id: 'data', title: 'Свои данные' },
 ];
 
 function Section({
@@ -151,6 +153,14 @@ export default async function SettingsPage({
                 Не удалось загрузить список устройств. Обновите страницу чуть позже.
               </p>
             )}
+          </Section>
+
+          <Section
+            id="data"
+            title="Свои данные"
+            text="Выгрузка всего, что сервис хранит о вас, и удаление аккаунта."
+          >
+            <AccountData exportError={one('export')} />
           </Section>
         </div>
       </div>

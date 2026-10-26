@@ -14,7 +14,7 @@ vi.mock('next/headers', () => ({
 vi.mock('next/navigation', () => ({ redirect: () => undefined }));
 
 const fetchMock = vi.fn();
-const { POST, GET } = await import('./route');
+const { POST, GET, DELETE } = await import('./route');
 
 /** Сколько байт тела прочитано обработчиком: лимит должен остановить чтение рано. */
 let pulled = 0;
@@ -116,5 +116,27 @@ describe('GET /account/avatar', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('cache-control')).toBe('private, no-cache');
     expect(res.headers.get('content-type')).toBe('image/webp');
+  });
+});
+
+describe('DELETE /account/avatar', () => {
+  it('deletes through the API with the session token', async () => {
+    fetchMock.mockResolvedValue(Response.json({ id: 'u1', avatarVersion: null }));
+    const res = await DELETE();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ avatarVersion: null });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://api.test/v1/me/avatar');
+    expect(init.method).toBe('DELETE');
+    expect(new Headers(init.headers).get('authorization')).toBe('Bearer tok');
+  });
+
+  it('rejects a foreign origin and a missing session without calling the API', async () => {
+    state.headers.set('origin', 'https://evil.example');
+    expect((await DELETE()).status).toBe(403);
+    state.headers.set('origin', 'http://localhost:3000');
+    state.cookie = null;
+    expect((await DELETE()).status).toBe(401);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

@@ -724,6 +724,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["Me_delete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/drafts": {
         parameters: {
             query?: never;
@@ -751,6 +767,22 @@ export interface paths {
         put: operations["Drafts_replace"];
         post?: never;
         delete: operations["Drafts_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["Me_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1144,6 +1176,58 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AccountExportDto: {
+            /** @description Аккаунт: email, имя, роль, телефон, город */
+            account: {
+                [key: string]: unknown;
+            };
+            /** @description Привязанные входы через банк */
+            bankLogins: {
+                [key: string]: unknown;
+            }[];
+            /** @description Свои отклики */
+            bids: {
+                [key: string]: unknown;
+            }[];
+            /** @description Профиль мастера */
+            contractorProfile: {
+                [key: string]: unknown;
+            } | null;
+            /** @description Черновики */
+            drafts: {
+                [key: string]: unknown;
+            }[];
+            /** Format: date-time */
+            exportedAt: string;
+            /** @description Избранные заказы */
+            favorites: {
+                [key: string]: unknown;
+            }[];
+            /** @description Свои заказы; у откликов на них — только число */
+            jobs: {
+                [key: string]: unknown;
+            }[];
+            /** @description Свои сообщения в переписке */
+            messages: {
+                [key: string]: unknown;
+            }[];
+            /** @description Свои жалобы */
+            reports: {
+                [key: string]: unknown;
+            }[];
+            /** @description Отзывы о себе, без автора */
+            reviewsReceived: {
+                [key: string]: unknown;
+            }[];
+            /** @description Написанные отзывы */
+            reviewsWritten: {
+                [key: string]: unknown;
+            }[];
+            /** @description Действующие сеансы */
+            sessions: {
+                [key: string]: unknown;
+            }[];
+        };
         AdminUserDto: {
             bids: number;
             blocked: boolean;
@@ -1320,8 +1404,12 @@ export interface components {
         };
         /** @enum {string} */
         Currency: "RUB";
+        DeleteAccountDto: {
+            /** @description Текущий пароль */
+            password: string;
+        };
         ErrorResponse: {
-            /** @description Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, LOGIN_THROTTLED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_* */
+            /** @description Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, PASSWORD_INVALID, ACCOUNT_HAS_ACTIVE_DEALS, ACCOUNT_DELETED, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, LOGIN_THROTTLED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_* */
             code: string;
             /** @description Текстовое имя статуса */
             error: string;
@@ -1651,7 +1739,7 @@ export interface components {
             role: components["schemas"]["SelfServiceRole"];
         };
         OAuthNeedRoleError: {
-            /** @description Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, LOGIN_THROTTLED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_* */
+            /** @description Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, PASSWORD_INVALID, ACCOUNT_HAS_ACTIVE_DEALS, ACCOUNT_DELETED, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, LOGIN_THROTTLED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_* */
             code: string;
             /** @description Текстовое имя статуса */
             error: string;
@@ -1814,6 +1902,8 @@ export interface components {
             median: number;
             /** @description Цена за м² по заказам с площадью работ в анкете: по городу или, если там мало, по всем городам; null — мало и там */
             perSqm: components["schemas"]["PriceSqmDto"] | null;
+            /** @description Мало данных: показывать как грубый ориентир */
+            rough: boolean;
         };
         PriceEstimatesDto: {
             /** @description Только категории с достаточными данными */
@@ -1830,6 +1920,8 @@ export interface components {
             low: number;
             /** @description Медиана, ₽ (округлено) */
             median: number;
+            /** @description Мало данных: показывать как грубый ориентир */
+            rough: boolean;
         };
         PublicContractorDto: {
             completedJobs: number;
@@ -3582,7 +3674,7 @@ export interface operations {
                 budgetTo?: number;
                 /** @description Опубликован за последние N дней */
                 days?: 1 | 7 | 30;
-                /** @description Только заказы без откликов (отозванные и скрытые не считаются) */
+                /** @description Только заказы без откликов (отозванные, скрытые и отклики заблокированных мастеров не считаются) */
                 noBids?: boolean;
                 /** @description new — сначала новые; budget_desc — по нижней границе бюджета, budget_asc — по верхней; без бюджета в конце */
                 sort?: components["schemas"]["JobSort"];
@@ -5256,6 +5348,64 @@ export interface operations {
             };
         };
     };
+    Me_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteAccountDto"];
+            };
+        };
+        responses: {
+            /** @description Аккаунт удалён, все сеансы завершены */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Ошибка валидации запроса */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Конфликт с текущим состоянием ресурса */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     Drafts_list: {
         parameters: {
             query?: never;
@@ -5543,6 +5693,43 @@ export interface operations {
             };
             /** @description Ресурса нет или он принадлежит другому пользователю */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Me_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountExportDto"];
+                };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

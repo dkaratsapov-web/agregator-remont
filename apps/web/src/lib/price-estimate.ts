@@ -40,7 +40,9 @@ const areaFormat = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
  */
 export function estimateText(estimate: PriceEstimateDto, area: number | null = null): string {
   const where = estimate.city ? `в городе ${estimate.city}` : 'по всем городам';
-  let text =
+  // Мало данных — так и говорим, и не делаем вид, что цифры точные (аудит F-04).
+  let text = estimate.rough ? 'Откликов пока мало — это грубый ориентир. ' : '';
+  text +=
     `Мастера на сервисе обычно просят за такие работы от ${formatAmount(estimate.low)} до ` +
     `${rub(estimate.high)}, половина откликов — дешевле ${rub(estimate.median)}. Посчитано ` +
     `${byBids(estimate.bids)} в категории «${JOB_CATEGORY_LABELS[estimate.category]}» ${where} ` +
@@ -50,7 +52,7 @@ export function estimateText(estimate: PriceEstimateDto, area: number | null = n
     // Цена за м² может быть посчитана по всем городам, когда оценка заказа — по городу.
     const sqmWhere =
       sqm.city === estimate.city ? '' : sqm.city ? ` в городе ${sqm.city}` : ' по всем городам';
-    text += ` За м²${sqmWhere} — обычно от ${formatAmount(sqm.low)} до ${rub(sqm.high)}`;
+    text += ` За м²${sqmWhere}${sqm.rough ? ' (грубо, мало данных)' : ''} — обычно от ${formatAmount(sqm.low)} до ${rub(sqm.high)}`;
     text += area
       ? `: для ваших ${areaFormat.format(area)}\u00a0м² это около ` +
         `${formatAmount(roundEstimate(sqm.low * area))}–${rub(roundEstimate(sqm.high * area))}.`

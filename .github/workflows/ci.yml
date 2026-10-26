@@ -191,8 +191,13 @@ jobs:
           # Оценка цены под бюджетом по откликам сервиса: с JS и без, нет для заказа из нескольких
           # работ (docs/PRICE_ESTIMATES.md).
           node scripts/price-estimate-e2e.mjs
+          # Свои данные: скачивание файла и удаление аккаунта с JS и без (docs/ACCOUNTS.md).
+          node scripts/account-data-e2e.mjs
           # Доступность из аудита (UX-1…14), замеры LCP/CLS/INP и видео пролёта на главной.
           node scripts/ux-e2e.mjs
+          # Доступность axe-core (WCAG 2.1 AA) на 19 страницах: гость, заказчик (светлая и тёмная
+          # тема), мастер; падает на нарушениях serious/critical (docs/audit/UX_NO_JS_A11Y.md).
+          node scripts/a11y-e2e.mjs
           # Safari (WebKit, iPhone): поведение главной, видео, reduced motion, вход (ТЗ #40, п. 8).
           node scripts/webkit-e2e.mjs
           # Главная за настоящим deploy/Caddyfile (http://localhost:8080, подходит для service

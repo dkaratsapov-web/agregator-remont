@@ -19,6 +19,7 @@ interface Row {
   median: number;
   high: number;
   bids: number;
+  jobs: number;
 }
 
 /** Число из ответа анкеты; иное (строка, нет ответа) — 0. Ключ — из кода, не от человека. */
@@ -50,7 +51,7 @@ export class PriceEstimatesService {
    * спрашивает оценку при каждом открытии, а на 100 000 откликов каждый из четырёх запросов
    * идёт около 0,2 с (docs/PRICE_ESTIMATES.md). Ключ — город из списка сервиса или «все
    * города», поэтому размер кэша ограничен списком городов. Одновременные запросы ждут один
-   * расчёт; ошибка из кэша убирается.
+   * расчёт; ошибка из кэша убирается — только своя запись, не более свежая.
    */
   private readonly cache = new Map<string, { at: number; value: Promise<PriceEstimatesDto> }>();
   private readonly ttlMs: number;
@@ -68,7 +69,11 @@ export class PriceEstimatesService {
     if (hit && Date.now() - hit.at < this.ttlMs) return hit.value;
     const value = this.compute(city);
     this.cache.set(key, { at: Date.now(), value });
-    value.catch(() => this.cache.delete(key));
+    // Удаляем только свою запись: пока этот расчёт шёл, срок мог истечь, и в кэше уже лежит
+    // результат следующего (аудит 23.10.2026, F-03).
+    value.catch(() => {
+      if (this.cache.get(key)?.value === value) this.cache.delete(key);
+    });
     return value;
   }
 
@@ -102,6 +107,8 @@ export class PriceEstimatesService {
       median: roundEstimate(row.median, step),
       high: roundEstimate(row.high, step),
       bids: row.bids,
+      rough:
+        row.bids < PRICE_ESTIMATE.ROUGH_BELOW_BIDS || row.jobs < PRICE_ESTIMATE.ROUGH_BELOW_JOBS,
     };
   }
 
@@ -112,13 +119,18 @@ export class PriceEstimatesService {
   /** perSqm — цена отклика, делённая на площадь работ, только у заказов с площадью. */
   private query(since: Date, where: Prisma.Sql, perSqm = false): Promise<Row[]> {
     const value = perSqm ? Prisma.sql`(b.price / (${WORK_AREA}))` : Prisma.sql`b.price`;
-    const withArea = perSqm ? Prisma.sql`AND (${WORK_AREA}) > 0` : Prisma.empty;
+    // Мелкие работы (меньше SQM_MIN_AREA м²) в цену за м² не входят: цена за метр там не
+    // показательна (аудит F-04).
+    const withArea = perSqm
+      ? Prisma.sql`AND (${WORK_AREA}) >= ${PRICE_ESTIMATE.SQM_MIN_AREA}`
+      : Prisma.empty;
     return this.prisma.$queryRaw<Row[]>`
       SELECT j.category::text AS category,
              percentile_cont(0.25) WITHIN GROUP (ORDER BY ${value})::float8 AS low,
              percentile_cont(0.5) WITHIN GROUP (ORDER BY ${value})::float8 AS median,
              percentile_cont(0.75) WITHIN GROUP (ORDER BY ${value})::float8 AS high,
-             count(*)::int AS bids
+             count(*)::int AS bids,
+             count(DISTINCT b.job_id)::int AS jobs
       FROM bids b
       JOIN jobs j ON j.id = b.job_id
       JOIN users u ON u.id = b.contractor_id

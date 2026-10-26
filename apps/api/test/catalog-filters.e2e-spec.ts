@@ -87,7 +87,7 @@ describe('Catalog filters: budget, posted within, no bids, sort (e2e)', () => {
     await http().get('/v1/jobs?days=3').expect(400);
   });
 
-  it('no bids: withdrawn and hidden bids do not count', async () => {
+  it("no bids: withdrawn, hidden and blocked contractors' bids do not count", async () => {
     const [master, other] = [await signUp(app, 'CONTRACTOR'), await signUp(app, 'CONTRACTOR')];
     const byName = async (name: string) =>
       (await prisma.job.findFirstOrThrow({ where: { title: `${tag} ${name}` } })).id;
@@ -98,6 +98,10 @@ describe('Catalog filters: budget, posted within, no bids, sort (e2e)', () => {
     await bid(await byName('до 50'), master.id);
     await bid(await byName('от 100'), master.id, { status: 'WITHDRAWN' });
     await bid(await byName('80–120'), other.id, { hiddenAt: new Date() });
+    // Отклик заблокированного мастера тоже не в счёт: мастер недоступен (аудит F-06).
+    const blocked = await signUp(app, 'CONTRACTOR');
+    await bid(await byName('без бюджета'), blocked.id);
+    await prisma.user.update({ where: { id: blocked.id }, data: { blockedAt: new Date() } });
     expect((await names('noBids=true')).sort()).toEqual(['80–120', 'без бюджета', 'от 100']);
     expect(await names('noBids=false')).toHaveLength(4);
     await http().get('/v1/jobs?noBids=maybe').expect(400);

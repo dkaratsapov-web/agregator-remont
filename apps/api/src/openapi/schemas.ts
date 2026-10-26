@@ -235,6 +235,30 @@ export class SessionsRevokedSchema {
   @int({ description: 'Сколько сессий завершено' }) revoked!: number;
 }
 
+const looseObject = { type: 'object', additionalProperties: true } as const;
+const looseList = (description: string) =>
+  ApiProperty({ type: 'array', items: looseObject, description });
+
+/** Выгрузка своих данных; поля разделов описаны в AccountExportDto (@agregator/shared). */
+@ApiSchema({ name: 'AccountExportDto' })
+export class AccountExportSchema {
+  @ApiProperty({ format: 'date-time' }) exportedAt!: string;
+  @ApiProperty({ ...looseObject, description: 'Аккаунт: email, имя, роль, телефон, город' })
+  account!: Record<string, unknown>;
+  @ApiProperty({ ...looseObject, nullable: true, description: 'Профиль мастера' })
+  contractorProfile!: Record<string, unknown> | null;
+  @looseList('Свои заказы; у откликов на них — только число') jobs!: unknown[];
+  @looseList('Черновики') drafts!: unknown[];
+  @looseList('Свои отклики') bids!: unknown[];
+  @looseList('Свои сообщения в переписке') messages!: unknown[];
+  @looseList('Написанные отзывы') reviewsWritten!: unknown[];
+  @looseList('Отзывы о себе, без автора') reviewsReceived!: unknown[];
+  @looseList('Избранные заказы') favorites!: unknown[];
+  @looseList('Свои жалобы') reports!: unknown[];
+  @looseList('Действующие сеансы') sessions!: unknown[];
+  @looseList('Привязанные входы через банк') bankLogins!: unknown[];
+}
+
 @ApiSchema({ name: 'AuthSessionDto' })
 export class AuthSessionSchema implements AuthSessionDto {
   @ApiProperty({ type: UserSchema }) user!: UserSchema;
@@ -730,6 +754,7 @@ export class PriceRangeSchema implements PriceRangeDto {
   @int({ description: 'Медиана, ₽ (округлено)' }) median!: number;
   @int({ description: 'Верхняя четверть, ₽ (округлено)' }) high!: number;
   @int({ description: 'Сколько откликов учтено' }) bids!: number;
+  @ApiProperty({ description: 'Мало данных: показывать как грубый ориентир' }) rough!: boolean;
 }
 
 @ApiSchema({ name: 'PriceSqmDto' })
@@ -755,6 +780,7 @@ export class PriceEstimateSchema implements PriceEstimateDto {
   @int({ description: 'Медиана, ₽ (округлено)' }) median!: number;
   @int({ description: 'Верхняя четверть, ₽ (округлено)' }) high!: number;
   @int({ description: 'Сколько откликов учтено' }) bids!: number;
+  @ApiProperty({ description: 'Мало данных: показывать как грубый ориентир' }) rough!: boolean;
   @ApiProperty({
     type: PriceSqmSchema,
     nullable: true,
