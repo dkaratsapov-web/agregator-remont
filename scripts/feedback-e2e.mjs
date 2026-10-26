@@ -102,13 +102,16 @@ try {
       await page.getByText('Поддержка ответила на ваши обращения').isVisible(),
     );
 
-    await page.goto(`${WEB}/account/feedback`, { waitUntil: 'networkidle' });
+    // Пометка — в первой отрисовке с сервера: с JS страница сразу отмечает ответ просмотренным
+    // и перерисовывается уже без неё.
+    const first = await (await page.goto(`${WEB}/account/feedback`, { waitUntil: 'load' })).text();
+    check(`${name}: the reply is marked new on opening`, first.includes('Новый ответ'));
+    await page.waitForLoadState('networkidle');
     const answered = page.locator('li', { hasText: text });
     check(
-      `${name}: the author sees the reply, marked new`,
+      `${name}: the author sees the reply`,
       ((await answered.textContent()) ?? '').includes('Ответ поддержки') &&
-        ((await answered.textContent()) ?? '').includes('Исправим в ближайшем обновлении') &&
-        ((await answered.textContent()) ?? '').includes('Новый ответ'),
+        ((await answered.textContent()) ?? '').includes('Исправим в ближайшем обновлении'),
     );
 
     // С JS ответ отмечается просмотренным при открытии страницы, без JS — кнопкой «Отметить все
