@@ -20,6 +20,7 @@ import type {
   JobItemDto,
   OwnJobDto,
 } from './jobs';
+import type { AdminFeedbackDto, FeedbackDto } from './feedback';
 import type { LeadDto } from './leads';
 import type { JobMessageDto, JobMessagesDto, PhotoDto } from './messages';
 import type {
@@ -89,6 +90,9 @@ export type ContractChecks = [
   Expect<Equal<JobItemDto, Schemas['JobItemDto']>>,
   Expect<Equal<LeadDto, Schemas['LeadDto']>>,
   Expect<Equal<Paginated<LeadDto>, Schemas['PaginatedLeadDto']>>,
+  Expect<Equal<FeedbackDto, Schemas['FeedbackDto']>>,
+  Expect<Equal<AdminFeedbackDto, Schemas['AdminFeedbackDto']>>,
+  Expect<Equal<Paginated<AdminFeedbackDto>, Schemas['PaginatedAdminFeedbackDto']>>,
   // Аккаунты и доверие: сброс пароля, пользователи, отзывы, избранное, автопроверка.
   Expect<Equal<PasswordResetLinkDto, Schemas['PasswordResetLinkDto']>>,
   Expect<Equal<AdminUserDto, Schemas['AdminUserDto']>>,

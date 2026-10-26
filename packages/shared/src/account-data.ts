@@ -77,6 +77,15 @@ export interface AccountExportDto {
     status: string;
     createdAt: string;
   }[];
+  /** Свои обращения в поддержку с ответами. */
+  feedback: {
+    kind: string;
+    body: string;
+    page: string | null;
+    createdAt: string;
+    reply: string | null;
+    repliedAt: string | null;
+  }[];
   sessions: { device: string | null; createdAt: string; lastSeenAt: string | null }[];
   bankLogins: { provider: string; createdAt: string }[];
 }

@@ -44,6 +44,7 @@ export class AccountDataService {
       reviewsReceived,
       favorites,
       reports,
+      feedback,
       sessions,
       bankLogins,
     ] = await Promise.all([
@@ -65,6 +66,7 @@ export class AccountDataService {
       this.prisma.review.findMany({ where: { contractorId: id }, orderBy: { createdAt: 'asc' } }),
       this.prisma.favoriteJob.findMany({ where: { userId: id }, orderBy: { createdAt: 'asc' } }),
       this.prisma.report.findMany({ where: { reporterId: id }, orderBy: { createdAt: 'asc' } }),
+      this.prisma.feedback.findMany({ where: { userId: id }, orderBy: { createdAt: 'asc' } }),
       this.prisma.session.findMany({
         where: { userId: id, expiresAt: { gt: new Date() } },
         orderBy: { createdAt: 'asc' },
@@ -161,6 +163,14 @@ export class AccountDataService {
         comment: r.comment,
         status: r.status,
         createdAt: iso(r.createdAt),
+      })),
+      feedback: feedback.map((f) => ({
+        kind: f.kind,
+        body: f.body,
+        page: f.page,
+        createdAt: iso(f.createdAt),
+        reply: f.reply,
+        repliedAt: isoOrNull(f.repliedAt),
       })),
       sessions: sessions.map((s) => ({
         device: s.device,
@@ -299,6 +309,7 @@ export class AccountDataService {
       const where = { userId: user.id };
       await tx.jobDraft.deleteMany({ where: { ownerId: user.id } });
       await tx.favoriteJob.deleteMany({ where });
+      await tx.feedback.deleteMany({ where });
       await tx.notification.deleteMany({ where });
       await tx.contactShare.deleteMany({ where });
       await tx.externalAccount.deleteMany({ where });

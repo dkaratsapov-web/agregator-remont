@@ -4,6 +4,7 @@ export * from './auth';
 export * from './account-data';
 export * from './bids';
 export * from './leads';
+export * from './feedback';
 export * from './plans';
 export * from './messages';
 export * from './notifications';

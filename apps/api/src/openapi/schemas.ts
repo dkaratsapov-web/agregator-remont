@@ -74,6 +74,10 @@ import {
   type ReportTarget,
   type JobStatus,
   type LeadDto,
+  type AdminFeedbackDto,
+  type FeedbackDto,
+  FEEDBACK_KINDS,
+  type FeedbackKind,
   type MyBidDto,
   type OwnJobDto,
   type Paginated,
@@ -255,6 +259,7 @@ export class AccountExportSchema {
   @looseList('Отзывы о себе, без автора') reviewsReceived!: unknown[];
   @looseList('Избранные заказы') favorites!: unknown[];
   @looseList('Свои жалобы') reports!: unknown[];
+  @looseList('Свои обращения в поддержку с ответами') feedback!: unknown[];
   @looseList('Действующие сеансы') sessions!: unknown[];
   @looseList('Привязанные входы через банк') bankLogins!: unknown[];
 }
@@ -373,6 +378,40 @@ export class LeadSchema implements LeadDto {
 @ApiSchema({ name: 'PaginatedLeadDto' })
 export class PaginatedLeadSchema implements Paginated<LeadDto> {
   @ApiProperty({ type: [LeadSchema] }) items!: LeadSchema[];
+  @int() page!: number;
+  @int() limit!: number;
+  @int() total!: number;
+}
+
+@ApiSchema({ name: 'FeedbackDto' })
+export class FeedbackSchema implements FeedbackDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ enum: FEEDBACK_KINDS, enumName: 'FeedbackKind' }) kind!: FeedbackKind;
+  @ApiProperty() body!: string;
+  @ApiProperty({ type: String, nullable: true, description: 'Путь страницы сайта' })
+  page!: string | null;
+  @dateTime() createdAt!: string;
+  @ApiProperty({ type: String, nullable: true, description: 'null — ещё не ответили' })
+  reply!: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) repliedAt!: string | null;
+}
+
+@ApiSchema({ name: 'FeedbackAuthor' })
+export class FeedbackAuthorSchema {
+  @ApiProperty() id!: string;
+  @int() publicId!: number;
+  @ApiProperty() name!: string;
+  @ApiProperty({ enum: USER_ROLES, enumName: 'UserRole' }) role!: UserRole;
+}
+
+@ApiSchema({ name: 'AdminFeedbackDto' })
+export class AdminFeedbackSchema extends FeedbackSchema implements AdminFeedbackDto {
+  @ApiProperty({ type: FeedbackAuthorSchema }) author!: FeedbackAuthorSchema;
+}
+
+@ApiSchema({ name: 'PaginatedAdminFeedbackDto' })
+export class PaginatedAdminFeedbackSchema implements Paginated<AdminFeedbackDto> {
+  @ApiProperty({ type: [AdminFeedbackSchema] }) items!: AdminFeedbackSchema[];
   @int() page!: number;
   @int() limit!: number;
   @int() total!: number;

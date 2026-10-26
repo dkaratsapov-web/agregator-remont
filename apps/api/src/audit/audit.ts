@@ -32,7 +32,8 @@ export function writeAudit(
       | 'lead'
       | 'user'
       | 'report'
-      | 'review';
+      | 'review'
+      | 'feedback';
     entityId: string;
     changes: FieldChanges;
   },
