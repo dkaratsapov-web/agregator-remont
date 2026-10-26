@@ -30,3 +30,11 @@ Critical/High=0 по подтверждённым дефектам; 100% кри�
 Сверить dependency lockfile и root/CI конфигурации целевого SHA, затем этап 02: auth/session guards/password reset/roles/OAuth с матрицей ролей и тестов. Создавать дополнительные отчёты в `docs/audit/independent/`, обновлять этот журнал, PR не сливать.
 
 **Разграничение доказательств:** file-tree inventory и static review выполнены; typecheck/test/deploy/VPS в этом проходе НЕ выполнялись.
+
+## Отчёт очередного прохода, 26.10.2026
+- Повторно зафиксирован целевой main `89614b5702b13435f05d9e1dbc7f126abdaa6801`; текущее Git-tree **815 объектов / 647 файлов**, `truncated=false`. Старые 600 файлов относятся к base ZIP SHA `4fca28f`, для текущего main **не засчитываются** автоматически.
+- Прочитан актуальный `pnpm-lock.yaml` (lockfile v9): подтверждено разрешение `multer 2.5.0`, `body-parser 2.4.0`, `next 16.4.1`, Prisma 6.19.3. Независимый `pnpm audit` не запускался.
+- Начат этап 02. Создан `docs/audit/independent/02A_AUTH_OAUTH.md`: токены, Argon2, роли, guards, password reset, login throttling, OAuth configuration/providers, тестовые точки. **Статус: IN PROGRESS**, ещё есть непросмотренные тесты и frontend PKCE.
+- AUD-09: bank OAuth JWT claims читаются без JWS cryptographic verify; до реального включения банковского OAuth нужен protocol conformance review (не объявлять exploitable, server-to-server TLS/userinfo сдерживают риск).
+- AUD-10: потенциальное TOCTOU между OAuth linked sign-in и admin blocking; `resolveSession` блокирует доступ, но session write может проиграть гонку. Нужен concurrency E2E.
+- Очередная партия: auth E2E, TBank flow, browser state/cookies, route access matrix. Этап 01 частично остаётся открытым по проверке запуска зависимостей на отдельном стенде.
