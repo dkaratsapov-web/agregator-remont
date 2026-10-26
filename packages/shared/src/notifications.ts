@@ -93,6 +93,8 @@ export interface NotificationsSummaryDto {
   jobs: { jobId: string; unread: number }[];
   /** Решения по вашим жалобам, которые вы ещё не открыли («Мои жалобы»); входят в значок. */
   reportDecisions: number;
+  /** Ответы поддержки на ваши обращения, которые вы ещё не открыли; входят в значок. */
+  feedbackReplies: number;
 }
 
 /**

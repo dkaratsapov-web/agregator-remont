@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { badgeCount } from '@/lib/notifications-badge';
 import { getUnreadSummary } from '@/lib/notifications-server';
 import { getCurrentUser } from '@/lib/session';
 import { AccountMenu } from './account-menu';
@@ -35,7 +36,7 @@ export async function SiteHeader() {
             {user ? (
               <AccountMenu
                 app
-                unread={summary ? summary.unread + summary.reportDecisions : null}
+                unread={summary ? badgeCount(summary) : null}
                 user={{
                   name: user.name,
                   role: user.role,

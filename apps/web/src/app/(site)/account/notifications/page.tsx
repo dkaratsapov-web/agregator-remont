@@ -36,6 +36,7 @@ export default async function NotificationsPage({
     getUnreadSummary(),
   ]);
   const decisions = summary?.reportDecisions ?? 0;
+  const replies = summary?.feedbackReplies ?? 0;
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 pb-16 pt-10 sm:px-6 md:pt-14 lg:px-10">
@@ -43,13 +44,23 @@ export default async function NotificationsPage({
         back={{ href: '/account', label: 'Кабинет' }}
         title="Уведомления"
         description="Что произошло по вашим заказам: отклики, план работ, этапы и сообщения. Уведомления заказа становятся прочитанными, когда вы его открываете."
-        action={data && data.unread + decisions > 0 ? <MarkAllRead /> : undefined}
+        action={data && data.unread + decisions + replies > 0 ? <MarkAllRead /> : undefined}
       />
       {decisions > 0 ? (
         <div className="mt-6 max-w-3xl">
           <Notice tone="neutral">
             Есть решения по вашим жалобам: <span className="tabular-nums">{decisions}</span>.{' '}
             <Link href="/account/reports" className="underline underline-offset-4">
+              Посмотреть
+            </Link>
+          </Notice>
+        </div>
+      ) : null}
+      {replies > 0 ? (
+        <div className="mt-6 max-w-3xl">
+          <Notice tone="neutral">
+            Поддержка ответила на ваши обращения: <span className="tabular-nums">{replies}</span>.{' '}
+            <Link href="/account/feedback" className="underline underline-offset-4">
               Посмотреть
             </Link>
           </Notice>

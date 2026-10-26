@@ -644,6 +644,13 @@ export async function listMyFeedback(token: string): Promise<FeedbackDto[]> {
   return expectJson<FeedbackDto[]>(res, 'GET /v1/me/feedback');
 }
 
+export async function markFeedbackSeen(token: string): Promise<void> {
+  const res = await request('/v1/me/feedback/seen', { method: 'POST', token });
+  if (res.status !== 204) {
+    throw new ApiError(`POST /v1/me/feedback/seen responded ${res.status}`, res.status);
+  }
+}
+
 export type FeedbackFilter = 'open' | 'answered';
 
 export async function listFeedback(

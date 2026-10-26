@@ -10,7 +10,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiCreatedResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import type { AuthContext } from '../auth/auth.types';
 import { CurrentAuth } from '../auth/current-auth.decorator';
 import { WriteRateLimited } from '../auth/rate-limit';
@@ -47,6 +47,15 @@ export class MyFeedbackController {
   @ApiOkResponse({ type: [FeedbackSchema] })
   mine(@CurrentAuth() auth: AuthContext): Promise<FeedbackDto[]> {
     return this.feedback.mine(auth.user);
+  }
+
+  // Без лимита записи, как отметка решений по жалобам: вызывается сам при открытии «Моих
+  // обращений», повтор ничего не меняет (только свои строки, одно обновление).
+  @Post('seen')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({ description: 'Ответы на свои обращения отмечены просмотренными' })
+  async markSeen(@CurrentAuth() auth: AuthContext): Promise<void> {
+    await this.feedback.markSeen(auth.user);
   }
 }
 

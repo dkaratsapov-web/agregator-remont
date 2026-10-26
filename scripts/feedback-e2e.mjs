@@ -95,12 +95,34 @@ try {
       ) === true,
     );
 
-    await page.goto(`${WEB}/account/feedback`, { waitUntil: 'load' });
+    // Автор узнаёт об ответе: строка на странице уведомлений.
+    await page.goto(`${WEB}/account/notifications`, { waitUntil: 'load' });
+    check(
+      `${name}: notifications say support replied`,
+      await page.getByText('Поддержка ответила на ваши обращения').isVisible(),
+    );
+
+    await page.goto(`${WEB}/account/feedback`, { waitUntil: 'networkidle' });
     const answered = page.locator('li', { hasText: text });
     check(
-      `${name}: the author sees the reply`,
+      `${name}: the author sees the reply, marked new`,
       ((await answered.textContent()) ?? '').includes('Ответ поддержки') &&
-        ((await answered.textContent()) ?? '').includes('Исправим в ближайшем обновлении'),
+        ((await answered.textContent()) ?? '').includes('Исправим в ближайшем обновлении') &&
+        ((await answered.textContent()) ?? '').includes('Новый ответ'),
+    );
+
+    // С JS ответ отмечается просмотренным при открытии страницы, без JS — кнопкой «Отметить все
+    // прочитанными» на странице уведомлений.
+    await page.goto(`${WEB}/account/notifications`, { waitUntil: 'load' });
+    if (name === 'without JS') {
+      await Promise.all([
+        page.waitForURL(/read=1/, { timeout: 15_000 }),
+        page.getByRole('button', { name: 'Отметить все прочитанными' }).click(),
+      ]);
+    }
+    check(
+      `${name}: after that the reply is no longer new`,
+      (await page.getByText('Поддержка ответила на ваши обращения').count()) === 0,
     );
   }
 

@@ -163,6 +163,10 @@
             "description": "null — ещё не ответили",
             "nullable": true,
             "type": "string"
+          },
+          "unseen": {
+            "description": "Ответ есть, но автор его ещё не открыл",
+            "type": "boolean"
           }
         },
         "required": [
@@ -173,6 +177,7 @@
           "createdAt",
           "reply",
           "repliedAt",
+          "unseen",
           "author"
         ],
         "type": "object"
@@ -1067,6 +1072,10 @@
             "description": "null — ещё не ответили",
             "nullable": true,
             "type": "string"
+          },
+          "unseen": {
+            "description": "Ответ есть, но автор его ещё не открыл",
+            "type": "boolean"
           }
         },
         "required": [
@@ -1076,7 +1085,8 @@
           "page",
           "createdAt",
           "reply",
-          "repliedAt"
+          "repliedAt",
+          "unseen"
         ],
         "type": "object"
       },
@@ -2252,6 +2262,10 @@
       "NotificationsSummaryDto": {
         "additionalProperties": false,
         "properties": {
+          "feedbackReplies": {
+            "description": "Непросмотренные ответы поддержки на ваши обращения",
+            "type": "integer"
+          },
           "jobs": {
             "description": "Заказы с непрочитанным",
             "items": {
@@ -2271,7 +2285,8 @@
         "required": [
           "unread",
           "jobs",
-          "reportDecisions"
+          "reportDecisions",
+          "feedbackReplies"
         ],
         "type": "object"
       },
@@ -9644,6 +9659,45 @@
               }
             },
             "description": "Ошибка валидации запроса"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Нет действующей сессии или неверные учётные данные"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Превышен лимит частоты запросов или суточная квота"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "tags": [
+          "feedback"
+        ]
+      }
+    },
+    "/v1/me/feedback/seen": {
+      "post": {
+        "operationId": "MyFeedback_markSeen",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Ответы на свои обращения отмечены просмотренными"
           },
           "401": {
             "content": {

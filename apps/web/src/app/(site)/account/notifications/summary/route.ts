@@ -1,4 +1,5 @@
 import { ApiError, getNotificationsSummary } from '@/lib/api';
+import { badgeCount } from '@/lib/notifications-badge';
 import { getSessionToken } from '@/lib/session';
 
 /** Число непрочитанных для значка в шапке: значок спрашивает его раз в минуту, пока вкладка открыта. */
@@ -7,9 +8,8 @@ export async function GET(): Promise<Response> {
   if (!token) return Response.json({ unread: 0 }, { status: 401 });
   try {
     const summary = await getNotificationsSummary(token);
-    // В значке — и уведомления, и непросмотренные решения по своим жалобам.
     return Response.json(
-      { unread: summary.unread + summary.reportDecisions },
+      { unread: badgeCount(summary) },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {

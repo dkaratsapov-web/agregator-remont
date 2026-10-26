@@ -1491,6 +1491,12 @@ describe('API contract (e2e)', () => {
       );
       await check('post', REPLY, http().post(url).set(admin.auth).send(reply), 200);
       await check('post', REPLY, http().post(url).set(admin.auth).send(reply), 409);
+
+      const SEEN = '/v1/me/feedback/seen';
+      const unseen = await check('get', MINE, http().get(MINE).set(user.auth), 200);
+      expect(unseen.body[0]).toMatchObject({ id: created.body.id, unseen: true });
+      await check('post', SEEN, http().post(SEEN).set(user.auth), 204);
+      await check('post', SEEN, http().post(SEEN), 401);
     });
   });
 
