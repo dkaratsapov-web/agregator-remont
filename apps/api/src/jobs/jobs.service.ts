@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { UsageCounters } from '../analytics/usage';
 import { ApiError } from '../common/api-error';
 import { PrismaService } from '../prisma/prisma.service';
+import { CountCache } from './count-cache';
 import { ListJobsQuery } from './dto/list-jobs.query';
 import { toJobDto } from './job.mapper';
 
@@ -18,8 +19,13 @@ export function escapeLike(value: string): string {
 /** cuid и id демо-данных; всё остальное заведомо не существует. */
 const JOB_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
+/** Число «всего» от 1000 совпадений хранится 5 с (count-cache.ts). */
+export const CATALOG_COUNT_CACHE = { min: 1000, ttlMs: 5000, maxKeys: 500 } as const;
+
 @Injectable()
 export class JobsService {
+  private readonly counts = new CountCache(CATALOG_COUNT_CACHE);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly usage: UsageCounters,
@@ -109,14 +115,25 @@ export class JobsService {
             ]
           : newest;
 
-    const [items, total] = await this.prisma.$transaction([
+    // Ключ — фильтры без страницы и порядка; город и поиск без учёта регистра, как в запросе.
+    const countKey = JSON.stringify([
+      category,
+      status,
+      query.city?.toLowerCase(),
+      query.q?.toLowerCase(),
+      budgetFrom,
+      budgetTo,
+      days,
+      noBids,
+    ]);
+    const [items, total] = await Promise.all([
       this.prisma.job.findMany({
         where,
         orderBy,
         skip: (page - 1) * limit,
         take: limit,
       }),
-      this.prisma.job.count({ where }),
+      this.counts.get(countKey, () => this.prisma.job.count({ where })),
     ]);
 
     // Открытие каталога — первая страница; листание дальше не считается.
