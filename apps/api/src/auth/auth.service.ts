@@ -80,13 +80,16 @@ export class AuthService {
     // узнавать заблокированные адреса.
     if (user.blockedAt) throw new ForbiddenException(ACCOUNT_BLOCKED);
     // Сессия создаётся под блокировкой строки пользователя и только если хеш пароля не сменился
-    // после проверки: вход по старому паролю в момент смены не переживёт её (SEC-5).
+    // после проверки: вход по старому паролю в момент смены не переживёт её (SEC-5). Блокировка
+    // проверяется снова под той же строкой: администратор мог заблокировать аккаунт, пока шла
+    // проверка пароля (AUD-10).
     return this.prisma.$transaction(async (tx) => {
-      const [row] = await tx.$queryRaw<{ password_hash: string }[]>`
-        SELECT password_hash FROM users WHERE id = ${user.id} FOR UPDATE`;
+      const [row] = await tx.$queryRaw<{ password_hash: string; blocked_at: Date | null }[]>`
+        SELECT password_hash, blocked_at FROM users WHERE id = ${user.id} FOR UPDATE`;
       if (row?.password_hash !== user.passwordHash) {
         throw new ApiError(401, 'INVALID_CREDENTIALS', INVALID_CREDENTIALS);
       }
+      if (row.blocked_at) throw new ForbiddenException(ACCOUNT_BLOCKED);
       await tx.session.deleteMany({ where: { userId: user.id, expiresAt: { lte: new Date() } } });
       return this.createSession(tx, user, userAgent);
     });

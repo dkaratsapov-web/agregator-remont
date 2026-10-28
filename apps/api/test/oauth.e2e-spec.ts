@@ -245,4 +245,29 @@ describe('Bank login: Sber ID and T-ID (e2e)', () => {
     await callback('sber', 'bad code with spaces', 'CUSTOMER').expect(400);
     expect(await prisma.user.count()).toBe(0);
   });
+
+  it('blocking during a bank sign-in: no session survives the block (AUD-10)', async () => {
+    const first = await callback('sber', grant(ivan), 'CUSTOMER').expect(200);
+    const userId = first.body.user.id as string;
+    // «Администратор» блокирует аккаунт и держит транзакцию открытой, пока идёт вход.
+    let commit!: () => void;
+    const held = new Promise<void>((resolve) => (commit = resolve));
+    const block = prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+        await tx.user.update({ where: { id: userId }, data: { blockedAt: new Date() } });
+        await tx.session.deleteMany({ where: { userId } });
+        await held;
+      },
+      { timeout: 20_000 },
+    );
+    const signIn = callback('sber', grant(ivan)).then((res) => res);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    commit();
+    await block;
+    const res = await signIn;
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('OAUTH_BLOCKED');
+    expect(await prisma.session.count({ where: { userId } })).toBe(0);
+  });
 });

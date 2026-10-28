@@ -224,10 +224,16 @@ export class OAuthService {
       include: { user: true },
     });
     if (!account) return null;
-    if (account.user.blockedAt) {
-      throw oauthError(HttpStatus.FORBIDDEN, 'OAUTH_BLOCKED', ACCOUNT_BLOCKED);
-    }
-    return this.auth.createSession(this.prisma, account.user, userAgent);
+    // Сессия — под блокировкой строки пользователя, блокировка проверяется под ней же: иначе
+    // сессия, созданная, пока администратор блокирует аккаунт, пережила бы блокировку (AUD-10).
+    return this.prisma.$transaction(async (tx) => {
+      const [row] = await tx.$queryRaw<{ blocked_at: Date | null }[]>`
+        SELECT blocked_at FROM users WHERE id = ${account.userId} FOR UPDATE`;
+      if (!row || row.blocked_at) {
+        throw oauthError(HttpStatus.FORBIDDEN, 'OAUTH_BLOCKED', ACCOUNT_BLOCKED);
+      }
+      return this.auth.createSession(tx, account.user, userAgent);
+    });
   }
 
   private async createAccount(
