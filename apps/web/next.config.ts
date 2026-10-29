@@ -25,12 +25,27 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     // Запросы с телом proxy.ts пропускает (иначе Next.js копирует и обрезает тело), но ответ на
-    // POST к адресу страницы — тоже HTML. Ему строгая политика без скриптов, а не никакой.
+    // POST к адресу страницы — тоже HTML. Ему строгая политика без nonce: только файлы скриптов
+    // со своего адреса, без встроенных.
     const bodyCsp = [
       { key: CSP_HEADER, value: buildCsp({ dev: process.env.NODE_ENV !== 'production' }) },
     ];
+    // То же для путей, где proxy.ts не работает (статика, кадры, иконки, service worker): там
+    // бывает и HTML — страница 404 по несуществующему адресу. Список — как в config.matcher.
+    const skipped = [
+      '/_next/static/:path*',
+      '/_next/image',
+      '/landing/:path*',
+      '/sw.js',
+      '/icon.svg',
+      '/apple-icon.png',
+      '/manifest.webmanifest',
+      '/robots.txt',
+      '/csp-report',
+    ];
     return [
       { source: '/:path*', headers: securityHeaders },
+      ...skipped.map((source) => ({ source, headers: bodyCsp })),
       {
         source: '/:path*',
         has: [{ type: 'header' as const, key: 'content-length' }],

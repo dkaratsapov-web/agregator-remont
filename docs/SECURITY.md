@@ -87,6 +87,9 @@ report-uri /csp-report
   проверки, `docs/REVIEW_AGENT.md`). Правила proxy и next.config не пересекаются: proxy — только
   без `Content-Length`/`Transfer-Encoding`, правило — только с ними. Тест matcher вызывает функции
   самого Next.js (`proxy.test.ts`).
+- Та же политика без nonce — на путях, где proxy не работает (`/_next/static`, `/landing`,
+  иконки, `sw.js`, `robots.txt`, `/csp-report`): там тоже бывает HTML — страница 404 по
+  несуществующему адресу. Тест сверяет список с matcher proxy.
 - Проверено в Chromium (Playwright) на `/`, `/jobs`, фильтре, карточке, 404 и `/offline`:
   0 нарушений, service worker регистрируется.
 

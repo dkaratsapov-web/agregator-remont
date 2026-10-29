@@ -4,6 +4,8 @@ import { CSP_HEADER } from './lib/csp';
 import { config, proxy } from './proxy';
 import * as staticInfo from 'next/dist/build/analysis/get-page-static-info';
 import { getMiddlewareRouteMatcher } from 'next/dist/shared/lib/router/utils/middleware-route-matcher';
+import { getPathMatch } from 'next/dist/shared/lib/router/utils/path-match';
+import nextConfig from '../next.config';
 
 // Функция, которой Next.js превращает config.matcher в правила; в описании типов Next её нет.
 const { getMiddlewareMatchers } = staticInfo as unknown as {
@@ -68,5 +70,49 @@ describe('proxy: CSP nonce', () => {
     expect(runs('/landing/flight-v4/frame.webp')).toBe(false);
     expect(runs('/sw.js')).toBe(false);
     expect(runs('/jobs', { 'next-router-prefetch': '1' })).toBe(false);
+  });
+});
+
+describe('CSP where proxy does not run', () => {
+  const runs = (path: string) =>
+    getMiddlewareRouteMatcher(getMiddlewareMatchers(config.matcher, {}))(
+      path,
+      { headers: {} } as never,
+      {},
+    );
+
+  it('static files, icons and their 404 pages still get a CSP from next.config', async () => {
+    // Ревью garantych-reviewer: 404 по адресу под исключённым из proxy префиксом — HTML-страница
+    // Next.js без CSP. Правила next.config сопоставляются так же, как в самом Next.js.
+    const rules = await nextConfig.headers!();
+    const cspFor = (path: string) =>
+      rules
+        .filter(
+          (rule) =>
+            !rule.has &&
+            getPathMatch(rule.source, { strict: true, removeUnnamedParams: true })(path),
+        )
+        .flatMap((rule) => rule.headers)
+        .find((h) => h.key.toLowerCase().startsWith('content-security-policy'))?.value;
+    for (const path of [
+      '/landing/missing.webp',
+      '/landing/flight-v3/nope/deep.mp4',
+      '/_next/static/missing.js',
+      '/_next/image',
+      '/sw.js',
+      '/icon.svg',
+      '/apple-icon.png',
+      '/manifest.webmanifest',
+      '/robots.txt',
+      '/csp-report',
+    ]) {
+      expect(runs(path), path).toBe(false);
+      const csp = cspFor(path);
+      expect(csp, path).toContain("script-src 'self'");
+      expect(csp, path).toContain("frame-ancestors 'none'");
+    }
+    // Страницы — с nonce от proxy, без второй политики из next.config.
+    expect(runs('/jobs')).toBe(true);
+    expect(cspFor('/jobs')).toBeUndefined();
   });
 });
