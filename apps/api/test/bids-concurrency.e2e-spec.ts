@@ -218,6 +218,37 @@ describe('Bids concurrency (e2e)', () => {
     expect([(await accept).status, (await bookmark).status]).toEqual([200, 200]);
   });
 
+  it('the chosen contractor deletes the account meanwhile: no deadlock', async () => {
+    // Ревью garantych-reviewer: удаление держало строку мастера FOR UPDATE и ждало его отклик,
+    // а выбор исполнителя держал отклик и ждал KEY SHARE на строке мастера (уведомление ему) —
+    // цикл, Postgres отменял одну транзакцию, ответ 500.
+    const { customer, jobId, contractors, bids } = await jobWithBids(1);
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const gate = prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM bids WHERE id = ${bids[0].id} FOR UPDATE`;
+        await held;
+      },
+      { timeout: 20_000 },
+    );
+    const accept = http()
+      .post(`/v1/me/jobs/${jobId}/bids/${bids[0].id}/accept`)
+      .set(customer.auth)
+      .then((r) => r);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const remove = http()
+      .post('/v1/me/delete')
+      .set(contractors[0].auth)
+      .send({ password: 'correct-horse-battery' })
+      .then((r) => r);
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    release();
+    await gate;
+    // Выбор прошёл первым: заказ в работе, удаление отказывает по делу (409), но не 500.
+    expect([(await accept).status, (await remove).status]).toEqual([200, 409]);
+  });
+
   it('a second bid while the owner chooses a contractor: no deadlock', async () => {
     const { customer, jobId, contractors, bids } = await jobWithBids(2);
     let release!: () => void;

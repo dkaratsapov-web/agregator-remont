@@ -257,8 +257,11 @@ export class AccountDataService {
     // Хеш недостижимого пароля: войти в удалённый аккаунт нельзя даже по старому паролю.
     const unusable = await hashPassword(randomBytes(32).toString('base64url'));
     await this.prisma.$transaction(async (tx) => {
+      // FOR NO KEY UPDATE: удаление меняет обычные столбцы и не конфликтует с KEY SHARE внешних
+      // ключей. С FOR UPDATE выбор исполнителя этого мастера (держит отклик, пишет ему
+      // уведомление) и удаление (держит строку, ждёт отклик) ждали друг друга.
       const [row] = await tx.$queryRaw<{ password_hash: string; deleted_at: Date | null }[]>`
-        SELECT password_hash, deleted_at FROM users WHERE id = ${user.id} FOR UPDATE`;
+        SELECT password_hash, deleted_at FROM users WHERE id = ${user.id} FOR NO KEY UPDATE`;
       if ((await tx.session.count({ where: { id: sessionId, userId: user.id } })) === 0) {
         throw new UnauthorizedException('Сеанс завершён. Войдите снова');
       }
