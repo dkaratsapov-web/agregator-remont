@@ -185,8 +185,8 @@ jobs_page() { # file total jobs...
 }
 J1='Lint, typecheck, test, build' J2='Docker stack (compose)' J3='Docker stack behind Caddy (proxy)'
 J4='Disaster drills (backup, restore, broken release, rollback)'
-all_green() {
-  ci_run "$(dev_head)" completed '"success"'
+all_green() { # [sha]
+  ci_run "${1:-$(dev_head)}" completed '"success"'
   jobs_page jobs1.json 4 "$(job "$J1" completed '"success"')" "$(job "$J2" completed '"success"')" "$(job "$J3" completed '"success"')" "$(job "$J4" completed '"success"')"
 }
 
@@ -217,6 +217,7 @@ API_FAIL=1 run
 check 'HTTP 429: docker not called' "$(wc -l < "$STUB_LOG" | tr -d ' ')" 0
 check 'HTTP 429: not marked failed' "$(failed)" none
 check 'HTTP 429: waits' "$(logged 'GitHub не ответил')" 1
+check 'HTTP 429: the start of the wait is recorded for monitor.sh' "$(grep -c '^since=' "$WORK/state/waiting")" 1
 
 # 5. Run найден, но для другого SHA или другого workflow — ждём.
 ci_run "$(git -C "$WORK/dev" rev-parse HEAD~1)" completed '"success"'
@@ -448,12 +449,39 @@ push_commit 'after rollback'
 all_green
 run
 check 'after rollback: new commit deployed' "$(deployed)" "$(dev_head)"
+# Откат после следующего обновления — на последнюю хорошую версию, а не на ту, с которой уже
+# откатывались; второй откат подряд — ещё на шаг назад (ревью garantych-reviewer).
+check 'deployed: no wait recorded' "$(test -e "$WORK/state/waiting" && echo waiting || echo none)" none
+after=$(deployed)
+earlier=$(grep -vx -e "$current" -e "$previous" -e "$after" "$WORK/state/history" | tail -n 1)
+cp -r "$WORK/state" "$WORK/state.saved"
+bash "$ROOT/deploy/autodeploy/rollback.sh" > "$WORK/out.log" 2>&1 || echo "exit $?" >> "$WORK/out.log"
+check 'rollback after a new deploy: back to the last good version, not the rolled-back one' "$(deployed)" "$previous"
+bash "$ROOT/deploy/autodeploy/rollback.sh" > "$WORK/out.log" 2>&1 || echo "exit $?" >> "$WORK/out.log"
+check 'second rollback in a row: one more step back' "$(deployed) $(failed)" "$earlier $previous"
+rm -rf "$WORK/state" && mv "$WORK/state.saved" "$WORK/state"
+git -C "$WORK/server" reset -q --hard "$after"
+# main сдвинули назад на старый слитый коммит с зелёным CI: «fast-forward» ничего не делает, и
+# под старым SHA собрался бы и записался текущий код. Остановка с уведомлением, сайт не трогается.
+git -C "$WORK/dev" push -q -f origin "$previous:main" 2> /dev/null
+all_green "$previous"
+printf 'NOTIFY_WEBHOOK_URL=https://hooks.invalid/agregator\n' >> "$WORK/server/deploy/.env"
+run
+check 'main moved back: stopped, nothing built, owner notified' \
+  "$(logged 'fast-forward невозможен') $(docker_calls compose) $(deployed) $(head_of "$WORK/server") $(grep -c hooks.invalid "$CURL_LOG")" \
+  "1 0 $after $after 1"
+git -C "$WORK/dev" push -q -f origin "$after:main" 2> /dev/null
+rm -f "$WORK/state/failed"
+all_green
 # Проверка восстановления: последняя копия разворачивается, миграций не больше, чем в репозитории.
 restore() { : > "$CURL_LOG"; bash "$ROOT/deploy/backup/restore-check.sh" > "$WORK/out.log" 2>&1 || echo "exit $?" >> "$WORK/out.log"; }
 (cd "$WORK/server" && RESTORE_MIGRATIONS=1 restore)
 check 'restore check: passed' "$(logged '^exit 1') $(logged 'готово')" "0 1"
+(cd "$WORK/server" && RESTORE_MIGRATIONS=0 restore)
+check 'restore check: a copy without migrations fails' "$(logged 'миграций в копии 0')" 1
+# После разрешённого отката в базе (и в копии) миграций больше, чем в коде: копия исправна.
 (cd "$WORK/server" && RESTORE_MIGRATIONS=5 restore)
-check 'restore check: too many migrations fails' "$(logged 'миграций в копии 5')" 1
+check 'restore check: more migrations than the code (after a rollback) passes' "$(logged '^exit 1') $(logged 'после отката')" "0 1"
 (cd "$WORK/server" && RESTORE_FAIL=1 restore)
 check 'restore check: pg_restore failure reported' "$(logged 'pg_restore не удался') $(grep -c 'hooks.invalid' "$CURL_LOG")" "1 1"
 sed -i '/^NOTIFY_WEBHOOK_URL=/d' "$WORK/server/deploy/.env"
@@ -570,6 +598,15 @@ check 'monitor: healthy server sends a plain heartbeat' \
   "$(logged 'проверок с проблемами: 0') $(grep -c 'hc.invalid/ping/abc$' "$CURL_LOG") $(grep -c '/fail' "$CURL_LOG")" '1 1 0'
 check 'monitor: records the accepted heartbeat for readiness.sh' \
   "$(sed -n 's/^heartbeat=//p' "$WORK/state/monitor-status") $(sed -n 's/^problems=//p' "$WORK/state/monitor-status")" 'accepted 0'
+# GitHub не отвечает постоянно (репозиторий стал приватным, переименован): автообновление ждёт
+# молча. Отставание от main дольше DEPLOY_WAIT_ALERT_HOURS — проблема для монитора.
+printf 'since=%s\n' "$(($(date +%s) - 7 * 3600))" > "$WORK/state/waiting"
+monitor
+check 'monitor: update waiting for GitHub for hours is a problem' "$(logged 'ждёт CI или ответа GitHub') $(grep -c '/fail' "$CURL_LOG")" '1 1'
+printf 'since=%s\n' "$(date +%s)" > "$WORK/state/waiting"
+monitor
+check 'monitor: a fresh wait is fine' "$(logged 'ждёт CI') $(grep -c '/fail' "$CURL_LOG")" '0 0'
+rm -f "$WORK/state/waiting"
 printf 'result=failed\nreason=pg_restore\nat=%s\n' "$(date +%s)" > "$WORK/state/restore-status"
 monitor
 check 'monitor: failed restore check is reported' "$(logged 'восстановления не прошла') $(grep -c '/fail' "$CURL_LOG")" '1 1'
@@ -623,7 +660,7 @@ all_green
 run
 check 'drop column migration deployed' "$(deployed)" "$(dev_head)"
 new=$(deployed)
-rollback() { : > "$STUB_LOG"; bash "$ROOT/deploy/autodeploy/rollback.sh" > "$WORK/out.log" 2>&1 || echo "exit $?" >> "$WORK/out.log"; }
+rollback() { : > "$STUB_LOG"; bash "$ROOT/deploy/autodeploy/rollback.sh" "$@" > "$WORK/out.log" 2>&1 || echo "exit $?" >> "$WORK/out.log"; }
 DB_MIGRATIONS='0_init\n3' rollback
 check 'rollback over applied incompatible migration: refused' "$(logged 'несовместимы со старым кодом') $(deployed) $(docker_calls 'up -d')" "1 $new 0"
 check 'rollback refusal names the migration and the runbook' "$(logged '\]   3$') $(logged 'проверит базу сам')" '1 1'
@@ -673,17 +710,18 @@ all_green
 rm -f "$WORK/state/failed"
 run
 marked=$(deployed)
-DB_MIGRATIONS='0_init\n3\n4' rollback
+# Версия $new уже откатывалась и ушла из истории: откат на неё — только явно.
+DB_MIGRATIONS='0_init\n3\n4' rollback "$new"
 check 'rollback over rollback-safe migration: allowed' "$(logged '^exit') $(failed)" "0 $marked"
 # Откат на версию без модерации, когда в базе есть скрытое модератором: отказ и варианты.
 all_green
 rm -f "$WORK/state/failed"
 run
 hiding=$(deployed)
-DB_MODERATION_COLUMNS=3 DB_HIDDEN=2 DB_MIGRATIONS='0_init\n3\n4' rollback
+DB_MODERATION_COLUMNS=3 DB_HIDDEN=2 DB_MIGRATIONS='0_init\n3\n4' rollback "$new"
 check 'rollback to a version without moderation with hidden content: refused' \
   "$(logged 'раскрыл бы скрытое') $(logged 'скрыто модератором: 2') $(deployed) $(docker_calls 'up -d')" "1 1 $hiding 0"
-DB_MODERATION_COLUMNS=3 DB_HIDDEN=0 DB_MIGRATIONS='0_init\n3\n4' rollback
+DB_MODERATION_COLUMNS=3 DB_HIDDEN=0 DB_MIGRATIONS='0_init\n3\n4' rollback "$new"
 check 'rollback without hidden content: allowed' "$(logged '^exit') $(failed)" "0 $hiding"
 
 # 15. Готовность сервера (readiness.sh): GO только при доказанной готовности — main защищён
