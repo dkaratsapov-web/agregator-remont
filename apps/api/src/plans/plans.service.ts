@@ -341,12 +341,16 @@ export class PlansService {
         entityId: deal.acceptedBidId,
         changes: { status: { from: 'ACCEPTED', to: 'WITHDRAWN' } },
       });
+      // Отклики удалённых и заблокированных мастеров не возвращаются: выбрать их — отдать заказ
+      // тому, кто не войдёт.
       const reopened = await tx.$queryRaw<{ id: string }[]>`
-        SELECT id FROM bids
-        WHERE job_id = ${jobId} AND status = 'REJECTED'::"BidStatus"
-          AND reject_reason = 'OTHER_ACCEPTED'::"BidRejectReason"
-        ORDER BY id
-        FOR UPDATE`;
+        SELECT b.id FROM bids b
+        JOIN users u ON u.id = b.contractor_id
+        WHERE b.job_id = ${jobId} AND b.status = 'REJECTED'::"BidStatus"
+          AND b.reject_reason = 'OTHER_ACCEPTED'::"BidRejectReason"
+          AND u.deleted_at IS NULL AND u.blocked_at IS NULL
+        ORDER BY b.id
+        FOR UPDATE OF b`;
       if (reopened.length > 0) {
         await tx.bid.updateMany({
           where: { id: { in: reopened.map((bid) => bid.id) } },

@@ -340,6 +340,44 @@ describe('Account export and deletion (e2e)', () => {
       expect(reset.body.code).toBe('ACCOUNT_DELETED');
     });
 
+    it('a write that started before the deletion does not land after it (401, nothing written)', async () => {
+      // Ревью garantych-reviewer: запрос прошёл проверку сессии до удаления, ждал строку
+      // пользователя и записывал после: телефон и город возвращались в удалённый аккаунт, а
+      // новый заказ появлялся в каталоге.
+      const customer = await register('CUSTOMER');
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      // Строку держит «пауза»: удаление и записи встают в очередь за ней в этом порядке.
+      const gate = prisma.$transaction(
+        async (tx) => {
+          await tx.$queryRaw`SELECT id FROM users WHERE id = ${customer.id} FOR UPDATE`;
+          await held;
+        },
+        { timeout: 20_000 },
+      );
+      const wait = () => new Promise((resolve) => setTimeout(resolve, 400));
+      const deletion = remove(customer).then((r) => r);
+      await wait();
+      const patch = http()
+        .patch('/v1/me')
+        .set(customer.auth)
+        .send({ phone: '+7 900 123-45-67', city: 'Казань' })
+        .then((r) => r);
+      const job = http()
+        .post('/v1/me/jobs')
+        .set(customer.auth)
+        .send(jobBody)
+        .then((r) => r);
+      await wait();
+      release();
+      await gate;
+      expect((await deletion).status).toBe(204);
+      expect([(await patch).status, (await job).status]).toEqual([401, 401]);
+      const row = await prisma.user.findUniqueOrThrow({ where: { id: customer.id } });
+      expect({ phone: row.phone, city: row.city }).toEqual({ phone: null, city: null });
+      expect(await prisma.job.count({ where: { ownerId: customer.id, status: 'OPEN' } })).toBe(0);
+    });
+
     it('two deletions at once: one succeeds, the other is refused by the ended session', async () => {
       const customer = await register('CUSTOMER');
       const results = await Promise.all([remove(customer), remove(customer)]);

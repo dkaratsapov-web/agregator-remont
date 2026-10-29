@@ -152,6 +152,45 @@ describe('Accounts and trust (e2e)', () => {
       const user = await signUp(app, 'CUSTOMER');
       await issue(user, user.id).expect(403);
     });
+
+    it('changing the password or blocking the account cancels an issued link', async () => {
+      // Ревью garantych-reviewer: человек сменил пароль из-за утечки (или его заблокировали и
+      // разблокировали), а выданная раньше ссылка ещё сутки ставила новый пароль.
+      const admin = await signUpAdmin(app, prisma);
+      const user = await signUp(app, 'CUSTOMER');
+      const { body: first } = await issue(admin, user.id).expect(201);
+      await http()
+        .post('/v1/me/password')
+        .set(user.auth)
+        .send({ currentPassword: PASSWORD, newPassword: NEW_PASSWORD })
+        .expect(204);
+      await reset(first.token, 'another-password-3').expect(400);
+
+      const { body: second } = await issue(admin, user.id).expect(201);
+      const block = (blocked: boolean) =>
+        http()
+          .post(`/v1/admin/users/${user.id}/blocked`)
+          .set(admin.auth)
+          .send({ blocked, reason: 'Проверка' })
+          .expect(200);
+      await block(true);
+      await block(false);
+      await reset(second.token, 'another-password-3').expect(400);
+    });
+
+    it('no link for an admin, another or oneself: that would take over the account', async () => {
+      // Заблокировать администратора нельзя, значит и перехватить его аккаунт ссылкой — тоже;
+      // и украденная сессия администратора не должна давать сменить его пароль без старого.
+      // Администратору новый пароль — только командой на сервере (ревью garantych-reviewer).
+      const a = await signUpAdmin(app, prisma);
+      const b = await signUpAdmin(app, prisma);
+      for (const target of [b, a]) {
+        const res = await issue(a, target.id).expect(409);
+        expect(res.body.code).toBe('ACCOUNT_IS_ADMIN');
+      }
+      expect(await prisma.passwordReset.count()).toBe(0);
+      await http().get('/v1/me').set(b.auth).expect(200);
+    });
   });
 
   describe('blocking in the database', () => {

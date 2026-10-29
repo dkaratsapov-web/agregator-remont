@@ -89,14 +89,27 @@ export class AdminUsersService {
     };
   }
 
-  /** Ссылка для нового пароля; прежние неиспользованные ссылки человека гаснут. */
+  /**
+   * Ссылка для нового пароля; прежние неиспользованные ссылки человека гаснут. Администратору —
+   * ни другому, ни себе: это перехват аккаунта (заблокировать администратора тоже нельзя), а
+   * украденная сессия администратора не должна менять его пароль без старого. Администратору
+   * новый пароль выдаёт команда на сервере (cli/password-reset-link.ts).
+   */
   async issuePasswordReset(adminId: string, id: string): Promise<PasswordResetLinkDto> {
     if (!ENTITY_ID_PATTERN.test(id)) throw new NotFoundException(USER_NOT_FOUND);
     return this.prisma.$transaction(async (tx) => {
-      const [user] = await tx.$queryRaw<{ blocked_at: Date | null; deleted_at: Date | null }[]>`
-        SELECT blocked_at, deleted_at FROM users WHERE id = ${id} FOR UPDATE`;
+      const [user] = await tx.$queryRaw<
+        { role: string; blocked_at: Date | null; deleted_at: Date | null }[]
+      >`SELECT role::text AS role, blocked_at, deleted_at FROM users WHERE id = ${id} FOR UPDATE`;
       if (!user) throw new NotFoundException(USER_NOT_FOUND);
       if (user.deleted_at) throw new ApiError(409, 'ACCOUNT_DELETED', ACCOUNT_DELETED);
+      if (user.role === 'ADMIN') {
+        throw new ApiError(
+          409,
+          'ACCOUNT_IS_ADMIN',
+          'Администратору ссылку не выдать: новый пароль — командой на сервере',
+        );
+      }
       if (user.blocked_at) {
         throw new ConflictException('Аккаунт заблокирован: сначала разблокируйте его');
       }
