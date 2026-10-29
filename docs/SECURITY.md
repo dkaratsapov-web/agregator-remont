@@ -74,6 +74,11 @@ report-uri /csp-report
 - Smoke-тест CI проверяет: в `script-src` есть nonce и нет `unsafe-inline`, скрипты страницы
   несут nonce, у нового ответа он другой. Unit-тесты — `csp.test.ts`, `proxy.test.ts`.
 - `style-src` пока с `'unsafe-inline'`: встроенные стили React и анимаций; стили не исполняют код.
+- Запросы с телом (`Content-Length` или `Transfer-Encoding`: Server Actions, загрузка фото,
+  `POST /lead`) идут мимо proxy. Иначе Next.js копирует тело для proxy, обрезает его после 10 МБ
+  (`proxyClientMaxBodySize`, фото — до 27 МБ) и ждёт его целиком, прежде чем ответить: открытый
+  `POST /lead` читал бы 8 МБ вместо мгновенного 503 (проверка в CI-задаче proxy). Страницы, которым
+  нужен nonce, браузер получает GET-запросом без тела.
 - Проверено в Chromium (Playwright) на `/`, `/jobs`, фильтре, карточке, 404 и `/offline`:
   0 нарушений, service worker регистрируется.
 

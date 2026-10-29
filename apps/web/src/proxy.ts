@@ -26,10 +26,15 @@ export const config = {
       // Страницы и Server Actions; статика, кадры пролёта, service worker и иконки — без CSP.
       source:
         '/((?!_next/static|_next/image|landing/|sw\\.js|icon\\.svg|apple-icon\\.png|manifest\\.webmanifest|robots\\.txt|csp-report).*)',
-      // Предзагрузка ссылок не рендерит документ: nonce ей не нужен.
+      // Предзагрузка ссылок не рендерит документ: nonce ей не нужен. Запросы с телом (Server
+      // Actions, загрузка фото, POST /lead) proxy не трогает: иначе Next.js копирует тело для
+      // proxy, обрезает его после 10 МБ (proxyClientMaxBodySize) и ждёт его целиком, прежде
+      // чем ответить. CSP нужен страницам, а их браузер получает GET-запросом без тела.
       missing: [
         { type: 'header', key: 'next-router-prefetch' },
         { type: 'header', key: 'purpose', value: 'prefetch' },
+        { type: 'header', key: 'content-length' },
+        { type: 'header', key: 'transfer-encoding' },
       ],
     },
   ],

@@ -32,6 +32,12 @@ describe('proxy: CSP nonce', () => {
     expect(res.headers.get('x-middleware-request-x-forwarded-for')).toBe('10.0.0.1');
   });
 
+  it('skips requests with a body: uploads and Server Actions are not copied or cut at 10 MB', () => {
+    const [rule] = config.matcher;
+    const skipped = rule.missing.map((m) => m.key);
+    expect(skipped).toEqual(expect.arrayContaining(['content-length', 'transfer-encoding']));
+  });
+
   it('skips static files and prefetches', () => {
     const [rule] = config.matcher;
     const re = new RegExp(`^${rule.source}$`);
