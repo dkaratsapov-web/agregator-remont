@@ -33,7 +33,7 @@ describe('security headers on every page', () => {
         h.key.toLowerCase().startsWith('content-security-policy'),
       );
       const scriptSrc = csp?.value.split('; ').find((d) => d.startsWith('script-src ')) ?? '';
-      expect(scriptSrc, key).toBe("script-src 'none'");
+      expect(scriptSrc, key).toBe("script-src 'self'");
       expect(csp?.value).toContain("frame-ancestors 'none'");
       expect(csp?.value).toContain("form-action 'self'");
     }

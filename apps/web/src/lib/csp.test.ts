@@ -27,9 +27,9 @@ describe('buildCsp', () => {
     expect(directive(csp, 'script-src')).not.toContain("'unsafe-inline'");
   });
 
-  it('without a nonce (pages rendered for a request with a body) no script runs', () => {
+  it('without a nonce (pages rendered for a request with a body) no inline script runs', () => {
     const csp = buildCsp({ dev: false });
-    expect(directive(csp, 'script-src')).toEqual(["'none'"]);
+    expect(directive(csp, 'script-src')).toEqual(["'self'"]);
     expect(directive(csp, 'object-src')).toEqual(["'none'"]);
   });
 
