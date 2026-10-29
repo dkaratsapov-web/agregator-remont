@@ -25,11 +25,13 @@ afterEach(() => {
 });
 
 describe('GET /account/notifications/summary', () => {
-  it('sums notifications and report decisions, not cached', async () => {
-    fetchMock.mockResolvedValue(Response.json({ unread: 3, reportDecisions: 2 }));
+  it('sums notifications, report decisions and support replies, not cached', async () => {
+    fetchMock.mockResolvedValue(
+      Response.json({ unread: 3, reportDecisions: 2, feedbackReplies: 1 }),
+    );
     const res = await GET();
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ unread: 5 });
+    expect(await res.json()).toEqual({ unread: 6 });
     expect(res.headers.get('cache-control')).toBe('no-store');
     expect(new Headers(fetchMock.mock.calls[0][1].headers).get('authorization')).toBe('Bearer tok');
   });

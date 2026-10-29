@@ -41,6 +41,8 @@ export interface FeedbackDto {
   /** Ответ администратора; null — ещё не ответили. */
   reply: string | null;
   repliedAt: string | null;
+  /** Ответ есть, а автор его ещё не открыл («Мои обращения»); входит в значок уведомлений. */
+  unseen: boolean;
 }
 
 export interface AdminFeedbackDto extends FeedbackDto {

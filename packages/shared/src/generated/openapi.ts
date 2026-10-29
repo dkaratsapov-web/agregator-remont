@@ -884,6 +884,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/feedback/seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MyFeedback_markSeen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/jobs": {
         parameters: {
             query?: never;
@@ -1293,6 +1309,8 @@ export interface components {
             repliedAt: string | null;
             /** @description null — ещё не ответили */
             reply: string | null;
+            /** @description Ответ есть, но автор его ещё не открыл */
+            unseen: boolean;
         };
         AdminUserDto: {
             bids: number;
@@ -1514,6 +1532,8 @@ export interface components {
             repliedAt: string | null;
             /** @description null — ещё не ответили */
             reply: string | null;
+            /** @description Ответ есть, но автор его ещё не открыл */
+            unseen: boolean;
         };
         /** @enum {string} */
         FeedbackKind: "BUG" | "IDEA" | "QUESTION";
@@ -1800,6 +1820,8 @@ export interface components {
             unread: number;
         };
         NotificationsSummaryDto: {
+            /** @description Непросмотренные ответы поддержки на ваши обращения */
+            feedbackReplies: number;
             /** @description Заказы с непрочитанным */
             jobs: components["schemas"]["NotificationsSummaryJobSchema"][];
             /** @description Непросмотренные решения по вашим жалобам */
@@ -6247,6 +6269,42 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
+            };
+            /** @description Нет действующей сессии или неверные учётные данные */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Превышен лимит частоты запросов или суточная квота */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    MyFeedback_markSeen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ответы на свои обращения отмечены просмотренными */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Нет действующей сессии или неверные учётные данные */
             401: {

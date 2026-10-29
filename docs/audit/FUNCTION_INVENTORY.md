@@ -6,7 +6,8 @@
   Route Handler `GET /account/export`, Server Action `deleteAccountAction`; итоговые числа ниже —
   на `4fca28f`, с этими добавками маршрутов API 88, Route Handlers 13.
 - Затем поддержка (`docs/FEEDBACK.md`): `POST` и `GET /v1/me/feedback`, `GET /v1/admin/feedback`,
-  `POST /v1/admin/feedback/{id}/reply` (маршрутов API 92), Server Actions `sendFeedbackAction`,
+  `POST /v1/admin/feedback/{id}/reply`, `POST /v1/me/feedback/seen` (маршрутов API 93), Server
+  Actions `sendFeedbackAction`, `markFeedbackSeenAction`,
   `replyFeedbackAction` и обёртка `replyFeedbackFormAction`, страницы `/account/feedback` и
   `/admin/feedback`, модель `Feedback`.
 - Что описано: маршруты API (NestJS), Server Actions и Route Handlers web (Next.js 16), страницы,

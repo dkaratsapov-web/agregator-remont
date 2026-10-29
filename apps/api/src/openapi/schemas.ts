@@ -394,6 +394,7 @@ export class FeedbackSchema implements FeedbackDto {
   @ApiProperty({ type: String, nullable: true, description: 'null — ещё не ответили' })
   reply!: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) repliedAt!: string | null;
+  @ApiProperty({ description: 'Ответ есть, но автор его ещё не открыл' }) unseen!: boolean;
 }
 
 @ApiSchema({ name: 'FeedbackAuthor' })
@@ -601,6 +602,8 @@ export class NotificationsSummarySchema implements NotificationsSummaryDto {
   @ApiProperty({ type: [NotificationsSummaryJobSchema], description: 'Заказы с непрочитанным' })
   jobs!: NotificationsSummaryJobSchema[];
   @int({ description: 'Непросмотренные решения по вашим жалобам' }) reportDecisions!: number;
+  @int({ description: 'Непросмотренные ответы поддержки на ваши обращения' })
+  feedbackReplies!: number;
 }
 
 @ApiSchema({ name: 'ReportReceivedDto' })

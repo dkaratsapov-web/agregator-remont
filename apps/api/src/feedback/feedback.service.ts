@@ -28,6 +28,7 @@ export function toFeedbackDto(row: Feedback): FeedbackDto {
     createdAt: row.createdAt.toISOString(),
     reply: row.reply,
     repliedAt: row.repliedAt?.toISOString() ?? null,
+    unseen: row.repliedAt !== null && row.authorSeenAt === null,
   };
 }
 
@@ -70,6 +71,14 @@ export class FeedbackService {
       take: MINE_LIMIT,
     });
     return rows.map(toFeedbackDto);
+  }
+
+  /** Ответы на свои обращения просмотрены: пропадают из значка уведомлений. */
+  async markSeen(user: User): Promise<void> {
+    await this.prisma.feedback.updateMany({
+      where: { userId: user.id, repliedAt: { not: null }, authorSeenAt: null },
+      data: { authorSeenAt: new Date() },
+    });
   }
 
   async list(query: ListFeedbackQuery): Promise<Paginated<AdminFeedbackDto>> {

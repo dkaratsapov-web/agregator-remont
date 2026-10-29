@@ -134,6 +134,39 @@ describe('Feedback (e2e)', () => {
     ).toBe(1);
   });
 
+  it('the author learns about a reply: the summary counts it until seen', async () => {
+    const admin = await signUpAdmin(app, prisma);
+    const user = await signUp(app, 'CUSTOMER');
+    const other = await signUp(app, 'CUSTOMER');
+    const summary = async (auth: Record<string, string>) =>
+      (await http().get('/v1/me/notifications/summary').set(auth).expect(200)).body
+        .feedbackReplies as number;
+    const mine = async () =>
+      (await http().get('/v1/me/feedback').set(user.auth).expect(200)).body as FeedbackDto[];
+
+    const { id } = (await send(user.auth, bug).expect(201)).body as FeedbackDto;
+    await send(other.auth, bug).expect(201);
+    // Без ответа — нечего смотреть.
+    expect(await summary(user.auth)).toBe(0);
+    expect((await mine())[0].unseen).toBe(false);
+
+    await http()
+      .post(`/v1/admin/feedback/${id}/reply`)
+      .set(admin.auth)
+      .send({ reply: 'Спасибо, исправили.' })
+      .expect(200);
+    expect(await summary(user.auth)).toBe(1);
+    expect((await mine())[0].unseen).toBe(true);
+    expect(await summary(other.auth)).toBe(0);
+
+    await http().post('/v1/me/feedback/seen').set(user.auth).expect(204);
+    expect(await summary(user.auth)).toBe(0);
+    expect((await mine())[0].unseen).toBe(false);
+    // Повтор ничего не меняет; без сессии — 401.
+    await http().post('/v1/me/feedback/seen').set(user.auth).expect(204);
+    await http().post('/v1/me/feedback/seen').expect(401);
+  });
+
   it('only admin sees the queue and replies; unknown id is 404', async () => {
     const admin = await signUpAdmin(app, prisma);
     const user = await signUp(app, 'CUSTOMER');

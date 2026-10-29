@@ -21,7 +21,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 const fetchMock = vi.fn();
-const { sendFeedbackAction } = await import('./actions');
+const { markFeedbackSeenAction, sendFeedbackAction } = await import('./actions');
 const { replyFeedbackFormAction } = await import('../../admin/feedback/actions');
 const { FOREIGN_ORIGIN } = await import('@/lib/action-guard');
 const { encodeFormArgs } = await import('@/lib/form-args');
@@ -129,5 +129,23 @@ describe('replyFeedbackFormAction', () => {
       error: 'На это обращение уже ответили: обновите страницу.',
       reply: 'Исправим.',
     });
+  });
+});
+
+describe('markFeedbackSeenAction', () => {
+  it('marks own replies seen; foreign origin and API failure return ok: false', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    expect(await markFeedbackSeenAction()).toEqual({ ok: true });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('http://api.test/v1/me/feedback/seen');
+    expect(init.method).toBe('POST');
+
+    fetchMock.mockResolvedValueOnce(json(500, { message: 'Сбой' }));
+    expect(await markFeedbackSeenAction()).toEqual({ ok: false });
+
+    state.headers.set('origin', 'https://evil.example');
+    fetchMock.mockClear();
+    expect(await markFeedbackSeenAction()).toEqual({ ok: false });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

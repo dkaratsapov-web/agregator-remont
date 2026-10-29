@@ -2,6 +2,7 @@ import { FEEDBACK_KIND_LABELS, FEEDBACK_LIMITS, type FeedbackDto } from '@agrega
 import type { Metadata } from 'next';
 import { ApiUnavailable } from '@/components/api-unavailable';
 import { FeedbackForm } from '@/components/feedback/feedback-form';
+import { FeedbackSeen } from '@/components/feedback/feedback-seen';
 import { EmptyState, PageHeader } from '@/components/ui/page-header';
 import { Sheet, SheetBody, SheetHeader } from '@/components/ui/sheet';
 import { listMyFeedback } from '@/lib/api';
@@ -21,7 +22,14 @@ function FeedbackItem({ item }: { item: FeedbackDto }) {
   return (
     <li className="px-5 py-4 sm:px-6">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <p className="font-semibold text-ink">{FEEDBACK_KIND_LABELS[item.kind]}</p>
+        <p className="font-semibold text-ink">
+          {FEEDBACK_KIND_LABELS[item.kind]}
+          {item.unseen ? (
+            <span className="ml-2 rounded-full bg-accent px-2 py-0.5 align-middle text-xs font-semibold text-accent-ink">
+              Новый ответ
+            </span>
+          ) : null}
+        </p>
         <span
           className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
             item.reply ? 'bg-ok-tint text-ok' : 'bg-sunken text-ink-soft'
@@ -68,8 +76,11 @@ export default async function FeedbackPage({
     console.error('Feedback: failed to load', error);
   }
 
+  const unseen = mine?.filter((item) => item.unseen).length ?? 0;
+
   return (
     <div className="mx-auto max-w-[1600px] px-4 pb-16 pt-10 sm:px-6 md:pt-14 lg:px-10">
+      <FeedbackSeen unseen={unseen} />
       <PageHeader
         back={{ href: '/account', label: 'Кабинет' }}
         title="Поддержка"

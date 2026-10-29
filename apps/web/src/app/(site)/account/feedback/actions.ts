@@ -3,8 +3,13 @@
 import { FEEDBACK_KINDS, FEEDBACK_LIMITS, type FeedbackKind } from '@agregator/shared';
 import { redirect } from 'next/navigation';
 import { FOREIGN_ORIGIN, isTrustedOrigin } from '@/lib/action-guard';
-import { apiErrorMessage, redirectIfUnauthorized, requireSessionToken } from '@/lib/action-helpers';
-import { sendFeedback } from '@/lib/api';
+import {
+  apiErrorMessage,
+  isUnauthorized,
+  redirectIfUnauthorized,
+  requireSessionToken,
+} from '@/lib/action-helpers';
+import { markFeedbackSeen, sendFeedback } from '@/lib/api';
 import { getClientIp } from '@/lib/session';
 
 const FEEDBACK = '/account/feedback';
@@ -54,4 +59,21 @@ export async function sendFeedbackAction(
     return { error: apiErrorMessage(error), values };
   }
   redirect(`${FEEDBACK}?sent=1`);
+}
+
+/**
+ * Человек открыл «Мои обращения»: ответы поддержки просмотрены и пропадают из значка.
+ * Вызывается со страницы (FeedbackSeen), без перехода; без JS ответы отмечаются кнопкой
+ * «Отметить все прочитанными» на странице уведомлений.
+ */
+export async function markFeedbackSeenAction(): Promise<{ ok: boolean }> {
+  if (!(await isTrustedOrigin())) return { ok: false };
+  const token = await requireSessionToken(FEEDBACK);
+  try {
+    await markFeedbackSeen(token);
+    return { ok: true };
+  } catch (error) {
+    if (!isUnauthorized(error)) console.error('Feedback: failed to mark replies seen', error);
+    return { ok: false };
+  }
 }
