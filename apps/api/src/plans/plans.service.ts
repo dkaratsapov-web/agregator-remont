@@ -407,6 +407,12 @@ export class PlansService {
     });
   }
 
+  /** Пользователь — исполнитель этой сделки (до тяжёлой обработки фото к сдаче этапа). */
+  async assertContractor(userId: string, jobId: string): Promise<void> {
+    const deal = await this.findDeal(this.prisma, userId, jobId, false);
+    if (deal.viewer !== 'CONTRACTOR') throw new ForbiddenException('Этапы сдаёт исполнитель');
+  }
+
   private findDeal(
     db: Prisma.TransactionClient,
     userId: string,
