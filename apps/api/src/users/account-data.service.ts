@@ -47,6 +47,9 @@ export class AccountDataService {
       feedback,
       sessions,
       bankLogins,
+      plans,
+      photos,
+      contactShares,
     ] = await Promise.all([
       this.prisma.contractorProfile.findUnique({ where: { userId: id } }),
       this.prisma.userAvatar.count({ where: { userId: id } }),
@@ -72,6 +75,27 @@ export class AccountDataService {
         orderBy: { createdAt: 'asc' },
       }),
       this.prisma.externalAccount.findMany({ where: { userId: id } }),
+      // План общий для сторон сделки: свой заказ или заказ, где свой отклик выбран.
+      this.prisma.jobPlan.findMany({
+        where: {
+          job: {
+            OR: [{ ownerId: id }, { bids: { some: { contractorId: id, status: 'ACCEPTED' } } }],
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+        include: {
+          stages: {
+            orderBy: { position: 'asc' },
+            include: { _count: { select: { photos: true } } },
+          },
+        },
+      }),
+      this.prisma.jobPhoto.findMany({ where: { uploaderId: id }, orderBy: { createdAt: 'asc' } }),
+      this.prisma.contactShare.findMany({
+        where: { userId: id },
+        orderBy: { createdAt: 'asc' },
+        include: { bid: { select: { jobId: true } } },
+      }),
     ]);
     await writeAudit(this.prisma, {
       actorId: id,
@@ -178,6 +202,41 @@ export class AccountDataService {
         lastSeenAt: isoOrNull(s.lastSeenAt),
       })),
       bankLogins: bankLogins.map((b) => ({ provider: b.provider, createdAt: iso(b.createdAt) })),
+      plans: plans.map((plan) => ({
+        jobId: plan.jobId,
+        author: plan.author,
+        sequential: plan.sequential,
+        status: plan.status,
+        returnReason: plan.returnReason,
+        proposedAt: isoOrNull(plan.proposedAt),
+        approvedAt: isoOrNull(plan.approvedAt),
+        stages: plan.stages.map((st) => ({
+          position: st.position,
+          title: st.title,
+          description: st.description,
+          durationDays: st.durationDays,
+          status: st.status,
+          submitComment: st.submitComment,
+          reworkComment: st.reworkComment,
+          submittedAt: isoOrNull(st.submittedAt),
+          acceptedAt: isoOrNull(st.acceptedAt),
+          photos: st._count.photos,
+        })),
+      })),
+      photos: photos.map((ph) => ({
+        id: ph.id,
+        jobId: ph.jobId,
+        stageId: ph.stageId,
+        messageId: ph.messageId,
+        width: ph.width,
+        height: ph.height,
+        bytes: ph.bytes,
+        createdAt: iso(ph.createdAt),
+      })),
+      contactShares: contactShares.map((c) => ({
+        jobId: c.bid.jobId,
+        createdAt: iso(c.createdAt),
+      })),
     };
   }
 

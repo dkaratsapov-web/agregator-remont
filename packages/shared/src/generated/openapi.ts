@@ -1253,6 +1253,10 @@ export interface components {
             bids: {
                 [key: string]: unknown;
             }[];
+            /** @description Сделки, где свои контакты открыты другой стороне */
+            contactShares: {
+                [key: string]: unknown;
+            }[];
             /** @description Профиль мастера */
             contractorProfile: {
                 [key: string]: unknown;
@@ -1277,6 +1281,14 @@ export interface components {
             }[];
             /** @description Свои сообщения в переписке */
             messages: {
+                [key: string]: unknown;
+            }[];
+            /** @description Свои загруженные фото, без файлов */
+            photos: {
+                [key: string]: unknown;
+            }[];
+            /** @description Планы работ по своим сделкам с этапами (общие для обеих сторон) */
+            plans: {
                 [key: string]: unknown;
             }[];
             /** @description Свои жалобы */
