@@ -12,15 +12,17 @@
  */
 export const CSP_HEADER = 'Content-Security-Policy-Report-Only';
 
-export function buildCsp({ dev, nonce }: { dev: boolean; nonce: string }): string {
+/**
+ * Без nonce — политика для ответов на запросы с телом (форма без JS, POST на адрес страницы):
+ * proxy.ts их пропускает, и скрипты на такой странице не выполняются вовсе ('none'); страница
+ * ответа на форму без JS и так работает без JS. Ставит её next.config.ts.
+ */
+export function buildCsp({ dev, nonce }: { dev: boolean; nonce?: string }): string {
   const directives: Record<string, string[]> = {
     'default-src': ["'self'"],
-    'script-src': [
-      "'self'",
-      `'nonce-${nonce}'`,
-      "'strict-dynamic'",
-      ...(dev ? ["'unsafe-eval'"] : []),
-    ],
+    'script-src': nonce
+      ? ["'self'", `'nonce-${nonce}'`, "'strict-dynamic'", ...(dev ? ["'unsafe-eval'"] : [])]
+      : ["'none'"],
     'style-src': ["'self'", "'unsafe-inline'"],
     'img-src': ["'self'", 'data:', 'blob:'],
     'font-src': ["'self'"],

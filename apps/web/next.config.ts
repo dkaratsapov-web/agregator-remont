@@ -1,5 +1,6 @@
 import path from 'node:path';
 import type { NextConfig } from 'next';
+import { buildCsp, CSP_HEADER } from './src/lib/csp';
 
 const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -23,8 +24,23 @@ const nextConfig: NextConfig = {
     serverActions: { bodySizeLimit: '27mb' },
   },
   async headers() {
+    // Запросы с телом proxy.ts пропускает (иначе Next.js копирует и обрезает тело), но ответ на
+    // POST к адресу страницы — тоже HTML. Ему строгая политика без скриптов, а не никакой.
+    const bodyCsp = [
+      { key: CSP_HEADER, value: buildCsp({ dev: process.env.NODE_ENV !== 'production' }) },
+    ];
     return [
       { source: '/:path*', headers: securityHeaders },
+      {
+        source: '/:path*',
+        has: [{ type: 'header' as const, key: 'content-length' }],
+        headers: bodyCsp,
+      },
+      {
+        source: '/:path*',
+        has: [{ type: 'header' as const, key: 'transfer-encoding' }],
+        headers: bodyCsp,
+      },
       {
         // Видео пролёта на главной: папка версионируется (flight-v3, flight-v4…), файлы не меняются.
         source: '/landing/:path*',

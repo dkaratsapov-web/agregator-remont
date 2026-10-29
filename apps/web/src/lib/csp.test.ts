@@ -27,6 +27,12 @@ describe('buildCsp', () => {
     expect(directive(csp, 'script-src')).not.toContain("'unsafe-inline'");
   });
 
+  it('without a nonce (pages rendered for a request with a body) no script runs', () => {
+    const csp = buildCsp({ dev: false });
+    expect(directive(csp, 'script-src')).toEqual(["'none'"]);
+    expect(directive(csp, 'object-src')).toEqual(["'none'"]);
+  });
+
   it('dev policy allows what Next.js HMR needs', () => {
     const csp = buildCsp({ dev: true, nonce: 'abc123' });
     expect(directive(csp, 'script-src')).toContain("'unsafe-eval'");

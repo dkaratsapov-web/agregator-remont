@@ -14,6 +14,9 @@ export function safeRedirectPath(raw: unknown): string {
   try {
     const url = new URL(raw, 'http://internal.invalid');
     if (url.origin !== 'http://internal.invalid') return DEFAULT_AFTER_LOGIN;
+    // Нормализация убирает «.» и «..»: «/.//evil.example» становится «//evil.example», а это
+    // адрес чужого сайта. Проверяем уже нормализованный путь.
+    if (url.pathname.startsWith('//')) return DEFAULT_AFTER_LOGIN;
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {
     return DEFAULT_AFTER_LOGIN;

@@ -54,8 +54,8 @@
 ## 3. Content-Security-Policy
 
 Текущее состояние: `Content-Security-Policy-Report-Only` (`apps/web/src/lib/csp.ts`) со своим
-nonce на каждый ответ. Его выдаёт `apps/web/src/proxy.ts` на каждый запрос страницы и Server
-Action: политика уходит в ответ и в заголовки запроса, откуда Next.js берёт nonce для своих
+nonce на каждый ответ. Его выдаёт `apps/web/src/proxy.ts` на каждый запрос страницы без тела
+(GET): политика уходит в ответ и в заголовки запроса, откуда Next.js берёт nonce для своих
 скриптов. Загруженные ими модули разрешает `'strict-dynamic'`. Встроенный скрипт без nonce
 (например, внедрённый через XSS) нарушает политику; `'unsafe-inline'` в `script-src` больше нет
 (независимый аудит, AUD-02). Все страницы рендерятся на запрос (`connection()` в корневом layout):
@@ -77,8 +77,14 @@ report-uri /csp-report
 - Запросы с телом (`Content-Length` или `Transfer-Encoding`: Server Actions, загрузка фото,
   `POST /lead`) идут мимо proxy. Иначе Next.js копирует тело для proxy, обрезает его после 10 МБ
   (`proxyClientMaxBodySize`, фото — до 27 МБ) и ждёт его целиком, прежде чем ответить: открытый
-  `POST /lead` читал бы 8 МБ вместо мгновенного 503 (проверка в CI-задаче proxy). Страницы, которым
-  нужен nonce, браузер получает GET-запросом без тела.
+  `POST /lead` читал бы 8 МБ вместо мгновенного 503 (проверка в CI-задаче proxy).
+- Но ответ на такой запрос тоже может быть HTML-страницей: форма без JS или любой POST на адрес
+  страницы рендерит её целиком. Им `next.config.ts` ставит строгую политику без nonce и без
+  скриптов (`script-src 'none'`): страница ответа на форму без JS и так работает без JS. Без
+  этого правила HTML-ответ на POST шёл бы вообще без CSP — обход политики (найдено агентом
+  проверки, `docs/REVIEW_AGENT.md`). Правила proxy и next.config не пересекаются: proxy — только
+  без `Content-Length`/`Transfer-Encoding`, правило — только с ними. Тест matcher вызывает функции
+  самого Next.js (`proxy.test.ts`).
 - Проверено в Chromium (Playwright) на `/`, `/jobs`, фильтре, карточке, 404 и `/offline`:
   0 нарушений, service worker регистрируется.
 
