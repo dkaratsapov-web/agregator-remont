@@ -115,6 +115,31 @@ describe('Auth (e2e)', () => {
       expect(await prisma.session.count()).toBe(2);
     });
 
+    it('blocking during a login: 403, and no session survives the block (AUD-10)', async () => {
+      const { id: userId } = (await register().expect(201)).body.user as { id: string };
+      // «Администратор» блокирует аккаунт и держит транзакцию открытой, пока идёт вход.
+      let commit!: () => void;
+      const held = new Promise<void>((resolve) => (commit = resolve));
+      const block = prisma.$transaction(
+        async (tx) => {
+          await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+          await tx.user.update({ where: { id: userId }, data: { blockedAt: new Date() } });
+          await tx.session.deleteMany({ where: { userId } });
+          await held;
+        },
+        { timeout: 20_000 },
+      );
+      const login = http()
+        .post('/v1/auth/login')
+        .send({ email: 'ivan@example.ru', password: PASSWORD })
+        .then((res) => res);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      commit();
+      await block;
+      expect((await login).status).toBe(403);
+      expect(await prisma.session.count({ where: { userId } })).toBe(0);
+    });
+
     it('returns the same generic 401 for a wrong password and an unknown email', async () => {
       await register().expect(201);
       const wrong = await http()
