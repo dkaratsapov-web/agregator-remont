@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Onest, Unbounded } from 'next/font/google';
+import { connection } from 'next/server';
 import { ServiceWorkerRegister } from '@/components/sw-register';
 import './globals.css';
 
@@ -34,7 +35,10 @@ export const viewport: Viewport = {
   colorScheme: 'light',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Каждая страница рендерится на запрос: в заранее собранный HTML нельзя вписать nonce этого
+  // ответа (CSP, src/proxy.ts). Главная и кабинет и так динамические (сессия).
+  await connection();
   return (
     <html lang="ru" className={`${onest.variable} ${unbounded.variable}`}>
       <body className="min-h-dvh font-sans antialiased">

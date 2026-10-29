@@ -53,10 +53,17 @@
 
 ## 3. Content-Security-Policy
 
-Текущее состояние: `Content-Security-Policy-Report-Only` (`apps/web/src/lib/csp.ts`).
+Текущее состояние: `Content-Security-Policy-Report-Only` (`apps/web/src/lib/csp.ts`) со своим
+nonce на каждый ответ. Его выдаёт `apps/web/src/proxy.ts` на каждый запрос страницы и Server
+Action: политика уходит в ответ и в заголовки запроса, откуда Next.js берёт nonce для своих
+скриптов. Загруженные ими модули разрешает `'strict-dynamic'`. Встроенный скрипт без nonce
+(например, внедрённый через XSS) нарушает политику; `'unsafe-inline'` в `script-src` больше нет
+(независимый аудит, AUD-02). Все страницы рендерятся на запрос (`connection()` в корневом layout):
+в заранее собранный HTML nonce не вписать; статическими раньше были только `/privacy`,
+`/offline` и страницы ошибок.
 
 ```
-default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';
+default-src 'self'; script-src 'self' 'nonce-<16 байт base64>' 'strict-dynamic'; style-src 'self' 'unsafe-inline';
 img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self';
 worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';
 report-uri /csp-report
@@ -64,6 +71,9 @@ report-uri /csp-report
 
 - В production нет `unsafe-eval` (проверяется unit-тестом и smoke-тестом в CI). В dev
   добавляются `unsafe-eval` и `ws:` для HMR.
+- Smoke-тест CI проверяет: в `script-src` есть nonce и нет `unsafe-inline`, скрипты страницы
+  несут nonce, у нового ответа он другой. Unit-тесты — `csp.test.ts`, `proxy.test.ts`.
+- `style-src` пока с `'unsafe-inline'`: встроенные стили React и анимаций; стили не исполняют код.
 - Проверено в Chromium (Playwright) на `/`, `/jobs`, фильтре, карточке, 404 и `/offline`:
   0 нарушений, service worker регистрируется.
 
@@ -82,9 +92,11 @@ report-uri /csp-report
 План перехода на enforce (до публичного релиза):
 1. ~~Сбор отчётов на собственный адрес~~ — сделано (`report-uri /csp-report`). Дальше —
    неделя закрытого теста без строк `csp-violation` в журнале web.
-2. Перейти на nonce: генерация в `proxy.ts` (бывший middleware), `script-src 'self' 'nonce-…' 'strict-dynamic'`,
-   убрать `'unsafe-inline'` из `script-src`. Учесть, что nonce делает все страницы динамическими.
-3. Переключить заголовок на `Content-Security-Policy`, добавить `upgrade-insecure-requests`.
+2. ~~Перейти на nonce~~ — сделано (`proxy.ts`, `script-src 'self' 'nonce-…' 'strict-dynamic'`,
+   без `'unsafe-inline'`), пока в режиме report-only. Дальше — неделя закрытого теста с nonce
+   без строк `csp-violation` в журнале web.
+3. Переключить заголовок на `Content-Security-Policy`, добавить `upgrade-insecure-requests`
+   (решение владельца: после этого шаг блокирует, а не только сообщает).
 4. Smoke-тест: заголовок enforce присутствует, страницы рендерятся без нарушений.
 
 ## 4. CORS

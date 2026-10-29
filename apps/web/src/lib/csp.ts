@@ -1,17 +1,26 @@
 /**
  * Content-Security-Policy для web.
  *
- * Сейчас отдаётся как Content-Security-Policy-Report-Only: нарушения видны в консоли
- * браузера и приходят отчётом на /csp-report, но ничего не блокируется. План перехода на enforce: docs/SECURITY.md.
- * 'unsafe-inline' в script-src нужен для inline-скриптов App Router до перехода на nonce.
+ * Скрипты — только с nonce этого ответа: его выдаёт proxy.ts на каждый запрос страницы, Next.js
+ * ставит его своим скриптам, а загруженные ими модули разрешает 'strict-dynamic'. Встроенный
+ * скрипт без nonce (например, внедрённый через XSS) не выполнится (независимый аудит, AUD-02).
+ *
+ * Пока отдаётся как Content-Security-Policy-Report-Only: нарушения видны в консоли браузера и
+ * приходят отчётом на /csp-report, но ничего не блокируется. Переход на enforce — отдельным
+ * решением владельца (docs/SECURITY.md, раздел 3).
  * 'unsafe-eval' и ws: допускаются только в dev (HMR / React Refresh).
  */
 export const CSP_HEADER = 'Content-Security-Policy-Report-Only';
 
-export function buildCsp({ dev }: { dev: boolean }): string {
+export function buildCsp({ dev, nonce }: { dev: boolean; nonce: string }): string {
   const directives: Record<string, string[]> = {
     'default-src': ["'self'"],
-    'script-src': ["'self'", "'unsafe-inline'", ...(dev ? ["'unsafe-eval'"] : [])],
+    'script-src': [
+      "'self'",
+      `'nonce-${nonce}'`,
+      "'strict-dynamic'",
+      ...(dev ? ["'unsafe-eval'"] : []),
+    ],
     'style-src': ["'self'", "'unsafe-inline'"],
     'img-src': ["'self'", 'data:', 'blob:'],
     'font-src': ["'self'"],

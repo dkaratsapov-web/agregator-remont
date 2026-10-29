@@ -79,6 +79,17 @@ const headers = (await fetch(`${WEB}/jobs`)).headers;
 const csp = headers.get('content-security-policy-report-only') ?? '';
 check('CSP report-only header present', csp.includes("default-src 'self'"));
 check('CSP has no unsafe-eval in production', !csp.includes('unsafe-eval'));
+const scriptSrc = csp.split('; ').find((d) => d.startsWith('script-src ')) ?? '';
+check(
+  'CSP: scripts only with this response nonce, no unsafe-inline',
+  /'nonce-[A-Za-z0-9+/=]+'/.test(scriptSrc) && !scriptSrc.includes('unsafe-inline'),
+);
+const page = await (await fetch(`${WEB}/jobs`)).text();
+const nonce = /'nonce-([A-Za-z0-9+/=]+)'/.exec(scriptSrc)?.[1];
+check(
+  'CSP: the page scripts carry a nonce, and a new response has a new one',
+  /<script[^>]+nonce=/.test(page) && !page.includes(`nonce="${nonce}"`),
+);
 check('X-Frame-Options DENY', headers.get('x-frame-options') === 'DENY');
 check('no X-Powered-By', headers.get('x-powered-by') === null);
 

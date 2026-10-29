@@ -15,10 +15,10 @@ describe('security headers on every page', () => {
     expect(headers['x-frame-options']).toBe('DENY');
     expect(headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
     expect(headers['permissions-policy']).toContain('geolocation=()');
-    const csp = Object.entries(headers).find(([key]) => key.startsWith('content-security-policy'));
-    expect(csp?.[1]).toContain("frame-ancestors 'none'");
-    expect(csp?.[1]).toContain("object-src 'none'");
-    expect(csp?.[1]).toContain("form-action 'self'");
+    // CSP со своим nonce на каждый ответ ставит proxy.ts (proxy.test.ts), не next.config.
+    expect(Object.keys(headers).some((key) => key.startsWith('content-security-policy'))).toBe(
+      false,
+    );
   });
 
   it('does not reveal the framework', () => {
