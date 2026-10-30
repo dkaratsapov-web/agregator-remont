@@ -495,5 +495,27 @@ describe('Job plan and stages (e2e)', () => {
       const fresh = await http().get(`${d.base}/plan`).set(d.other.auth).expect(200);
       expect(fresh.body).toMatchObject({ version: 0, stages: [] });
     });
+    it('bids of deleted or blocked contractors are not reopened and cannot be chosen', async () => {
+      // Ревью garantych-reviewer: после отказа исполнителя «на рассмотрении» снова оказывался
+      // отклик удалённого аккаунта, и заказ уходил в работу с тем, кто не войдёт.
+      const d = await approved();
+      // Так оставляет строку удаление аккаунта: удалён и заблокирован навсегда.
+      await prisma.user.update({
+        where: { id: d.other.id },
+        data: { deletedAt: new Date(), blockedAt: new Date() },
+      });
+      await http()
+        .post(`${d.base}/quit`)
+        .set(d.contractor.auth)
+        .send({ reason: 'Заболел, не смогу закончить' })
+        .expect(204);
+      const kept = await prisma.bid.findUniqueOrThrow({ where: { id: d.otherBid.id } });
+      expect(kept.status).toBe('REJECTED');
+      await http()
+        .post(`/v1/me/jobs/${d.jobId}/bids/${d.otherBid.id}/accept`)
+        .set(d.owner.auth)
+        .expect(409);
+      expect((await prisma.job.findUniqueOrThrow({ where: { id: d.jobId } })).status).toBe('OPEN');
+    });
   });
 });

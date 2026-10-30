@@ -53,10 +53,17 @@
 
 ## 3. Content-Security-Policy
 
-Текущее состояние: `Content-Security-Policy-Report-Only` (`apps/web/src/lib/csp.ts`).
+Текущее состояние: `Content-Security-Policy-Report-Only` (`apps/web/src/lib/csp.ts`) со своим
+nonce на каждый ответ. Его выдаёт `apps/web/src/proxy.ts` на каждый запрос страницы без тела
+(GET): политика уходит в ответ и в заголовки запроса, откуда Next.js берёт nonce для своих
+скриптов. Загруженные ими модули разрешает `'strict-dynamic'`. Встроенный скрипт без nonce
+(например, внедрённый через XSS) нарушает политику; `'unsafe-inline'` в `script-src` больше нет
+(независимый аудит, AUD-02). Все страницы рендерятся на запрос (`connection()` в корневом layout):
+в заранее собранный HTML nonce не вписать; статическими раньше были только `/privacy`,
+`/offline` и страницы ошибок.
 
 ```
-default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';
+default-src 'self'; script-src 'self' 'nonce-<16 байт base64>' 'strict-dynamic'; style-src 'self' 'unsafe-inline';
 img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; manifest-src 'self';
 worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';
 report-uri /csp-report
@@ -64,6 +71,25 @@ report-uri /csp-report
 
 - В production нет `unsafe-eval` (проверяется unit-тестом и smoke-тестом в CI). В dev
   добавляются `unsafe-eval` и `ws:` для HMR.
+- Smoke-тест CI проверяет: в `script-src` есть nonce и нет `unsafe-inline`, скрипты страницы
+  несут nonce, у нового ответа он другой. Unit-тесты — `csp.test.ts`, `proxy.test.ts`.
+- `style-src` пока с `'unsafe-inline'`: встроенные стили React и анимаций; стили не исполняют код.
+- Запросы с телом (`Content-Length` или `Transfer-Encoding`: Server Actions, загрузка фото,
+  `POST /lead`) идут мимо proxy. Иначе Next.js копирует тело для proxy, обрезает его после 10 МБ
+  (`proxyClientMaxBodySize`, фото — до 27 МБ) и ждёт его целиком, прежде чем ответить: открытый
+  `POST /lead` читал бы 8 МБ вместо мгновенного 503 (проверка в CI-задаче proxy).
+- Но ответ на такой запрос тоже может быть HTML-страницей: форма без JS или любой POST на адрес
+  страницы рендерит её целиком. Им `next.config.ts` ставит строгую политику без nonce: только
+  файлы скриптов со своего адреса, встроенные скрипты запрещены (`script-src 'self'`; `'none'`
+  нельзя — браузер без JS всё равно загружает файлы по `<link rel="preload">`, и это нарушение
+  поймали браузерные сценарии). Страница ответа на форму без JS и так работает без JS. Без
+  этого правила HTML-ответ на POST шёл бы вообще без CSP — обход политики (найдено агентом
+  проверки, `docs/REVIEW_AGENT.md`). Правила proxy и next.config не пересекаются: proxy — только
+  без `Content-Length`/`Transfer-Encoding`, правило — только с ними. Тест matcher вызывает функции
+  самого Next.js (`proxy.test.ts`).
+- Та же политика без nonce — на путях, где proxy не работает (`/_next/static`, `/landing`,
+  иконки, `sw.js`, `robots.txt`, `/csp-report`): там тоже бывает HTML — страница 404 по
+  несуществующему адресу. Тест сверяет список с matcher proxy.
 - Проверено в Chromium (Playwright) на `/`, `/jobs`, фильтре, карточке, 404 и `/offline`:
   0 нарушений, service worker регистрируется.
 
@@ -82,9 +108,11 @@ report-uri /csp-report
 План перехода на enforce (до публичного релиза):
 1. ~~Сбор отчётов на собственный адрес~~ — сделано (`report-uri /csp-report`). Дальше —
    неделя закрытого теста без строк `csp-violation` в журнале web.
-2. Перейти на nonce: генерация в `proxy.ts` (бывший middleware), `script-src 'self' 'nonce-…' 'strict-dynamic'`,
-   убрать `'unsafe-inline'` из `script-src`. Учесть, что nonce делает все страницы динамическими.
-3. Переключить заголовок на `Content-Security-Policy`, добавить `upgrade-insecure-requests`.
+2. ~~Перейти на nonce~~ — сделано (`proxy.ts`, `script-src 'self' 'nonce-…' 'strict-dynamic'`,
+   без `'unsafe-inline'`), пока в режиме report-only. Дальше — неделя закрытого теста с nonce
+   без строк `csp-violation` в журнале web.
+3. Переключить заголовок на `Content-Security-Policy`, добавить `upgrade-insecure-requests`
+   (решение владельца: после этого шаг блокирует, а не только сообщает).
 4. Smoke-тест: заголовок enforce присутствует, страницы рендерятся без нарушений.
 
 ## 4. CORS
@@ -371,8 +399,9 @@ report-uri /csp-report
   отсутствующая задача — не зелёная; учитываются все страницы списка задач. Ошибки GitHub API
   (403/429/таймаут) и непонятный ответ — «ждать», а не «разворачивать». API без токена (лимит 60
   запросов в час на IP); запросы идут, только пока новый коммит ждёт развёртывания.
-- **Только fast-forward**: локальные правки на сервере или переписанная история `main`
-  останавливают обновление, ничего не перезаписывая.
+- **Только fast-forward**: локальные правки на сервере, переписанная история `main` или `main`,
+  сдвинутая назад на старый коммит (`git merge --ff-only` тогда молча ничего не делает), останавливают
+  обновление с уведомлением, ничего не перезаписывая: сервер должен быть ровно на целевом коммите.
 - **Сборка отдельно от переключения**: пока образы собираются или если сборка упала, работают
   прежние контейнеры. `docker compose up` не атомарен: при сбое переключения часть контейнеров
   может быть новой — это ловит проверка здоровья.

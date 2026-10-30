@@ -15,10 +15,28 @@ describe('security headers on every page', () => {
     expect(headers['x-frame-options']).toBe('DENY');
     expect(headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
     expect(headers['permissions-policy']).toContain('geolocation=()');
-    const csp = Object.entries(headers).find(([key]) => key.startsWith('content-security-policy'));
-    expect(csp?.[1]).toContain("frame-ancestors 'none'");
-    expect(csp?.[1]).toContain("object-src 'none'");
-    expect(csp?.[1]).toContain("form-action 'self'");
+    // CSP со своим nonce на каждый ответ ставит proxy.ts (proxy.test.ts), не next.config.
+    expect(Object.keys(headers).some((key) => key.startsWith('content-security-policy'))).toBe(
+      false,
+    );
+  });
+
+  it('a page rendered for a request with a body (form without JS) still gets a strict CSP', async () => {
+    // proxy.ts такие запросы пропускает; без этого правила HTML-ответ на POST шёл бы вообще без
+    // CSP — обход политики (ревью garantych-reviewer, PR #66).
+    const rules = await nextConfig.headers!();
+    for (const key of ['content-length', 'transfer-encoding']) {
+      const rule = rules.find(
+        (r) => r.source === '/:path*' && r.has?.some((h) => h.type === 'header' && h.key === key),
+      );
+      const csp = rule?.headers.find((h) =>
+        h.key.toLowerCase().startsWith('content-security-policy'),
+      );
+      const scriptSrc = csp?.value.split('; ').find((d) => d.startsWith('script-src ')) ?? '';
+      expect(scriptSrc, key).toBe("script-src 'self'");
+      expect(csp?.value).toContain("frame-ancestors 'none'");
+      expect(csp?.value).toContain("form-action 'self'");
+    }
   });
 
   it('does not reveal the framework', () => {

@@ -10,7 +10,7 @@ const directive = (csp: string, name: string) =>
 
 describe('buildCsp', () => {
   it('production policy has no unsafe-eval and locks down framing, objects and base', () => {
-    const csp = buildCsp({ dev: false });
+    const csp = buildCsp({ dev: false, nonce: 'abc123' });
     expect(csp).not.toContain('unsafe-eval');
     expect(csp).not.toContain('ws:');
     expect(directive(csp, 'default-src')).toEqual(["'self'"]);
@@ -21,8 +21,20 @@ describe('buildCsp', () => {
     expect(directive(csp, 'report-uri')).toEqual(['/csp-report']);
   });
 
+  it('scripts run only with the nonce of this response (AUD-02): no unsafe-inline', () => {
+    const csp = buildCsp({ dev: false, nonce: 'abc123' });
+    expect(directive(csp, 'script-src')).toEqual(["'self'", "'nonce-abc123'", "'strict-dynamic'"]);
+    expect(directive(csp, 'script-src')).not.toContain("'unsafe-inline'");
+  });
+
+  it('without a nonce (pages rendered for a request with a body) no inline script runs', () => {
+    const csp = buildCsp({ dev: false });
+    expect(directive(csp, 'script-src')).toEqual(["'self'"]);
+    expect(directive(csp, 'object-src')).toEqual(["'none'"]);
+  });
+
   it('dev policy allows what Next.js HMR needs', () => {
-    const csp = buildCsp({ dev: true });
+    const csp = buildCsp({ dev: true, nonce: 'abc123' });
     expect(directive(csp, 'script-src')).toContain("'unsafe-eval'");
     expect(directive(csp, 'connect-src')).toContain('ws:');
   });

@@ -25,6 +25,14 @@
             },
             "type": "array"
           },
+          "contactShares": {
+            "description": "Сделки, где свои контакты открыты другой стороне",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
           "contractorProfile": {
             "additionalProperties": true,
             "description": "Профиль мастера",
@@ -69,6 +77,22 @@
           },
           "messages": {
             "description": "Свои сообщения в переписке",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "photos": {
+            "description": "Свои загруженные фото, без файлов",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "plans": {
+            "description": "Планы работ по своим сделкам с этапами (общие для обеих сторон)",
             "items": {
               "additionalProperties": true,
               "type": "object"
@@ -122,7 +146,10 @@
           "reports",
           "feedback",
           "sessions",
-          "bankLogins"
+          "bankLogins",
+          "plans",
+          "photos",
+          "contactShares"
         ],
         "type": "object"
       },
@@ -941,7 +968,7 @@
         "additionalProperties": false,
         "properties": {
           "code": {
-            "description": "Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, PASSWORD_INVALID, ACCOUNT_HAS_ACTIVE_DEALS, ACCOUNT_DELETED, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, LOGIN_THROTTLED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_*",
+            "description": "Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, PASSWORD_INVALID, ACCOUNT_HAS_ACTIVE_DEALS, ACCOUNT_DELETED, ACCOUNT_IS_ADMIN, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, LOGIN_THROTTLED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_*",
             "type": "string"
           },
           "error": {
@@ -2390,7 +2417,7 @@
         "additionalProperties": false,
         "properties": {
           "code": {
-            "description": "Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, PASSWORD_INVALID, ACCOUNT_HAS_ACTIVE_DEALS, ACCOUNT_DELETED, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, LOGIN_THROTTLED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_*",
+            "description": "Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, PASSWORD_INVALID, ACCOUNT_HAS_ACTIVE_DEALS, ACCOUNT_DELETED, ACCOUNT_IS_ADMIN, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, LOGIN_THROTTLED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_*",
             "type": "string"
           },
           "error": {

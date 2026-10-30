@@ -44,10 +44,16 @@ describe('GET /account/notifications/summary', () => {
 
   it('401 when the API rejects the session; 502 without details when it fails', async () => {
     fetchMock.mockResolvedValueOnce(Response.json({ code: 'UNAUTHORIZED' }, { status: 401 }));
-    expect((await GET()).status).toBe(401);
+    const denied = await GET();
+    expect(denied.status).toBe(401);
     fetchMock.mockResolvedValueOnce(new Response('boom', { status: 500 }));
     const res = await GET();
     expect(res.status).toBe(502);
     expect(await res.json()).toEqual({ unread: null });
+    // Ревью garantych-reviewer: ответ зависит от cookie — ни один, даже ошибочный, не кэшируется.
+    expect(denied.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    state.cookie = null;
+    expect((await GET()).headers.get('cache-control')).toBe('no-store');
   });
 });

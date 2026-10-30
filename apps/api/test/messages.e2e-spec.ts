@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import sharp from 'sharp';
 import request from 'supertest';
 import { createTestApp } from './create-app';
+import { PhotosService } from '../src/photos/photos.service';
 import { MESSAGE_LIMITS, PHOTO_LIMITS } from '@agregator/shared';
 import { requiredAnswers, signUp } from './helpers';
 
@@ -315,6 +316,31 @@ describe('Job messages and photos (e2e)', () => {
       const thumbMeta = await sharp(thumb.body as Buffer).metadata();
       expect(Math.max(thumbMeta.width!, thumbMeta.height!)).toBe(480);
       await http().get(`${url}?size=huge`).set(d.owner.auth).expect(400);
+    });
+
+    it('photos from outside the deal are refused before any processing', async () => {
+      // Ревью garantych-reviewer: фото перекодировались (тяжёлая работа sharp) до проверки
+      // доступа — любой вошедший грузил бы сервер чужими заказами.
+      const d = await deal();
+      const stranger = await signUp(app, 'CONTRACTOR');
+      const prepare = jest.spyOn(app.get(PhotosService), 'prepare');
+      try {
+        const photo = await phonePhoto();
+        await http()
+          .post(`${d.base}/messages`)
+          .set(stranger.auth)
+          .attach('photos', photo, { filename: 'a.jpg', contentType: 'image/jpeg' })
+          .expect(404);
+        await http()
+          .post(`${d.base}/stages/missing/submit`)
+          .set(d.other.auth)
+          .field('comment', 'Этап готов, фото приложил')
+          .attach('photos', photo, { filename: 'a.jpg', contentType: 'image/jpeg' })
+          .expect(404);
+        expect(prepare).not.toHaveBeenCalled();
+      } finally {
+        prepare.mockRestore();
+      }
     });
 
     it('photo-only message is allowed; strangers, other jobs and wrong ids get 404', async () => {

@@ -9,8 +9,10 @@ import type { User } from '@prisma/client';
 import { writeAudit } from '../audit/audit';
 import { findDeal } from '../plans/deal';
 import { PrismaService } from '../prisma/prisma.service';
+import { visibleJobTitle } from './hidden-title';
 import { CreateReportDto } from './dto/moderation.dto';
 import { QuotaExceeded } from '../common/api-error';
+import { lockActiveUser } from '../users/lock-user';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -33,7 +35,7 @@ export class ReportsService {
     const jobId = await this.targetJob(user, dto);
     return this.prisma.$transaction(async (tx) => {
       // Жалобы одного человека — по очереди: дубликат и суточный предел считаются точно.
-      await tx.$queryRaw`SELECT id FROM users WHERE id = ${user.id} FOR UPDATE`;
+      await lockActiveUser(tx, user.id);
       const open = await tx.report.findFirst({
         where: {
           reporterId: user.id,
@@ -94,7 +96,7 @@ export class ReportsService {
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         skip: (page - 1) * limit,
         take: limit,
-        include: { job: { select: { title: true } } },
+        include: { job: { select: { title: true, hiddenAt: true, ownerId: true } } },
       }),
       this.prisma.report.count({ where }),
     ]);
@@ -105,7 +107,7 @@ export class ReportsService {
         reason: r.reason,
         status: r.status,
         jobId: r.jobId,
-        jobTitle: r.job.title,
+        jobTitle: visibleJobTitle(r.job, user.id),
         note: r.note,
         createdAt: r.createdAt.toISOString(),
         resolvedAt: r.resolvedAt?.toISOString() ?? null,

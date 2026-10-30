@@ -74,9 +74,11 @@ jobs=$(query 'select count(*) from jobs') || die 'таблица jobs не чи�
 seconds=$(($(date +%s) - started))
 
 log "миграций в копии: $applied, в репозитории: $expected; users: $users; jobs: $jobs; восстановление: ${seconds} с"
-# Копия может быть сделана до последнего обновления: миграций в ней не больше, чем в репозитории.
-if [ "$applied" -le 0 ] || [ "$applied" -gt "$expected" ]; then
-  die "миграций в копии $applied, в репозитории $expected"
+# Копия может быть сделана до последнего обновления (миграций меньше, чем в репозитории), а после
+# разрешённого отката — больше: в базе остаются миграции версии, с которой откатились.
+[ "$applied" -gt 0 ] || die "миграций в копии $applied, в репозитории $expected"
+if [ "$applied" -gt "$expected" ]; then
+  log "в копии миграций больше, чем в коде: так бывает после отката на прежнюю версию"
 fi
 write_status "$status_name" result=ok "file=$source_file" "seconds=$seconds" "migrations=$applied"
 # Внешний монитор еженедельной проверки на сервере; разовые проверки (другой RESTORE_STATUS) его

@@ -17,6 +17,7 @@ import type { ChangePasswordDto } from './dto/change-password.dto';
 import type { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import type { UpdateProfileDto } from './dto/update-profile.dto';
 import { toUserDto } from './user.mapper';
+import { lockActiveUser } from './lock-user';
 
 /** Личный кабинет: профиль, оформление, пароль, устройства и фото. Только для себя. */
 @Injectable()
@@ -44,14 +45,22 @@ export class AccountService {
         data.phone = phone;
       }
     }
-    const updated = await this.prisma.user.update({ where: { id: user.id }, data });
+    // Под строкой пользователя и только для живого аккаунта: запрос, начатый до удаления, не
+    // вернёт телефон и город в удалённый аккаунт (lock-user.ts).
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await lockActiveUser(tx, user.id);
+      return tx.user.update({ where: { id: user.id }, data });
+    });
     return toUserDto(updated);
   }
 
   async updatePreferences(user: User, dto: UpdatePreferencesDto): Promise<UserDto> {
-    const updated = await this.prisma.user.update({
-      where: { id: user.id },
-      data: { uiTheme: dto.theme, uiScale: dto.scale, uiMotion: dto.motion },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await lockActiveUser(tx, user.id);
+      return tx.user.update({
+        where: { id: user.id },
+        data: { uiTheme: dto.theme, uiScale: dto.scale, uiMotion: dto.motion },
+      });
     });
     return toUserDto(updated);
   }
@@ -92,6 +101,8 @@ export class AccountService {
         throw new UnauthorizedException('Сеанс завершён. Войдите снова');
       }
       await tx.user.update({ where: { id: user.id }, data: { passwordHash } });
+      // Выданная раньше ссылка сброса больше не действует: пароль меняют и из-за утечки.
+      await tx.passwordReset.deleteMany({ where: { userId: user.id, usedAt: null } });
       const { count } = await tx.session.deleteMany({
         where: { userId: user.id, id: { not: sessionId } },
       });
@@ -162,6 +173,7 @@ export class AccountService {
     // Копия в собственный ArrayBuffer: Prisma принимает Bytes как Uint8Array<ArrayBuffer>.
     const data = new Uint8Array(await processAvatar(file));
     const updated = await this.prisma.$transaction(async (tx) => {
+      await lockActiveUser(tx, user.id);
       await tx.userAvatar.upsert({
         where: { userId: user.id },
         create: { userId: user.id, data },
@@ -174,6 +186,7 @@ export class AccountService {
 
   async deleteAvatar(user: User): Promise<UserDto> {
     const updated = await this.prisma.$transaction(async (tx) => {
+      await lockActiveUser(tx, user.id);
       await tx.userAvatar.deleteMany({ where: { userId: user.id } });
       return tx.user.update({ where: { id: user.id }, data: { avatarUpdatedAt: null } });
     });

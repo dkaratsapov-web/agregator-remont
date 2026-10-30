@@ -46,9 +46,12 @@ CMD ["node", "dist/main.js"]
 FROM node:22-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392 AS web
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 WORKDIR /app
-COPY --from=build --chown=node:node /repo/apps/web/.next/standalone ./
-COPY --from=build --chown=node:node /repo/apps/web/.next/static ./apps/web/.next/static
-COPY --from=build --chown=node:node /repo/apps/web/public ./apps/web/public
+# Код и статика принадлежат root: процесс сайта (node) не может переписать свой server.js.
+# Писать он может только в кэш Next.js (оптимизация картинок, кэш запросов).
+COPY --from=build /repo/apps/web/.next/standalone ./
+COPY --from=build /repo/apps/web/.next/static ./apps/web/.next/static
+COPY --from=build /repo/apps/web/public ./apps/web/public
+RUN mkdir -p apps/web/.next/cache && chown node:node apps/web/.next/cache
 USER node
 EXPOSE 3000
 CMD ["node", "apps/web/server.js"]

@@ -11,6 +11,7 @@ import { QuotaExceeded } from '../common/api-error';
 import { ENTITY_ID_PATTERN } from '../common/text';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CreateFeedbackDto, ListFeedbackQuery } from './dto/feedback.dto';
+import { lockActiveUser } from '../users/lock-user';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** «Мои обращения»: последние обращения человека, больше в кабинете не нужно. */
@@ -44,7 +45,7 @@ export class FeedbackService {
   async create(user: User, dto: CreateFeedbackDto): Promise<FeedbackDto> {
     const since = new Date(Date.now() - DAY_MS);
     return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM users WHERE id = ${user.id} FOR UPDATE`;
+      await lockActiveUser(tx, user.id);
       const today = await tx.feedback.findMany({
         where: { userId: user.id, createdAt: { gt: since } },
         orderBy: { createdAt: 'asc' },

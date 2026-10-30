@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Проверки сервера раз в час (таймер из install.sh): место на диске, срок сертификата HTTPS,
 # синхронизация времени, ответ сайта, свежесть и место резервных копий (local-only или вне
-# сервера), проверка восстановления, работа канала уведомлений. О проблеме — уведомление
+# сервера), проверка восстановления, зависшее автообновление, работа канала уведомлений. О проблеме — уведомление
 # (notify.sh), не чаще раза в сутки на каждую проблему.
 # Внешний монитор: MONITOR_HEARTBEAT_URL (healthchecks.io и т. п., период 1 ч). Без проблем
 # скрипт отправляет на него «жив», с проблемами — «<адрес>/fail». Если сервер лёг целиком или
@@ -71,6 +71,13 @@ if [ -z "$restore_at" ] || [ $((now - restore_at)) -gt $((8 * 86400)) ]; then
   alert restore-stale 'проверки восстановления из копии не было больше 8 дней (agregator-restore-check)'
 elif [ "$(status_value restore-status result)" != ok ]; then
   alert restore-failed "последняя проверка восстановления не прошла: $(status_value restore-status reason)"
+fi
+
+# Автообновление ждёт (CI не закончился, GitHub не отвечает) дольше порога: сервер отстаёт от main.
+DEPLOY_WAIT_ALERT_HOURS=${DEPLOY_WAIT_ALERT_HOURS:-6}
+waiting_since=$(status_value waiting since)
+if [ -n "$waiting_since" ] && [ $((now - waiting_since)) -gt $((DEPLOY_WAIT_ALERT_HOURS * 3600)) ]; then
+  alert deploy-waiting "обновление ждёт CI или ответа GitHub $(((now - waiting_since) / 3600)) ч: journalctl -u agregator-deploy"
 fi
 
 if command -v timedatectl > /dev/null; then

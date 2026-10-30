@@ -9,6 +9,7 @@ import type { Prisma } from '@prisma/client';
 import { writeAudit } from '../audit/audit';
 import { ENTITY_ID_PATTERN } from '../common/text';
 import { toProfileDto } from '../contractors/profile.mapper';
+import { visibleJobTitle } from '../moderation/hidden-title';
 import { PrismaService } from '../prisma/prisma.service';
 import { ContractorReviewsQuery, CreateReviewDto } from './dto/review.dto';
 import { ratingsFor } from './ratings';
@@ -21,7 +22,7 @@ const REVIEW_SELECT = {
   text: true,
   createdAt: true,
   author: { select: { name: true } },
-  job: { select: { title: true } },
+  job: { select: { title: true, hiddenAt: true, ownerId: true } },
 } as const;
 
 function toReviewDto(row: Prisma.ReviewGetPayload<{ select: typeof REVIEW_SELECT }>): ReviewDto {
@@ -30,7 +31,8 @@ function toReviewDto(row: Prisma.ReviewGetPayload<{ select: typeof REVIEW_SELECT
     rating: row.rating,
     text: row.text,
     authorName: row.author.name,
-    jobTitle: row.job.title,
+    // Отзывы видны на публичной карточке мастера: название скрытого заказа — заглушкой.
+    jobTitle: visibleJobTitle(row.job),
     createdAt: row.createdAt.toISOString(),
   };
 }

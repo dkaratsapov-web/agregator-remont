@@ -277,6 +277,12 @@ jobs:
           fi
           bash scripts/image-secrets-check.sh agregator-api:local agregator-web:local
 
+      - name: Web process cannot rewrite its own code
+        run: |
+          # Ревью garantych-reviewer: код сайта принадлежал node — процесс мог переписать server.js.
+          docker run --rm --entrypoint sh agregator-web:local -c \
+            'test ! -w apps/web/server.js && test ! -w apps/web/.next/static && test -w apps/web/.next/cache'
+
       - name: Wait for web
         run: |
           for i in $(seq 1 60); do
