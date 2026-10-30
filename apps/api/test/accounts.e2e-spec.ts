@@ -1,4 +1,5 @@
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { FAVORITE_LIMITS } from '@agregator/shared';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { createTestApp } from './create-app';
@@ -374,6 +375,40 @@ describe('Accounts and trust (e2e)', () => {
       await http().delete(`/v1/me/favorites/${ids[0]}`).set(contractor.auth).expect(200);
       const empty = await http().get('/v1/me/favorites/ids').set(contractor.auth).expect(200);
       expect(empty.body.jobIds).toEqual([]);
+    });
+
+    it('jobs hidden by a moderator do not take room in the limit', async () => {
+      // Ревью garantych-reviewer: скрытые закладки человек не видит и убрать не может, а предел
+      // их считал — избранное «заполнялось» навсегда.
+      const owner = await signUp(app, 'CUSTOMER');
+      const contractor = await signUp(app, 'CONTRACTOR');
+      const { body: hidden } = await http().post('/v1/me/jobs').set(owner.auth).send(jobBody);
+      await http().put(`/v1/me/favorites/${hidden.id}`).set(contractor.auth).expect(200);
+      await prisma.job.update({ where: { id: hidden.id }, data: { hiddenAt: new Date() } });
+      // Остальные места заняты видимыми заказами (вставка напрямую: заказов нужно много).
+      const { title, description, category, city, ownerId, status } =
+        await prisma.job.findUniqueOrThrow({ where: { id: hidden.id } });
+      const filler = await prisma.job.createManyAndReturn({
+        data: Array.from({ length: FAVORITE_LIMITS.MAX - 1 }, () => ({
+          title,
+          description,
+          category,
+          city,
+          ownerId,
+          status,
+        })),
+        select: { id: true },
+      });
+      await prisma.favoriteJob.createMany({
+        data: filler.map(({ id }) => ({ userId: contractor.id, jobId: id })),
+      });
+      const [last, over] = await prisma.job.createManyAndReturn({
+        data: [0, 1].map(() => ({ title, description, category, city, ownerId, status })),
+        select: { id: true },
+      });
+      // Место скрытой закладки свободно: последнее видимое проходит, следующее — уже нет.
+      await http().put(`/v1/me/favorites/${last.id}`).set(contractor.auth).expect(200);
+      await http().put(`/v1/me/favorites/${over.id}`).set(contractor.auth).expect(409);
     });
   });
 

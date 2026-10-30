@@ -58,7 +58,9 @@ export class FavoritesService {
         select: { jobId: true },
       });
       if (exists) return;
-      if ((await tx.favoriteJob.count({ where: { userId } })) >= FAVORITE_LIMITS.MAX) {
+      // Считаются только видимые: скрытые модератором человек не видит и убрать не может.
+      const count = await tx.favoriteJob.count({ where: { userId, job: { hiddenAt: null } } });
+      if (count >= FAVORITE_LIMITS.MAX) {
         throw new ConflictException(
           `В избранном может быть не больше ${FAVORITE_LIMITS.MAX} заказов: уберите ненужные`,
         );
