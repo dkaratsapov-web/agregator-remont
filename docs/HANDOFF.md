@@ -55,6 +55,11 @@
   `account-deletion.e2e-spec.ts` и строкой в `docs/ACCOUNTS.md`.
 - Проверка владельца `/opt/agregator` в `install.sh` (каталог должен принадлежать root).
 - Повторный прогон агента `garantych-reviewer` после слияния #66 по всему main.
+- Обновить Playwright (сейчас 1.56) до версии с поддержкой Ubuntu 26.04 и вернуть CI на
+  `ubuntu-latest`. Пока образ раннеров закреплён на `ubuntu-24.04` (`.github/workflows/ci.yml`).
+- `pnpm audit --prod --audit-level high` в CI падает на каждом новом предупреждении о
+  транзитивной зависимости. Исправление: override в `pnpm-workspace.yaml` с номером GHSA в
+  комментарии, как у `effect`, `multer` и `body-parser`.
 
 ## Локальная проверка
 
