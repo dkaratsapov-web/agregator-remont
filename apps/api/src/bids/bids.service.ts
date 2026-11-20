@@ -18,6 +18,7 @@ import { CreateBidDto } from './dto/create-bid.dto';
 import { PaginationQuery } from '../jobs/dto/list-jobs.query';
 import { ListMyBidsQuery } from './dto/list-my-bids.query';
 import { ApiError, QuotaExceeded } from '../common/api-error';
+import { lockActiveUser } from '../users/lock-user';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const JOB_NOT_FOUND = 'Заказ не найден';
@@ -49,7 +50,7 @@ export class BidsService {
     try {
       const bid = await this.prisma.$transaction(async (tx) => {
         // Квота откликов: создания одного подрядчика выполняются по очереди.
-        await tx.$queryRaw`SELECT id FROM users WHERE id = ${contractorId} FOR UPDATE`;
+        await lockActiveUser(tx, contractorId);
         const today = await tx.bid.count({
           where: { contractorId, createdAt: { gt: new Date(Date.now() - DAY_MS) } },
         });
@@ -111,6 +112,7 @@ export class BidsService {
           jobId,
           kind: 'BID_RECEIVED',
           data: { price: created.price, durationDays: created.durationDays ?? undefined },
+          bidId: created.id,
         });
         return created;
       });
@@ -233,10 +235,16 @@ export class BidsService {
       const lockedBid = await tx.$queryRaw<{ id: string }[]>`
         SELECT id FROM bids WHERE id = ${bidId} AND job_id = ${jobId} FOR UPDATE`;
       if (lockedBid.length === 0) throw new NotFoundException(BID_NOT_FOUND);
-      const bid = await tx.bid.findUniqueOrThrow({ where: { id: bidId } });
+      const bid = await tx.bid.findUniqueOrThrow({
+        where: { id: bidId },
+        include: { contractor: { select: { blockedAt: true, deletedAt: true } } },
+      });
       if (bid.hiddenAt) throw new NotFoundException(BID_NOT_FOUND);
       if (bid.status !== 'PENDING') {
         throw new ApiError(409, 'BID_NOT_PENDING', 'Этот отклик уже нельзя выбрать');
+      }
+      if (bid.contractor.blockedAt || bid.contractor.deletedAt) {
+        throw new ApiError(409, 'BID_NOT_PENDING', 'Этот мастер больше недоступен');
       }
 
       const updated = await tx.bid.update({

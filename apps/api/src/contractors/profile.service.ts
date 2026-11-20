@@ -5,6 +5,7 @@ import { writeAudit } from '../audit/audit';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpsertProfileDto } from './dto/profile.dto';
 import { toProfileDto } from './profile.mapper';
+import { lockActiveUser } from '../users/lock-user';
 
 /** Содержимое профиля для журнала (без служебных дат). */
 function snapshot(profile: ContractorProfile | null) {
@@ -36,7 +37,7 @@ export class ProfileService {
       // Блокировка строки пользователя до чтения профиля: изменения профиля одного подрядчика,
       // включая самое первое создание, выполняются по очереди, и «было» в журнале — это
       // действительно предыдущее состояние.
-      await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+      await lockActiveUser(tx, userId);
       const before = await tx.contractorProfile.findUnique({ where: { userId } });
       const saved = await tx.contractorProfile.upsert({
         where: { userId },

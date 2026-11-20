@@ -7,6 +7,7 @@ import {
 } from '@agregator/shared';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import { visibleJobTitle } from '../moderation/hidden-title';
 import { PrismaService } from '../prisma/prisma.service';
 import { ListNotificationsQuery, MarkNotificationsReadDto } from './dto/notifications.dto';
 
@@ -21,19 +22,24 @@ const NOTIFICATION_SELECT = {
   job: { select: { title: true, ownerId: true, hiddenAt: true } },
 } as const;
 
-/** Название скрытого модератором заказа видит только владелец (аудит 23.10.2026, F-07). */
-export const HIDDEN_JOB_TITLE = 'Заказ скрыт модератором';
 type NotificationRow = Prisma.NotificationGetPayload<{ select: typeof NOTIFICATION_SELECT }>;
+
+/** bidId — внутренняя ссылка (скрытие отклика удаляет его уведомления), наружу не отдаётся. */
+function publicData(data: Prisma.JsonValue): NotificationData {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- поле убирается из ответа
+  const { bidId, ...rest } = (data ?? {}) as NotificationData & { bidId?: string };
+  return rest;
+}
 
 function toNotificationDto(userId: string, row: NotificationRow): NotificationDto {
   return {
     id: row.id,
     kind: row.kind,
     jobId: row.jobId,
-    jobTitle: row.job.hiddenAt && row.job.ownerId !== userId ? HIDDEN_JOB_TITLE : row.job.title,
+    jobTitle: visibleJobTitle(row.job, userId),
     party: row.job.ownerId === userId ? 'OWNER' : 'CONTRACTOR',
     count: row.count,
-    data: row.data as NotificationData,
+    data: publicData(row.data),
     read: row.readAt !== null,
     createdAt: row.createdAt.toISOString(),
   };

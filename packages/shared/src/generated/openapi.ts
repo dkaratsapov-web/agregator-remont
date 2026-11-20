@@ -1253,6 +1253,10 @@ export interface components {
             bids: {
                 [key: string]: unknown;
             }[];
+            /** @description Сделки, где свои контакты открыты другой стороне */
+            contactShares: {
+                [key: string]: unknown;
+            }[];
             /** @description Профиль мастера */
             contractorProfile: {
                 [key: string]: unknown;
@@ -1277,6 +1281,14 @@ export interface components {
             }[];
             /** @description Свои сообщения в переписке */
             messages: {
+                [key: string]: unknown;
+            }[];
+            /** @description Свои загруженные фото, без файлов */
+            photos: {
+                [key: string]: unknown;
+            }[];
+            /** @description Планы работ по своим сделкам с этапами (общие для обеих сторон) */
+            plans: {
                 [key: string]: unknown;
             }[];
             /** @description Свои жалобы */
@@ -1499,7 +1511,7 @@ export interface components {
             password: string;
         };
         ErrorResponse: {
-            /** @description Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, PASSWORD_INVALID, ACCOUNT_HAS_ACTIVE_DEALS, ACCOUNT_DELETED, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, LOGIN_THROTTLED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_* */
+            /** @description Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, PASSWORD_INVALID, ACCOUNT_HAS_ACTIVE_DEALS, ACCOUNT_DELETED, ACCOUNT_IS_ADMIN, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, LOGIN_THROTTLED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_* */
             code: string;
             /** @description Текстовое имя статуса */
             error: string;
@@ -1854,7 +1866,7 @@ export interface components {
             role: components["schemas"]["SelfServiceRole"];
         };
         OAuthNeedRoleError: {
-            /** @description Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, PASSWORD_INVALID, ACCOUNT_HAS_ACTIVE_DEALS, ACCOUNT_DELETED, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, LOGIN_THROTTLED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_* */
+            /** @description Машинный код: VALIDATION_FAILED, BAD_REQUEST, NO_FIELDS_TO_UPDATE, BUDGET_RANGE_INVALID, UNAUTHENTICATED, INVALID_CREDENTIALS, FORBIDDEN, FORBIDDEN_ROLE, NOT_FOUND, CONFLICT, EMAIL_TAKEN, JOB_NOT_OPEN, JOB_ALREADY_CLOSED, BID_ALREADY_EXISTS, BID_NOT_PENDING, PASSWORD_INVALID, ACCOUNT_HAS_ACTIVE_DEALS, ACCOUNT_DELETED, ACCOUNT_IS_ADMIN, GONE, PAYLOAD_TOO_LARGE, UNPROCESSABLE, RATE_LIMITED, LOGIN_THROTTLED, DAILY_QUOTA_EXCEEDED, INTERNAL, BAD_GATEWAY, UNAVAILABLE; вход через банк — OAUTH_* */
             code: string;
             /** @description Текстовое имя статуса */
             error: string;

@@ -9,6 +9,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { ENTITY_ID_PATTERN } from '../common/text';
 import { toJobDto } from '../jobs/job.mapper';
 import { PrismaService } from '../prisma/prisma.service';
+import { lockActiveUser } from '../users/lock-user';
 
 const JOB_NOT_FOUND = 'Заказ не найден';
 
@@ -49,7 +50,7 @@ export class FavoritesService {
     if (!ENTITY_ID_PATTERN.test(jobId)) throw new NotFoundException(JOB_NOT_FOUND);
     await this.prisma.$transaction(async (tx) => {
       // Закладки одного человека — по очереди: предел считается точно.
-      await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+      await lockActiveUser(tx, userId);
       const job = await tx.job.findUnique({ where: { id: jobId }, select: { hiddenAt: true } });
       if (!job || job.hiddenAt) throw new NotFoundException(JOB_NOT_FOUND);
       const exists = await tx.favoriteJob.findUnique({
@@ -57,7 +58,9 @@ export class FavoritesService {
         select: { jobId: true },
       });
       if (exists) return;
-      if ((await tx.favoriteJob.count({ where: { userId } })) >= FAVORITE_LIMITS.MAX) {
+      // Считаются только видимые: скрытые модератором человек не видит и убрать не может.
+      const count = await tx.favoriteJob.count({ where: { userId, job: { hiddenAt: null } } });
+      if (count >= FAVORITE_LIMITS.MAX) {
         throw new ConflictException(
           `В избранном может быть не больше ${FAVORITE_LIMITS.MAX} заказов: уберите ненужные`,
         );

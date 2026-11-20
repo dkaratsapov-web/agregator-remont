@@ -20,3 +20,5 @@ overrides:
   multer@>=2.0.0 <2.5.0: ^2.5.0
   # GHSA-27r3-jxmh-p828: @nestjs/platform-express -> express -> body-parser 2.3.0 (патч в 2.4.0).
   body-parser@>=2.0.0 <2.4.0: ^2.4.0
+  # GHSA-7589-6fvf-x4pw: prisma -> @prisma/config -> effect 3.21.0 (ReDoS, патч в 3.22.1).
+  effect@<3.22.1: ^3.22.1

@@ -1039,11 +1039,9 @@ describe('API contract (e2e)', () => {
       owner.auth.Authorization = `Bearer ${relogged.body.token}`;
       await check('post', RESET, reset(link.body.token), 400);
       const blockedLink = await issue(contractor.id, admin).expect(201);
-      await http()
-        .post(`/v1/admin/users/${contractor.id}/blocked`)
-        .set(admin.auth)
-        .send({ blocked: true, reason: 'Проверка блокировки' })
-        .expect(200);
+      // Блокировка через API гасит выданные ссылки (тогда ответ 400); 403 — когда ссылка
+      // пережила блокировку (например, её записал прежний код после отката).
+      await prisma.user.update({ where: { id: contractor.id }, data: { blockedAt: new Date() } });
       await check('post', RESET, reset(blockedLink.body.token), 403);
       await check('post', PR, issue(contractor.id, admin), 409);
       await http()

@@ -127,22 +127,32 @@ def split_top(text):
     return parts
 
 
+# Имя таблицы как в Postgres: «схема.таблица», без кавычек регистр приводится к нижнему,
+# в кавычках сохраняется; без схемы — public. Иначе «новая» таблица "Jobs" или audit.jobs
+# сделала бы безопасными изменения существующей jobs (ревью garantych-reviewer).
+IDENT = r'(?:"(?:[^"]|"")+"|[^\s"(),;.]+)'
+QUALIFIED = rf'{IDENT}(?:\s*\.\s*{IDENT})?'
+
+
 def name(identifier):
-    return identifier.split('.')[-1].strip('"').lower()
+    parts = [p.strip() for p in re.findall(IDENT, identifier)]
+    parts = [p[1:-1].replace('""', '"') if p.startswith('"') else p.lower() for p in parts]
+    return '.'.join((['public'] + parts)[-2:])
 
 
 def created_table(stmt):
-    found = re.match(r'create (?:unlogged )?table (?:if not exists )?(\S+?)\s*\(', stmt, re.IGNORECASE)
+    # IF NOT EXISTS не создаёт таблицу, если она уже есть: такую не считаем новой.
+    found = re.match(rf'create (?:unlogged )?table ({QUALIFIED})\s*\(', stmt, re.IGNORECASE)
     return name(found.group(1)) if found else None
 
 
-def blocking_reference(s, new_tables):
+def blocking_reference(stmt, new_tables):
     """Ссылка на существующую таблицу, которая помешает прежнему коду удалять её строки."""
-    for found in re.finditer(r'references (\S+?)\s*\(', s):
+    for found in re.finditer(rf'\breferences\s+({QUALIFIED})', stmt, re.IGNORECASE):
         target = name(found.group(1))
-        rest = s[found.end():].split(' references ')[0]
-        on_delete = re.search(r'on delete (cascade|set null|set default|restrict|no action)', rest)
-        if target not in new_tables and (not on_delete or on_delete.group(1) in ('restrict', 'no action')):
+        rest = re.split(r'\breferences\b', stmt[found.end():], flags=re.IGNORECASE)[0]
+        on_delete = re.search(r'on delete (cascade|set null|set default|restrict|no action)', rest, re.IGNORECASE)
+        if target not in new_tables and (not on_delete or on_delete.group(1).lower() in ('restrict', 'no action')):
             return (f'внешний ключ на существующую таблицу {target} без ON DELETE CASCADE/SET NULL: '
                     'прежний код не сможет удалить строку, на которую ссылается новая')
     return None
@@ -151,29 +161,37 @@ def blocking_reference(s, new_tables):
 def danger(stmt, new_tables):
     """None — безопасно, иначе причина."""
     s = stmt.lower()
+    if re.match(r'create (unlogged )?table if not exists ', s):
+        return 'CREATE TABLE IF NOT EXISTS: таблица может уже существовать — нужна проверка вручную'
     if re.match(r'create (unlogged )?table ', s) and created_table(stmt):
-        return blocking_reference(s, new_tables)
+        return blocking_reference(stmt, new_tables)
     if re.match(r'create type \S+ as enum\b', s) or re.match(r'create extension\b', s):
         return None
     if re.match(r'comment on\b', s) or re.match(r'(update|insert into)\b', s):
         return None
     if re.match(r'create index\b', s):
         return None
-    unique = re.match(r'create unique index (?:concurrently )?(?:if not exists )?\S+ on (?:only )?(\S+?)[\s(]', s)
+    unique = re.match(rf'create unique index (?:concurrently )?(?:if not exists )?{IDENT} on (?:only )?({QUALIFIED})',
+                      stmt, re.IGNORECASE)
     if unique:
         if name(unique.group(1)) in new_tables:
             return None
         return 'уникальный индекс на существующей таблице: прежний код может его нарушить'
-    alter = re.match(r'alter table (?:if exists )?(?:only )?(\S+)\s+(.*)', s)
+    alter = re.match(rf'alter table (?:if exists )?(?:only )?({QUALIFIED})\s+(.*)', stmt, re.IGNORECASE)
     if alter:
         if name(alter.group(1)) in new_tables:
-            return blocking_reference(s, new_tables)
-        for action in split_top(alter.group(2)):
+            return blocking_reference(stmt, new_tables)
+        for original in split_top(alter.group(2)):
+            action = original.lower()
             if re.match(r'add (?:column )?(?!constraint\b|primary\b|unique\b|foreign\b|check\b|exclude\b)', action):
                 if 'not null' in action and 'default' not in action:
                     return 'обязательный столбец без DEFAULT: прежний код его не заполняет'
                 if re.search(r'\b(check|primary key|generated)\b', action):
                     return f'новый столбец с ограничением: «{action[:80]}»'
+                # Внешний ключ прямо в новом столбце — та же ссылка, что и у новой таблицы.
+                reference = blocking_reference(original, new_tables)
+                if reference:
+                    return reference
                 continue
             if re.match(r'alter (?:column )?\S+ set default\b', action):
                 continue

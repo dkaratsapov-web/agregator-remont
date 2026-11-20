@@ -74,6 +74,11 @@ describe('parseQuery and parseCity', () => {
     ['  плитка ', 'плитка'],
     [['ванна', 'кухня'], 'ванна'],
     ['а'.repeat(101), undefined],
+    // Длину считаем как API (class-validator): эмодзи — один символ, FE0F не в счёт. Иначе API
+    // отвечает 400, и каталог показывает «сервис недоступен» (ревью garantych-reviewer).
+    ['😀', undefined],
+    ['❤️', undefined],
+    ['a😀', 'a😀'],
   ])('query %j -> %j', (raw, expected) => {
     expect(parseQuery(raw)).toBe(expected);
   });
@@ -82,6 +87,7 @@ describe('parseQuery and parseCity', () => {
     expect(parseCity(' Тверь ')).toBe('Тверь');
     expect(parseCity('Т')).toBeUndefined();
     expect(parseCity('а'.repeat(101))).toBeUndefined();
+    expect(parseCity('😀')).toBeUndefined();
   });
 });
 

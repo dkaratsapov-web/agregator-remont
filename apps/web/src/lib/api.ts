@@ -1,4 +1,6 @@
 import 'server-only';
+import { headers as nextHeaders } from 'next/headers';
+import { clientIpFromForwardedFor, parseTrustProxyHops } from './client-ip';
 import type {
   AdminFeedbackDto,
   FeedbackDto,
@@ -98,11 +100,28 @@ function apiBaseUrl(): string {
   return url.replace(/\/+$/, '');
 }
 
+/**
+ * Адрес посетителя из запроса, который сейчас обрабатывает web (те же доверенные прокси, что и в
+ * getClientIp). Без него API считает лимит запросов по адресу web — один на всех посетителей:
+ * чтение страниц, фото и переписки упирается в общий предел 120 в минуту. Вне обработки запроса
+ * (сборка, фоновая задача) адреса нет.
+ */
+async function currentClientIp(): Promise<string | undefined> {
+  const hops = parseTrustProxyHops(process.env.WEB_TRUST_PROXY_HOPS);
+  if (hops < 1) return undefined;
+  try {
+    return clientIpFromForwardedFor((await nextHeaders()).get('x-forwarded-for'), hops);
+  } catch {
+    return undefined;
+  }
+}
+
 async function request(path: string, options: RequestOptions = {}): Promise<Response> {
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
-  if (options.clientIp) headers['X-Forwarded-For'] = options.clientIp;
+  const clientIp = options.clientIp ?? (await currentClientIp());
+  if (clientIp) headers['X-Forwarded-For'] = clientIp;
   if (options.userAgent) headers['X-Client-User-Agent'] = options.userAgent.slice(0, 512);
 
   try {

@@ -63,10 +63,15 @@ fi
 git fetch --quiet origin "$BRANCH"
 target=$(git rev-parse "origin/$BRANCH")
 deployed=$(cat "$STATE_DIR/deployed" 2> /dev/null || true)
-[ "$deployed" = "$target" ] && exit 0
-if [ -f "$STATE_DIR/failed" ] && [ "$(cat "$STATE_DIR/failed")" = "$target" ]; then
+if [ "$deployed" = "$target" ] ||
+  { [ -f "$STATE_DIR/failed" ] && [ "$(cat "$STATE_DIR/failed")" = "$target" ]; }; then
+  rm -f "$STATE_DIR/waiting"
   exit 0
 fi
+# Начало ожидания (CI ещё идёт, GitHub не отвечает): monitor.sh поднимет тревогу, если сервер
+# отстаёт от main дольше DEPLOY_WAIT_ALERT_HOURS. Иначе при постоянном отказе GitHub API
+# (репозиторий стал приватным, переименован) автообновление остановилось бы молча.
+[ -f "$STATE_DIR/waiting" ] || printf 'since=%s\n' "$(date +%s)" > "$STATE_DIR/waiting"
 
 # Неудача. Временные сбои (сборка, переключение, проверка) повторяются до DEPLOY_ATTEMPTS раз при
 # следующих запусках; после последней попытки коммит помечается неудачным и владелец получает
@@ -151,9 +156,15 @@ esac
 # --- Обновление ------------------------------------------------------------------------------
 current=$(git rev-parse HEAD)
 log "обновление $current -> $target"
-if ! git merge --ff-only --quiet "origin/$BRANCH"; then
-  log 'fast-forward невозможен (локальные изменения на сервере?), остановлено'
+# Только вперёд: main должен продолжать код на сервере. Если main сдвинули назад на старый
+# коммит, git merge --ff-only ответит «уже актуально» с кодом 0, и под старым SHA собрался бы и
+# записался текущий код. Вернуться на старую версию — rollback.sh, отменить изменение — git
+# revert через PR.
+if ! git merge-base --is-ancestor HEAD "$target" || ! git merge --ff-only --quiet "$target" ||
+  [ "$(git rev-parse HEAD)" != "$target" ]; then
+  log 'fast-forward невозможен: main не продолжает код на сервере (локальные изменения на сервере или main сдвинули назад), остановлено'
   echo "$target" > "$STATE_DIR/failed"
+  notify "обновление ${target:0:12} остановлено: main не продолжает код на сервере (${current:0:12}). Откат — rollback.sh, отмена изменения — git revert через PR"
   exit 1
 fi
 
@@ -238,7 +249,7 @@ done
 [ -z "$problem" ] || fail "проверка после обновления: $problem" retry
 
 echo "$target" > "$STATE_DIR/deployed"
-rm -f "$STATE_DIR/failed" "$STATE_DIR/attempts"
+rm -f "$STATE_DIR/failed" "$STATE_DIR/attempts" "$STATE_DIR/waiting"
 # История для отката: последние развёрнутые коммиты, новые в конце.
 { grep -v "^$target\$" "$STATE_DIR/history" 2> /dev/null || true; echo "$target"; } |
   tail -n 20 > "$STATE_DIR/history.new" && mv "$STATE_DIR/history.new" "$STATE_DIR/history"

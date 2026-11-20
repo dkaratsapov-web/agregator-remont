@@ -86,6 +86,44 @@ export interface AccountExportDto {
     reply: string | null;
     repliedAt: string | null;
   }[];
+  /**
+   * Планы работ по своим сделкам — как заказчика и как исполнителя (план общий для обеих
+   * сторон). У этапа — число фото-отчётов.
+   */
+  plans: {
+    jobId: string;
+    author: string;
+    sequential: boolean;
+    status: string;
+    returnReason: string | null;
+    proposedAt: string | null;
+    approvedAt: string | null;
+    stages: {
+      position: number;
+      title: string;
+      description: string;
+      durationDays: number | null;
+      status: string;
+      submitComment: string | null;
+      reworkComment: string | null;
+      submittedAt: string | null;
+      acceptedAt: string | null;
+      photos: number;
+    }[];
+  }[];
+  /** Свои загруженные фото (в переписке и к этапам): без самих файлов. */
+  photos: {
+    id: string;
+    jobId: string;
+    stageId: string | null;
+    messageId: string | null;
+    width: number;
+    height: number;
+    bytes: number;
+    createdAt: string;
+  }[];
+  /** Сделки, в которых свои контакты открыты другой стороне. */
+  contactShares: { jobId: string; createdAt: string }[];
   sessions: { device: string | null; createdAt: string; lastSeenAt: string | null }[];
   bankLogins: { provider: string; createdAt: string }[];
 }

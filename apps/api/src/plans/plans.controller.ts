@@ -154,6 +154,8 @@ export class PlansController {
     @Body() dto: PlanCommentDto,
     @UploadedFiles() files: UploadedPhoto[] | undefined,
   ): Promise<JobPlanDto> {
+    // Перекодирование фото — тяжёлая работа: сначала проверка, что сдаёт исполнитель сделки.
+    if (files?.length) await this.plans.assertContractor(auth.user.id, jobId);
     const photos = await this.photos.prepare(files);
     return this.plans.submitStage(auth.user.id, jobId, stageId, dto, photos);
   }

@@ -14,15 +14,18 @@ export async function notify(
     jobId: string;
     kind: Exclude<NotificationKind, 'MESSAGE'>;
     data?: NotificationData;
+    /** Отклик, о котором уведомление: хранится в данных, чтобы скрытие отклика убрало и его. */
+    bidId?: string;
   },
 ): Promise<void> {
   if (!entry.userId || entry.userId === entry.actorId) return;
+  const data = { ...(entry.data ?? {}), ...(entry.bidId ? { bidId: entry.bidId } : {}) };
   await db.notification.create({
     data: {
       userId: entry.userId,
       jobId: entry.jobId,
       kind: entry.kind,
-      data: (entry.data ?? {}) as Prisma.InputJsonValue,
+      data: data as Prisma.InputJsonValue,
     },
   });
 }

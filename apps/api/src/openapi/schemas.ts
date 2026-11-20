@@ -262,6 +262,9 @@ export class AccountExportSchema {
   @looseList('Свои обращения в поддержку с ответами') feedback!: unknown[];
   @looseList('Действующие сеансы') sessions!: unknown[];
   @looseList('Привязанные входы через банк') bankLogins!: unknown[];
+  @looseList('Планы работ по своим сделкам с этапами (общие для обеих сторон)') plans!: unknown[];
+  @looseList('Свои загруженные фото, без файлов') photos!: unknown[];
+  @looseList('Сделки, где свои контакты открыты другой стороне') contactShares!: unknown[];
 }
 
 @ApiSchema({ name: 'AuthSessionDto' })

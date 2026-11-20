@@ -305,6 +305,65 @@ describe('Moderation (e2e)', () => {
       }).expect(404);
     });
 
+    it('the title of a hidden job stays with its owner: not in bids, reports or the public card', async () => {
+      // Ревью garantych-reviewer: название скрытого заказа утекало в «Мои отклики» мастера,
+      // в «Мои жалобы» и в отзывы на публичной карточке мастера (как F-07 у уведомлений).
+      const d = await deal();
+      const admin = await signUpAdmin(app, prisma);
+      const reporter = await signUp(app, 'CONTRACTOR');
+      await report(reporter, { targetType: 'JOB', targetId: d.jobId, reason: 'SPAM' }).expect(201);
+      await http()
+        .post(`/v1/me/jobs/${d.jobId}/close`)
+        .set(d.owner.auth)
+        .send({ outcome: 'COMPLETED' })
+        .expect(200);
+      await http()
+        .post(`/v1/me/jobs/${d.jobId}/review`)
+        .set(d.owner.auth)
+        .send({ rating: 5, text: 'Всё сделано аккуратно и в срок, рекомендую.' })
+        .expect(201);
+      await http()
+        .post(`/v1/admin/jobs/${d.jobId}/hidden`)
+        .set(admin.auth)
+        .send({ hidden: true, reason: 'Контакты в названии' })
+        .expect(200);
+
+      const { publicId } = await prisma.user.findUniqueOrThrow({ where: { id: d.contractor.id } });
+      const seen = [
+        await http().get('/v1/me/bids').set(d.contractor.auth).expect(200),
+        await http().get('/v1/reports/mine').set(reporter.auth).expect(200),
+        await http().get(`/v1/contractors/${publicId}`).expect(200),
+      ];
+      for (const res of seen) {
+        expect(JSON.stringify(res.body)).not.toContain(jobBody.title);
+        expect(JSON.stringify(res.body)).toContain('Заказ скрыт модератором');
+      }
+      // Владелец своё название видит.
+      const own = await http().get(`/v1/me/jobs/${d.jobId}`).set(d.owner.auth).expect(200);
+      expect(own.body.title).toBe(jobBody.title);
+    });
+
+    it('a hidden bid takes its notification with it: no price in the bell or the list', async () => {
+      // Ревью garantych-reviewer: отклик скрыт, а уведомление о нём с ценой и сроком осталось.
+      const owner = await signUp(app, 'CUSTOMER');
+      const spammer = await signUp(app, 'CONTRACTOR');
+      const admin = await signUpAdmin(app, prisma);
+      const jobId = await openJob(owner);
+      const spamBid = await bid(spammer, jobId);
+      const before = await http().get('/v1/me/notifications').set(owner.auth).expect(200);
+      expect(before.body.items).toHaveLength(1);
+      expect(before.body.items[0].data).toEqual({ price: 60_000, durationDays: 7 });
+      await http()
+        .post(`/v1/admin/bids/${spamBid}/hidden`)
+        .set(admin.auth)
+        .send({ hidden: true, reason: 'Реклама в отклике' })
+        .expect(200);
+      const after = await http().get('/v1/me/notifications').set(owner.auth).expect(200);
+      expect(after.body.items).toEqual([]);
+      const summary = await http().get('/v1/me/notifications/summary').set(owner.auth).expect(200);
+      expect(summary.body.unread).toBe(0);
+    });
+
     it('a hidden bid disappears for the owner and cannot be chosen; the chosen bid cannot be hidden', async () => {
       const owner = await signUp(app, 'CUSTOMER');
       const spammer = await signUp(app, 'CONTRACTOR');

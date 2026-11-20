@@ -21,6 +21,13 @@ describe('safeRedirectPath', () => {
     '/\t/evil.example',
     '/\n/evil.example',
     `/${'a'.repeat(600)}`,
+    // Точки нормализуются в «//»: адрес чужого сайта (ревью garantych-reviewer).
+    '/.//evil.example',
+    '/..//evil.example',
+    '/%2e//evil.example',
+    '/%2E%2E//evil.example',
+    '/x/..//evil.example',
+    '/./\\evil.example',
   ])('falls back for %j', (raw) => {
     expect(safeRedirectPath(raw)).toBe(DEFAULT_AFTER_LOGIN);
   });

@@ -15,7 +15,9 @@ concurrency:
 jobs:
   verify:
     name: Lint, typecheck, test, build
-    runs-on: ubuntu-latest
+    # Образ закреплён: ubuntu-latest стал 26.04, а Playwright 1.56 его не поддерживает
+    # (браузеры для сценариев не ставятся). Переход на 26.04 вместе с обновлением Playwright.
+    runs-on: ubuntu-24.04
     # Обычно ~10 минут; запас на две попытки установки браузеров при медленном зеркале Ubuntu.
     timeout-minutes: 35
 
@@ -221,7 +223,7 @@ jobs:
 
   docker:
     name: Docker stack (compose)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       COMPOSE: docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.local.yml -f deploy/docker-compose.ci.yml
@@ -277,6 +279,12 @@ jobs:
           fi
           bash scripts/image-secrets-check.sh agregator-api:local agregator-web:local
 
+      - name: Web process cannot rewrite its own code
+        run: |
+          # Ревью garantych-reviewer: код сайта принадлежал node — процесс мог переписать server.js.
+          docker run --rm --entrypoint sh agregator-web:local -c \
+            'test ! -w apps/web/server.js && test ! -w apps/web/.next/static && test -w apps/web/.next/cache'
+
       - name: Wait for web
         run: |
           for i in $(seq 1 60); do
@@ -324,7 +332,7 @@ jobs:
 
   drills:
     name: Disaster drills (backup, restore, broken release, rollback)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       COMPOSE: docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml
@@ -371,7 +379,7 @@ jobs:
 
   proxy:
     name: Docker stack behind Caddy (proxy)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       COMPOSE: docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.proxy.yml

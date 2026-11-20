@@ -6,6 +6,7 @@ import { UsageCounters } from '../analytics/usage';
 import { PrismaService } from '../prisma/prisma.service';
 import { draftDetails, draftItems, toJobDraftDto } from './draft.mapper';
 import { SaveDraftDto } from './dto/draft-input.dto';
+import { lockActiveUser } from '../users/lock-user';
 
 const NOT_FOUND = 'Черновик не найден';
 
@@ -37,7 +38,7 @@ export class DraftsService {
   async create(ownerId: string, dto: SaveDraftDto): Promise<JobDraftDto> {
     const draft = await this.prisma.$transaction(async (tx) => {
       // Блокировка строки пользователя: параллельные сохранения не превысят лимит черновиков.
-      await tx.$queryRaw`SELECT id FROM users WHERE id = ${ownerId} FOR UPDATE`;
+      await lockActiveUser(tx, ownerId);
       const count = await tx.jobDraft.count({ where: { ownerId } });
       if (count >= DRAFT_LIMITS.MAX_PER_USER) {
         throw new ConflictException(

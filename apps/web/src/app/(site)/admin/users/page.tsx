@@ -50,7 +50,8 @@ function UserRow({ user, returnTo }: { user: AdminUserDto; returnTo: string }) {
         Заказов: {user.jobs} · Откликов: {user.bids} · Открытых жалоб на него: {user.openReports}
       </p>
       <div className="mt-3 flex flex-wrap items-start gap-2">
-        {user.blocked ? null : (
+        {/* Администратору ссылку не выдать (API отвечает 409): новый пароль — командой на сервере. */}
+        {user.blocked || user.role === 'ADMIN' ? null : (
           <ResetLinkForm action={issueResetLinkFormAction} args={[user.id, returnTo]} />
         )}
         {user.role === 'ADMIN' ? null : (

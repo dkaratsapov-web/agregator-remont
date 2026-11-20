@@ -74,6 +74,21 @@ ALTER TABLE "notes" ADD CONSTRAINT "notes_job_id_fkey" FOREIGN KEY ("job_id") RE
 case_sql 'new table: foreign key without ON DELETE' 2 'CREATE TABLE "notes" ("id" TEXT NOT NULL, "job_id" TEXT REFERENCES "jobs"("id"));'
 case_sql 'new table: foreign key with SET NULL' 0 'CREATE TABLE "notes" ("id" TEXT NOT NULL, "job_id" TEXT);
 ALTER TABLE "notes" ADD CONSTRAINT "notes_job_id_fkey" FOREIGN KEY ("job_id") REFERENCES "jobs"("id") ON DELETE SET NULL ON UPDATE CASCADE;'
+# Лазейки белого списка (ревью garantych-reviewer): «новая» таблица с именем существующей
+# (IF NOT EXISTS, другая схема, другой регистр) не делает её изменения безопасными; внешний
+# ключ без списка столбцов и встроенный в ADD COLUMN существующей таблицы тоже ловится.
+case_sql 'CREATE TABLE IF NOT EXISTS of an existing table, then DROP COLUMN' 2 'CREATE TABLE IF NOT EXISTS "jobs" ("id" TEXT);
+ALTER TABLE "jobs" DROP COLUMN "title";'
+case_sql 'table of the same name in another schema, then DROP COLUMN' 2 'CREATE TABLE "audit"."jobs" ("id" TEXT);
+ALTER TABLE "jobs" DROP COLUMN "title";'
+case_sql 'quoted table of another case, then DROP COLUMN' 2 'CREATE TABLE "Jobs" ("id" TEXT);
+ALTER TABLE "jobs" DROP COLUMN "title";'
+case_sql 'new table: foreign key without a column list' 2 'CREATE TABLE "notes" ("id" TEXT NOT NULL, "job_id" TEXT REFERENCES "jobs");'
+case_sql 'existing table: new column with a foreign key' 2 'ALTER TABLE "jobs" ADD COLUMN "parent_id" TEXT REFERENCES "jobs"("id");'
+case_sql 'existing table: new column with a foreign key ON DELETE SET NULL' 0 'ALTER TABLE "jobs" ADD COLUMN "parent_id" TEXT REFERENCES "jobs"("id") ON DELETE SET NULL;'
+case_sql 'new table in another case is still new: its foreign key and index are fine' 0 'CREATE TABLE "Notes" ("id" TEXT NOT NULL, "job_id" TEXT);
+ALTER TABLE "Notes" ADD CONSTRAINT "notes_job_fkey" FOREIGN KEY ("job_id") REFERENCES "jobs"("id") ON DELETE CASCADE;
+CREATE UNIQUE INDEX "notes_job_key" ON "Notes"("job_id");'
 
 # Пометка действует только на оператор сразу после неё.
 case_sql 'marker on a safe statement does not cover a dangerous one' 2 '-- rollback-safe: столбец новый

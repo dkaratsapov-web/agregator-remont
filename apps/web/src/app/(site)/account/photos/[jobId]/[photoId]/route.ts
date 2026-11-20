@@ -5,8 +5,9 @@ import { getSessionToken } from '@/lib/session';
 
 /**
  * Фото к сообщению или сдаче этапа: токен из cookie сессии, доступ проверяет API (стороны
- * сделки и администратор, остальным 404). Содержимое по адресу не меняется, но адрес открывает
- * только участник — поэтому кеш только в браузере (private) и не дольше суток.
+ * сделки и администратор, остальным 404). Кеш только в браузере и с проверкой каждый раз
+ * (private, no-cache): после выхода из аккаунта на общем компьютере фото чужой квартиры не
+ * откроется из кеша, как и фото профиля.
  */
 export async function GET(
   request: Request,
@@ -26,7 +27,7 @@ export async function GET(
     return new Response(image, {
       headers: {
         'Content-Type': 'image/webp',
-        'Cache-Control': 'private, max-age=86400',
+        'Cache-Control': 'private, no-cache',
         'X-Content-Type-Options': 'nosniff',
       },
     });

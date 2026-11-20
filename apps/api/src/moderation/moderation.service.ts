@@ -189,10 +189,12 @@ export class ModerationService {
       const was = locked[0].blocked_at !== null;
       if (was === dto.blocked) return { id, blocked: was };
       await tx.user.update({ where: { id }, data: { blockedAt: dto.blocked ? new Date() : null } });
-      // Блокировка завершает все сеансы сразу: следующий запрос — уже без входа.
+      // Блокировка завершает все сеансы сразу: следующий запрос — уже без входа. И гасит
+      // выданные ссылки сброса пароля: после разблокировки старая ссылка не сработает.
       const revoked = dto.blocked
         ? (await tx.session.deleteMany({ where: { userId: id } })).count
         : 0;
+      if (dto.blocked) await tx.passwordReset.deleteMany({ where: { userId: id, usedAt: null } });
       await writeAudit(tx, {
         actorId: adminId,
         action: dto.blocked ? 'USER_BLOCKED' : 'USER_UNBLOCKED',
@@ -240,8 +242,15 @@ export class ModerationService {
       }
       const data = { hiddenAt: dto.hidden ? new Date() : null };
       if (entityType === 'job') await tx.job.update({ where: { id }, data });
-      else if (entityType === 'bid') await tx.bid.update({ where: { id }, data });
-      else if (entityType === 'review') await tx.review.update({ where: { id }, data });
+      else if (entityType === 'bid') {
+        await tx.bid.update({ where: { id }, data });
+        // Скрытый отклик заказчик не видит — и уведомление о нём с ценой и сроком тоже.
+        if (dto.hidden) {
+          await tx.notification.deleteMany({
+            where: { kind: 'BID_RECEIVED', data: { path: ['bidId'], equals: id } },
+          });
+        }
+      } else if (entityType === 'review') await tx.review.update({ where: { id }, data });
       else await tx.jobMessage.update({ where: { id }, data });
       await writeAudit(tx, {
         actorId: adminId,

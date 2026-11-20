@@ -1,5 +1,7 @@
 # Старт Claude Code: единственный разработчик
 
+Текущее состояние работы, правила владельца и открытые решения: `docs/HANDOFF.md`.
+
 Проект: https://github.com/dkaratsapov-web/agregator-remont
 
 ## Роли

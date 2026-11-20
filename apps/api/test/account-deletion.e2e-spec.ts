@@ -184,6 +184,66 @@ describe('Account export and deletion (e2e)', () => {
         .body as AccountExportDto;
       expect(written.reviewsWritten).toMatchObject([{ jobId, rating: 5 }]);
     });
+
+    it('the deal: plan with stages for both sides, own photos and consents to share contacts', async () => {
+      // Ревью garantych-reviewer: план, этапы, фото этапов и согласия на обмен контактами
+      // хранятся о человеке, но в выгрузку не попадали.
+      const customer = await register('CUSTOMER');
+      const contractor = await register('CONTRACTOR');
+      const jobId = await openJob(customer);
+      const bidId = await bid(contractor, jobId);
+      await accept(customer, jobId, bidId);
+      await http()
+        .put(`/v1/jobs/${jobId}/plan`)
+        .set(contractor.auth)
+        .send({
+          version: 0,
+          sequential: true,
+          stages: [
+            { title: 'Демонтаж', description: 'Старая плитка', durationDays: 2 },
+            { title: 'Плитка', description: '', durationDays: 7 },
+          ],
+        })
+        .expect(200);
+      await http().put(`/v1/jobs/${jobId}/contacts`).set(contractor.auth).expect(200);
+      const [stage] = await prisma.jobStage.findMany({ orderBy: { position: 'asc' }, take: 1 });
+      await prisma.jobPhoto.create({
+        data: {
+          jobId,
+          contractorId: contractor.id,
+          uploaderId: contractor.id,
+          stageId: stage.id,
+          width: 1600,
+          height: 1200,
+          bytes: 240_000,
+        },
+      });
+
+      const mine = (await http().get('/v1/me/export').set(contractor.auth).expect(200))
+        .body as AccountExportDto;
+      const plan = {
+        jobId,
+        author: 'CONTRACTOR',
+        status: 'DRAFT',
+        stages: [
+          { position: 1, title: 'Демонтаж', description: 'Старая плитка', photos: 1 },
+          { position: 2, title: 'Плитка', durationDays: 7, photos: 0 },
+        ],
+      };
+      expect(mine.plans).toMatchObject([plan]);
+      expect(mine.photos).toMatchObject([
+        { jobId, stageId: stage.id, width: 1600, bytes: 240_000 },
+      ]);
+      expect(mine.contactShares).toMatchObject([{ jobId }]);
+
+      // Заказчик видит тот же план своего заказа; фото и согласие — не его.
+      const theirs = (await http().get('/v1/me/export').set(customer.auth).expect(200))
+        .body as AccountExportDto;
+      expect(theirs.plans).toMatchObject([plan]);
+      expect(theirs.photos).toEqual([]);
+      expect(theirs.contactShares).toEqual([]);
+      expect(JSON.stringify(theirs)).not.toContain(contractor.id);
+    });
   });
 
   describe('delete', () => {
@@ -338,6 +398,44 @@ describe('Account export and deletion (e2e)', () => {
         .set(admin.auth)
         .expect(409);
       expect(reset.body.code).toBe('ACCOUNT_DELETED');
+    });
+
+    it('a write that started before the deletion does not land after it (401, nothing written)', async () => {
+      // Ревью garantych-reviewer: запрос прошёл проверку сессии до удаления, ждал строку
+      // пользователя и записывал после: телефон и город возвращались в удалённый аккаунт, а
+      // новый заказ появлялся в каталоге.
+      const customer = await register('CUSTOMER');
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      // Строку держит «пауза»: удаление и записи встают в очередь за ней в этом порядке.
+      const gate = prisma.$transaction(
+        async (tx) => {
+          await tx.$queryRaw`SELECT id FROM users WHERE id = ${customer.id} FOR UPDATE`;
+          await held;
+        },
+        { timeout: 20_000 },
+      );
+      const wait = () => new Promise((resolve) => setTimeout(resolve, 400));
+      const deletion = remove(customer).then((r) => r);
+      await wait();
+      const patch = http()
+        .patch('/v1/me')
+        .set(customer.auth)
+        .send({ phone: '+7 900 123-45-67', city: 'Казань' })
+        .then((r) => r);
+      const job = http()
+        .post('/v1/me/jobs')
+        .set(customer.auth)
+        .send(jobBody)
+        .then((r) => r);
+      await wait();
+      release();
+      await gate;
+      expect((await deletion).status).toBe(204);
+      expect([(await patch).status, (await job).status]).toEqual([401, 401]);
+      const row = await prisma.user.findUniqueOrThrow({ where: { id: customer.id } });
+      expect({ phone: row.phone, city: row.city }).toEqual({ phone: null, city: null });
+      expect(await prisma.job.count({ where: { ownerId: customer.id, status: 'OPEN' } })).toBe(0);
     });
 
     it('two deletions at once: one succeeds, the other is refused by the ended session', async () => {

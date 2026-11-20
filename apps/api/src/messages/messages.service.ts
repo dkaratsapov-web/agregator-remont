@@ -62,6 +62,9 @@ export class MessagesService {
     dto: SendMessageDto,
     files: UploadedPhoto[] | undefined,
   ): Promise<JobMessagesDto> {
+    // Перекодирование фото — тяжёлая работа: сначала доступ к сделке (без блокировки; под
+    // блокировкой он проверяется ещё раз в транзакции).
+    if (files?.length) await findDeal(this.prisma, userId, jobId, false, NO_DEAL);
     const photos = await this.photos.prepare(files);
     if (!dto.body && photos.length === 0) {
       throw new BadRequestException('Напишите сообщение или приложите фото');

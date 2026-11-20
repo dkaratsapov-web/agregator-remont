@@ -26,6 +26,7 @@ import { CreateJobDto, UpdateJobDto } from './dto/job-input.dto';
 import { readJobDetails, readJobItems } from '../jobs/job.mapper';
 import { toOwnJobDto } from './own-job.mapper';
 import { ApiError, QuotaExceeded } from '../common/api-error';
+import { lockActiveUser } from '../users/lock-user';
 
 const JOB_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 /** Повторная публикация того же черновика (ответ 409; web показывает его как есть). */
@@ -111,7 +112,7 @@ export class MyJobsService {
     const job = await this.prisma.$transaction(async (tx) => {
       // Блокировка строки пользователя сериализует создание заказов одним пользователем:
       // параллельные запросы считают квоту по очереди и не могут превысить её.
-      await tx.$queryRaw`SELECT id FROM users WHERE id = ${ownerId} FOR UPDATE`;
+      await lockActiveUser(tx, ownerId);
       // Повтор того же запроса (двойной клик, повтор после обрыва связи) с тем же ключом формы:
       // возвращается уже созданный заказ, второй не создаётся. Под блокировкой пользователя
       // параллельные повторы идут по очереди и находят первый (AUDIT_FINDINGS MVP-1).

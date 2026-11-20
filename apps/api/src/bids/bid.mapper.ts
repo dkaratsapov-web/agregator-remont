@@ -1,6 +1,7 @@
 import type { BidDto, ContractorRatingDto, JobBidDto, MyBidDto } from '@agregator/shared';
 import type { Bid, ContractorProfile, Job, User } from '@prisma/client';
 import { toProfileDto } from '../contractors/profile.mapper';
+import { visibleJobTitle } from '../moderation/hidden-title';
 
 export function toBidDto(bid: Bid): BidDto {
   return {
@@ -21,7 +22,8 @@ export function toMyBidDto(bid: Bid & { job: Job }): MyBidDto {
     ...toBidDto(bid),
     job: {
       id: bid.job.id,
-      title: bid.job.title,
+      // Мастер не владелец заказа: название скрытого заказа ему не показывается.
+      title: visibleJobTitle(bid.job, bid.contractorId),
       city: bid.job.city,
       status: bid.job.status,
       closeOutcome: bid.job.closeOutcome,

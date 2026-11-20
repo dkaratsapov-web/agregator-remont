@@ -30,20 +30,29 @@ export function parseCategory(raw: RawParam): JobCategory | undefined {
   return isJobCategory(value) ? value : undefined;
 }
 
+/**
+ * Длина строки так, как её считает проверка API (class-validator): символ из двух половинок
+ * (эмодзи) — один, селекторы начертания FE0E/FE0F не в счёт. Иначе сайт пропустит строку, API
+ * ответит 400, и вместо каталога будет «сервис недоступен».
+ */
+function apiLength(value: string): number {
+  let length = 0;
+  for (const char of value) if (char !== '\uFE0E' && char !== '\uFE0F') length += 1;
+  return length;
+}
+
 /** Текст поиска: обрезка пробелов; слишком короткий или длинный запрос игнорируется (API его отклонит). */
 export function parseQuery(raw: RawParam): string | undefined {
   const value = first(raw)?.trim();
-  if (!value || value.length < JOB_SEARCH.QUERY_MIN || value.length > JOB_SEARCH.QUERY_MAX) {
-    return undefined;
-  }
+  const length = value ? apiLength(value) : 0;
+  if (!value || length < JOB_SEARCH.QUERY_MIN || length > JOB_SEARCH.QUERY_MAX) return undefined;
   return value;
 }
 
 export function parseCity(raw: RawParam): string | undefined {
   const value = first(raw)?.trim();
-  if (!value || value.length < JOB_LIMITS.CITY_MIN || value.length > JOB_LIMITS.CITY_MAX) {
-    return undefined;
-  }
+  const length = value ? apiLength(value) : 0;
+  if (!value || length < JOB_LIMITS.CITY_MIN || length > JOB_LIMITS.CITY_MAX) return undefined;
   return value;
 }
 
